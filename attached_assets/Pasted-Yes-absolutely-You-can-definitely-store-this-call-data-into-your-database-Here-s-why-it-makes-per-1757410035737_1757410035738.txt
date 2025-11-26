@@ -1,0 +1,53 @@
+Yes, absolutely! You can definitely store this call data into your database. Here's why it makes perfect sense and how it would work:
+
+Why Store Call Data in DB?
+1. Performance Benefits
+Much faster loading - No waiting for Bland.ai API calls every time
+No API rate limits - Currently you're making multiple API calls per user per page load
+Instant pagination - Database queries are much faster than external API calls
+2. Better User Experience
+Faster call history page loads - From seconds to milliseconds
+Offline capability - Data available even if Bland.ai API is down
+Better search and filtering - Database queries are more flexible than API filters
+3. Enhanced Features
+Historical data preservation - Keep data even if Bland.ai changes/deletes it
+Custom analytics - Run complex queries for reports and insights
+Cost tracking integration - Link calls directly to your call_costs table
+How It Would Work:
+Current Flow:
+User visits call history → API calls Bland.ai → Filter by user's numbers → Display
+New Flow:
+User visits call history → Query local DB → Display (much faster!)
+Data Sync Strategy:
+You have a few options:
+
+Real-time sync via webhooks - If Bland.ai supports call completion webhooks
+Periodic sync job - Fetch new calls every few minutes/hours
+Hybrid approach - Store calls + periodic sync to catch any missed ones
+Database Table Structure:
+You'd need a calls table like:
+
+CREATE TABLE calls (
+  id SERIAL PRIMARY KEY,
+  call_id VARCHAR UNIQUE NOT NULL, -- Bland.ai's call ID
+  user_id UUID NOT NULL REFERENCES users(id),
+  to_number VARCHAR NOT NULL,
+  from_number VARCHAR NOT NULL,
+  duration_seconds INTEGER,
+  status VARCHAR,
+  created_at TIMESTAMP,
+  recording_url TEXT,
+  transcript TEXT,
+  summary TEXT,
+  -- Link to cost tracking
+  cost_cents INTEGER,
+  FOREIGN KEY (user_id) REFERENCES users(id)
+);
+Integration with Your Existing System:
+Since you already have the call_costs table and wallet system, you could:
+
+Store the call when it happens
+Calculate and deduct the cost
+Link the call record to the cost record
+Have a complete audit trail
+This would give you much better performance while maintaining all the functionality you currently have. The initial sync to populate historical data would be a one-time process

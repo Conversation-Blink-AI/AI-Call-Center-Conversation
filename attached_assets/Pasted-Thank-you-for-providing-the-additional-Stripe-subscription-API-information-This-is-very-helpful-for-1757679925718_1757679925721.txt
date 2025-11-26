@@ -1,0 +1,42 @@
+Thank you for providing the additional Stripe subscription API information. This is very helpful for understanding how to implement the subscription-based phone number system.
+
+Based on the Stripe CLI commands you've shared, here's how they would translate to your implementation:
+
+Key Implementation Points for Your Phone Number Subscription System
+1. Customer-Subscription Linking
+The commands show exactly how to link customers to subscriptions:
+
+Use your existing getOrCreateStripeCustomer() function to get the customer ID
+Create subscriptions with that customer ID
+Use checkout sessions in subscription mode for the UI flow
+2. Subscription Creation Flow
+For your phone number purchase flow, you'd use:
+
+stripe checkout.sessions create \
+  --customer=cus_123ABC \
+  --line_items[0][price]=price_456DEF \
+  --line_items[0][quantity]=1 \
+  --mode=subscription
+This maps to your /api/payments/stripe/create-checkout-session endpoint, but modified for subscription mode instead of payment mode.
+
+3. Trial Periods (Optional)
+The trial command shows how you could offer free trials:
+
+stripe subscriptions create \
+  --customer=cus_123ABC \
+  --items[0][price]=price_456DEF \
+  --trial_period_days=14
+This could be useful for letting users test phone numbers before charging.
+
+4. Subscription Management
+The stripe subscriptions list --customer=cus_123ABC command is perfect for your billing page to show all active subscriptions for a user.
+
+5. Integration with Your Current Code
+Your existing webhook handler already processes checkout.session.completed events. You'd need to:
+
+Modify it to handle subscription mode sessions
+Add handlers for subscription lifecycle events (customer.subscription.created, invoice.payment_succeeded, etc.)
+Link the subscription to the phone number in your database
+The beauty of this approach is that your existing Stripe customer management (via getOrCreateStripeCustomer.ts) is already set up perfectly for this subscription model. You just need to shift from one-time payments to recurring subscriptions.
+
+Would you like me to explain any specific part of how these Stripe APIs would integrate with your current codebase structure?

@@ -1,0 +1,46 @@
+I understand the requirement now! Let me investigate the current implementation to understand what's happening:
+
+Current Situation Analysis
+Looking at the codebase, I can see that:
+
+/dashboard/call-history page is fetching call data directly from Bland.ai API in real-time using the useUserCallData hook
+Database tables exist for storing call data (the calls table in scripts/create-postgres-tables.sql)
+Sync services are implemented but there seems to be a disconnect
+Key Issues Identified
+1. Data Flow Problem
+The /dashboard/call-history page uses useUserCallData hook which calls Bland.ai API directly
+The sync service exists but the call history page is NOT using the synced database data
+Instead, it's fetching fresh data from Bland.ai every time
+2. Sync Service Implementation Gap
+Looking at services/call-sync-service.ts, I see:
+
+✅ fetchCallsFromBland() - fetches from API
+✅ syncCallToDatabase() - saves to database
+✅ syncCallsForUser() - syncs user's calls
+⚠️ But the call history page doesn't use this synced data
+3. API vs Database Inconsistency
+app/api/calls/sync/route.ts has sync endpoints
+But app/dashboard/call-history/page.tsx bypasses the database entirely
+The page should be reading from the synced database, not making live API calls
+Root Cause
+The call history page is designed to hit Bland.ai API directly instead of reading from the synced database. This means:
+
+No persistence of call data
+Slower page loads
+API rate limits could be hit
+No offline capability
+Loss of data if Bland.ai is down
+Required Solution
+We need to:
+
+Modify the call history page to read from the database instead of Bland.ai API
+Ensure the sync service is properly populating the database
+Create database queries that match the current API response format
+Add automatic sync so data stays current
+The end result should be:
+
+Call history page shows the same data (but from database)
+Faster page loads
+Data persists even if Bland.ai is temporarily unavailable
+Background sync keeps data fresh
+Do you want me to proceed with implementing these fixes to make the call history page use the synced database data instead of live API calls?

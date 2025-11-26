@@ -1,0 +1,62 @@
+Based on your preference for sync-based billing over webhook-based billing, I'll explain the approach and then help you implement it.
+
+📊 Sync-Based Billing Strategy
+Sync-based billing means:
+
+Periodically fetch calls from Bland AI API
+Sync them to your database
+Automatically bill unbilled calls during the sync process
+You already have most of the infrastructure in place! Here's how it works:
+
+Current Sync Flow:
+User triggers sync (manual/scheduled)
+    ↓
+CallSyncService.syncCallsForUser()
+    ↓
+Fetch calls from Bland AI API
+    ↓
+Store in database (cost_cents = NULL)
+    ↓
+CallBillingService.processPendingBills()
+    ↓
+Bill all unbilled calls
+    ↓
+Wallet deducted, transactions recorded
+Key Components Already Built:
+CallSyncService - Fetches calls from Bland AI
+CallBillingService - Bills unbilled calls automatically
+/api/calls/sync - Manual sync endpoint
+Auto-billing integration - Synced calls trigger billing automatically
+How to Use Sync-Based Billing:
+Option 1: Manual Sync (Current)
+
+// Call this endpoint to sync and bill
+POST /api/calls/sync
+{
+  "userId": "user_123"
+}
+Option 2: Scheduled Sync (Recommended)
+I can help you set up a cron job or scheduled task to auto-sync every X minutes/hours.
+
+Option 3: On-Demand Sync
+Add a "Sync Calls" button in your dashboard that users can click.
+
+🎯 Recommended Implementation
+Since you prefer sync-based billing, I recommend disabling the webhook and using scheduled sync instead. Here's what I suggest:
+
+Step 1: Disable Webhook (Optional)
+The webhook at /api/webhooks/bland/route.ts won't be needed.
+
+Step 2: Add Scheduled Sync
+I'll create a new API endpoint that runs on a schedule to sync calls for all users.
+
+Step 3: Add Manual Sync Button
+Add a "Sync & Bill Calls" button to your dashboard for manual syncing.
+
+Would you like me to:
+
+Create a scheduled sync endpoint that runs every X minutes/hours?
+Add a manual sync button to your dashboard?
+Disable the webhook-based billing entirely?
+Keep both options (webhook + sync) and let you choose per use case?
+Let me know your preference, and I'll implement it! 🚀

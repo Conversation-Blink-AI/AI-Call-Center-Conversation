@@ -1,0 +1,65 @@
+I understand your requirement! You want to create an API endpoint called getPurchaseNumber that takes an email ID as a parameter and returns all purchased phone numbers for that user.
+
+Let me outline the plan of action:
+
+Plan of Action
+1. API Endpoint Structure
+Route: /api/getPurchaseNumber
+Method: GET
+Query Parameter: email (the user's email address)
+Response: JSON object containing all purchased numbers for that email
+2. Database Query Strategy
+Looking at your existing codebase, I can see you're using PostgreSQL with a phone_numbers table. The query flow would be:
+
+Find the user_id from the users table using the provided email
+Query the phone_numbers table for all records matching that user_id
+Return formatted phone number data
+3. Implementation Approach
+Based on your existing patterns in files like:
+
+app/api/user/phone-numbers/route.ts
+app/api/bland-ai/debug/numbers/route.ts
+The implementation would:
+
+Input Validation: Verify email parameter is provided
+User Lookup: Find user by email in the database
+Phone Numbers Query: Get all phone numbers for that user
+Data Formatting: Return consistent response format
+Error Handling: Handle cases where user doesn't exist or has no numbers
+4. Database Schema Reference
+From your existing code, the relevant tables are:
+
+users table: Contains id, email, etc.
+phone_numbers table: Contains user_id, phone_number, location, purchased_at, etc.
+5. Response Format
+The response would follow your existing pattern:
+
+{
+  "success": true,
+  "email": "user@example.com",
+  "phoneNumbers": [
+    {
+      "id": "...",
+      "number": "+1234567890",
+      "location": "San Francisco, CA",
+      "purchased_at": "...",
+      "status": "active"
+    }
+  ],
+  "count": 1
+}
+6. Authentication Considerations
+Should this endpoint require authentication?
+Or should it be publicly accessible with just the email parameter?
+Based on your existing patterns, I'd recommend adding some form of validation
+7. File Location
+I'd suggest creating: app/api/getPurchaseNumber/route.ts
+
+This follows your existing API structure and would integrate seamlessly with your current authentication and database patterns.
+
+Questions before implementation:
+
+Do you want this endpoint to require authentication, or should it be accessible with just the email?
+Should we include any additional filters (like status, date range)?
+Any specific error handling requirements?
+Would you like me to proceed with implementing this endpoint based on this plan?

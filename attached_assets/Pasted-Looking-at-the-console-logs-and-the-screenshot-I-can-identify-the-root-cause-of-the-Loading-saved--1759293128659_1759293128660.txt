@@ -1,0 +1,43 @@
+Looking at the console logs and the screenshot, I can identify the root cause of the "Loading saved pathway..." issue on the /dashboard/pathway/14155321516 page.
+
+Root Cause Analysis
+Primary Issue: Infinite Loop in API Calls
+
+From the console output, I can see that the same API endpoint /api/pathways/load-flowchart?pathwayId=5b9cbbed-71ac-424a-bed9-51441bdec107 is being called repeatedly every ~1.8 seconds in an infinite loop.
+
+Contributing Factors:
+
+useEffect Dependency Issue: In components/flowchart-builder/flowchart-canvas.tsx, there's likely a useEffect that's constantly re-triggering because of unstable dependencies or missing dependency array items.
+
+State Update Loop: The flowchart canvas component is probably updating state that causes the component to re-render, which triggers the useEffect again, creating an infinite loop.
+
+Missing Dependency Array or Incorrect Dependencies: The useEffect that loads the saved flowchart might be missing proper dependencies or has dependencies that change on every render.
+
+Specific Problem Areas:
+
+Looking at the flowchart canvas code, the issue is likely in this useEffect:
+
+useEffect(() => {
+  if (!pathwayInfo?.pathway_id) return
+  const loadSavedFlowchart = async () => {
+    // ... API call logic
+  }
+  loadSavedFlowchart()
+}, [pathwayInfo?.pathway_id, initialNodes, initialEdges, setNodes, setEdges])
+Potential Issues:
+
+setNodes and setEdges are functions that might be recreated on every render
+initialNodes and initialEdges might be objects that are recreated on every render
+The component might be re-mounting repeatedly
+Secondary Issues:
+
+The loading state (isLoadingFlowchart) might not be properly managed
+The API response might be causing state updates that trigger re-renders
+The parent component might be passing unstable props
+Impact:
+
+Excessive API calls (every 1.8 seconds)
+Poor user experience with constant "Loading saved pathway..." message
+Potential performance issues and increased server load
+Database connection pool exhaustion
+The fix would involve stabilizing the useEffect dependencies, properly managing the loading state, and ensuring the component doesn't re-mount unnecessarily.

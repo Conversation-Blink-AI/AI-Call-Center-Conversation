@@ -1,0 +1,62 @@
+Looking at your current architecture and the issue you're experiencing, let me explain how the call logging system currently works and what needs to be modified.
+
+Current Architecture Analysis
+1. Call Data Sources and Display Pages
+Dashboard/Call-History Page (/dashboard/call-history):
+
+Uses useUserCallData hook which fetches data directly from Bland.ai API
+Shows real-time call logs from Bland.ai's system
+Has auto-sync functionality that syncs fetched calls to your database
+This is why you see the new call here immediately
+Dashboard/Calls Page (/dashboard/calls):
+
+Fetches data from your local database only via /api/calls/database
+Shows call statistics and database-stored calls
+Has a manual "Sync Now" button that calls /api/calls/sync
+2. Database Sync Issues
+From the console logs, I can see there's a critical database schema issue:
+
+Database query error: error: column "started_at" of relation "calls" does not exist
+The sync is failing because:
+
+The database schema expects start_time and end_time columns
+But the sync service is trying to insert into started_at and ended_at columns
+This mismatch causes all sync operations to fail (0 calls synced)
+3. Auto-Billing Flow
+Looking at the CallDatabaseService.syncCallsForUser method, there is auto-billing logic that should:
+
+Sync completed calls with duration > 0
+Automatically bill them and deduct from wallet
+But this fails due to the database schema mismatch
+What Needs to Be Modified
+1. Fix Database Schema Mismatch
+The CallDatabaseService has inconsistent column names:
+
+The service expects started_at/ended_at in the INSERT query
+But the database schema uses start_time/end_time
+2. Real-time Call Sync Architecture
+To achieve the desired behavior where calls appear immediately in /dashboard/calls:
+
+Option A: Webhook-based Real-time Sync
+
+Set up Bland.ai webhook to notify your system when calls complete
+Automatically sync and bill calls in real-time
+Refresh the calls page data automatically
+Option B: Polling-based Auto-refresh
+
+Add auto-refresh functionality to /dashboard/calls
+Periodically fetch new calls and sync them
+Update the UI when new calls are detected
+3. Billing Integration
+The auto-billing logic exists but fails due to the sync issue. Once fixed:
+
+Completed calls with duration > 0 will be automatically billed
+Wallet balance will be debited immediately
+User will see updated balance and call costs in real-time
+4. UI Consistency
+Both pages should show the same data source (database) with:
+
+Real-time sync keeping database up-to-date
+Consistent call display and statistics
+Immediate reflection of billing changes
+The root cause is the database schema mismatch preventing successful sync operations. Once that's fixed, the auto-billing and real-time updates should work as expected.

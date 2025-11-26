@@ -1,0 +1,46 @@
+Looking at your current architecture, yes, it's absolutely possible to trigger the sync without visiting the call-history page first. Here are several approaches we can implement:
+
+Current Issue Analysis
+Right now, the billing automation only happens when:
+
+User visits /dashboard/call-history
+This triggers the useUserCallData hook
+The hook fetches from Bland.ai API and auto-syncs to database
+During sync, the billing service runs and deducts from wallet
+Then /dashboard/calls shows updated data
+Possible Solutions
+1. Auto-Sync on Dashboard/Calls Page Load
+Add the same auto-sync logic that exists in useUserCallData hook directly to the /dashboard/calls page
+This would fetch from Bland.ai API and sync to database whenever the calls page loads
+Billing would happen automatically during this sync
+2. Background Sync with Interval
+Implement a background service that runs every few minutes
+Could use setInterval or a server-side cron-like solution
+Automatically syncs new calls and handles billing without user interaction
+3. Webhook-Based Real-Time Sync
+Use Bland.ai webhooks (if available) to get notified of new calls immediately
+When webhook fires, automatically sync the new call and bill it
+Most real-time approach
+4. Manual Sync Button Enhancement
+Keep the current sync button on /dashboard/calls but make it more prominent
+Add auto-sync on page load as a fallback
+Give users control while ensuring data stays fresh
+5. Hybrid Approach
+Auto-sync on both /dashboard/calls and /dashboard/call-history page loads
+Add periodic background sync (every 30 seconds) while user is on either page
+Use Bland.ai webhooks if available for instant updates
+Recommended Solution
+I'd recommend Solution #1 + #5 (Hybrid) because:
+
+Immediate: Auto-sync when calls page loads
+Continuous: Periodic sync while user stays on the page
+User-Friendly: No extra steps required from user
+Reliable: Multiple sync triggers ensure data consistency
+Implementation Points
+The changes would involve:
+
+Adding auto-sync logic to /dashboard/calls/page.tsx
+Modifying the existing sync functions to work from multiple entry points
+Ensuring the billing service properly handles duplicate call prevention
+Adding periodic sync intervals while user is active on the page
+Would you like me to implement any of these approaches?

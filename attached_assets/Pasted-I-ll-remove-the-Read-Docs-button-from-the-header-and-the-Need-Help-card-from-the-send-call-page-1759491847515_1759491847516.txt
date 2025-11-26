@@ -1,0 +1,98 @@
+I'll remove the "Read Docs" button from the header and the "Need Help?" card from the send call page.
+
+app/dashboard/sendcall/page.tsx
+Checkpoint made
+Remove Read Docs button and Need Help card
+7 hours ago
+•
+ok so here is the issue we are facing right now .
+
+in the send call even when the user select the Voice from the Drop down list it still show "select a voice".
+we are also not able to send the voice ID for the perticula voice tha we are selecting .
+we are getting all the details of that voice in the API aas i can see in the newtwork tab of the inspection mode .
+DONT MAKE ANY CHANGES now first i want you to make a diagnos to the code of the send call page and check "/dashboard/sendcall"
+
+SH
+
+shubhamt8
+Assistant
+just now
+I'll diagnose the voice selection issue on the /dashboard/sendcall page. Let me analyze the code from the sendcall page.
+
+Diagnosis of Voice Selection Issues
+After analyzing the code, I've identified three critical problems:
+
+Problem 1: Voice Selection Not Displaying Selected Voice
+Looking at the voice selection code around line 360:
+
+<Select 
+  value={callData.voice || ""} 
+  onValueChange={(value) => {
+    console.log("Voice selected:", value)
+    updateCallData('voice', value)
+  }}
+>
+  <SelectTrigger className="w-full" id="voice">
+    <SelectValue placeholder="Select a voice" />
+  </SelectTrigger>
+The Issue: The SelectValue component doesn't have a way to display the selected voice name. It only shows the placeholder when no value is selected. Even when callData.voice has a value (the voice ID), the SelectValue component doesn't know how to render it because:
+
+The value is the voice_id (a UUID)
+But there's no mapping to display the human-readable voice.name
+Problem 2: Default Voice Setting Logic Flaw
+Looking at lines 148-156:
+
+if (voicesData.voices?.length > 0 && !callData.voice) {
+  const raviVoice = voicesData.voices.find((v: Voice) => v.name === "ravi")
+  const indianVoice = voicesData.voices.find((v: Voice) => v.name.toLowerCase().includes("indian"))
+  const defaultVoice = raviVoice?.voice_id || indianVoice?.voice_id || voicesData.voices[0].voice_id
+  console.log("Setting default voice:", defaultVoice, "from voice:", raviVoice?.name || indianVoice?.name || voicesData.voices[0].name)
+  updateCallData('voice', defaultVoice)
+}
+The Issue: According to the console logs in your webview:
+
+["Setting default voice:",null,"from voice:","ravi"]
+This shows that raviVoice?.voice_id is null even though raviVoice?.name is "ravi". This means the voice object structure is different than expected.
+
+Looking at the Voice interface (lines 19-25):
+
+interface Voice {
+  voice_id: string
+  name: string
+  preview_url?: string
+  id: string; // Added for key
+  description?: string; // Added for display
+}
+But from the API response in voices route, the actual structure uses id not voice_id:
+
+interface BlandVoice {
+  id: string
+  name: string
+  description: string
+  public: boolean
+  tags: string[]
+}
+Problem 3: Voice ID Field Mismatch
+The code is looking for voice.voice_id in multiple places:
+
+Line 153: raviVoice?.voice_id
+Line 370: value={voice.voice_id}
+Line 378: Checking voices.find(v => v.voice_id === callData.voice)
+But the actual API returns voices with id field, not voice_id field. This is confirmed by the network tab showing the voice data structure.
+
+Summary of Root Causes:
+Field Name Mismatch: The code expects voice_id but the API returns id
+SelectValue Display: The Select component can't display the selected voice name because it only has the ID
+Default Voice Logic: The default voice selection is failing because it's looking for the wrong field name (voice_id instead of id)
+The Fix Required:
+The code needs to be updated to:
+
+Use id consistently instead of voice_id when accessing voice data
+Map the selected id to the voice name for display in the SelectValue
+Fix the default voice selection logic to use the correct field
+This explains why:
+
+The dropdown shows "Select a voice" even after selection (no name mapping)
+The voice ID isn't being sent properly (field mismatch)
+The console shows null for the default voice ID (wrong field access)
+Would you like me to proceed with the fixes?

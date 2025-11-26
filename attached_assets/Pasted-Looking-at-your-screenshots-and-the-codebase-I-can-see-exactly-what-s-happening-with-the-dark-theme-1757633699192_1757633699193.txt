@@ -1,0 +1,58 @@
+Looking at your screenshots and the codebase, I can see exactly what's happening with the dark theme implementation. Let me analyze the UI components and theme structure:
+
+Current Theme Analysis
+Theme Provider Setup
+You have next-themes properly configured with a ThemeProvider component, and the profile page correctly uses useTheme hook.
+
+CSS Variables Structure
+Looking at your CSS files, I can see you have two different CSS variable systems:
+
+styles/globals.css - Uses custom sidebar variables and different color schemes
+app/globals.css - Uses standard shadcn/ui variables
+The Problem - Partial Theme Application
+From your screenshots, I can see that:
+
+Dark theme IS working in the main content area (Security Settings section)
+Light theme remains in the sidebar and header areas
+This creates the inconsistent UI you're experiencing
+Root Cause Analysis
+The issue is in your CSS variable definitions. Here's what's happening:
+
+styles/globals.css defines these sidebar-specific variables:
+
+--sidebar-background: 0 0% 98%; /* Light mode */
+--sidebar-background: 240 5.9% 10%; /* Dark mode */
+app/globals.css defines standard variables:
+
+--background: 0 0% 100%; /* Light mode */
+--background: 222.2 84% 4.9%; /* Dark mode */
+Dashboard Layout (app/dashboard/layout.tsx) likely uses the sidebar components that reference the sidebar variables
+
+Profile Page Content uses standard --background and --card variables which are working correctly
+
+Component Architecture Analysis
+Based on your file structure, here are the key UI components:
+
+Dashboard Components:
+
+components/dashboard/dashboard-sidebar.tsx - Uses sidebar CSS variables
+components/dashboard/dashboard-header.tsx - Likely uses sidebar variables
+app/dashboard/layout.tsx - Wraps all dashboard pages
+UI Components:
+
+components/ui/ folder contains 40+ shadcn/ui components
+These use standard CSS variables from app/globals.css
+Theme Integration:
+
+components/theme-provider.tsx - Properly configured
+Profile page correctly implements theme toggle
+The Solution Strategy
+To fix this, we need to:
+
+Standardize CSS Variables - Align both CSS files to use the same variable system
+Update Sidebar Components - Ensure they respond to theme changes
+Verify Layout Component - Check if dashboard layout needs theme integration
+Test All Dashboard Pages - Ensure consistent theming across the entire dashboard
+The inconsistency comes from having different CSS variable naming conventions in your two CSS files. The main content uses variables that are properly toggled by next-themes, while the sidebar components use variables that aren't responding to theme changes correctly.
+
+Would you like me to proceed with implementing the fixes to make the dark theme work consistently across all UI components?

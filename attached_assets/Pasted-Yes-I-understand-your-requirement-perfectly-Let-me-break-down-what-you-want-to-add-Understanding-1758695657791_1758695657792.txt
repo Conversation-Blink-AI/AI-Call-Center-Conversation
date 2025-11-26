@@ -1,0 +1,51 @@
+Yes, I understand your requirement perfectly! Let me break down what you want to add:
+
+Understanding Your Requirement:
+New Node Type: Webhook Node
+
+1. Input Fields:
+Name: Text input for naming the webhook node
+Webhook Section: A comprehensive API configuration section with:
+HTTP Method dropdown (GET, POST, PUT, etc.)
+URL input field
+Authorization toggle/section
+Headers toggle/section
+Body toggle/section
+Timeout setting (in seconds)
+Retry Attempts setting
+"Reroute through server" toggle
+"Test API Request" button
+Response Data toggle/section
+"Pathway After API Request Response" dropdown/section
+2. UI Requirements:
+The webhook configuration UI should match the style shown in your attached image
+Clean, organized layout with collapsible sections
+Toggle switches for optional features
+Proper form inputs and validation
+3. Backend Integration:
+Update the convertReactFlowToBland function in reactflow-converter.ts to handle the new webhook node type
+Generate appropriate JSON structure that Bland.ai can understand for webhook nodes
+What I Need to Implement:
+New Webhook Node Component (webhook-node.tsx)
+Add Webhook Node to Node Palette (update node-palette.tsx)
+Update Node Editor Drawer (add webhook-specific fields to node-editor-drawer.tsx)
+Update Flowchart Canvas (register the new node type in flowchart-canvas.tsx)
+Update ReactFlow Converter (handle webhook node in reactflow-converter.ts)
+Questions Before Implementation:
+Webhook Node Behavior: Should this webhook node:
+
+Make the API call during the conversation flow?
+Use the response data to influence the conversation path?
+Store the response in variables for later use?
+Default Values: What should be the default values for:
+
+HTTP method (GET?)
+Timeout (10 seconds?)
+Retry attempts (0?)
+Color Scheme: What color should the webhook node be? (I see you have green for greeting, blue for question, yellow for customer response, purple for transfer, red for end call)
+
+Bland.ai Integration: Do you have specific requirements for how this webhook node should be formatted in the JSON that gets sent to Bland.ai? Any specific field names or structure they expect?
+
+Error Handling: How should the node behave if the webhook call fails? Should there be a fallback path or error handling configuration?
+
+Once you confirm these details, I'll implement the complete webhook node functionality!

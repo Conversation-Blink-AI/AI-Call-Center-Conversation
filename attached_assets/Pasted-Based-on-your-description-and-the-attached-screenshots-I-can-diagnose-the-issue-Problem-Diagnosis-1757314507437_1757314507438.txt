@@ -1,0 +1,37 @@
+Based on your description and the attached screenshots, I can diagnose the issue:
+
+Problem Diagnosis:
+The issue is that the payment is being processed successfully (you can see the 200 response for checkout.session.completed in Stripe), but the frontend alert dialog is stuck and not responding when you click "OK".
+
+Looking at the code, here's what's happening:
+
+Payment Flow Works: The Stripe webhook is receiving the payment successfully and returning 200
+Frontend Alert Issue: The alert dialog with "Payment successful! Your wallet will be updated shortly." is showing but the OK button is not working
+Root Cause:
+The problem is in the TopUpStripeButton.jsx component. Looking at the code, I can see this pattern:
+
+useEffect(() => {
+  const urlParams = new URLSearchParams(window.location.search)
+  if (urlParams.get('success') === '1') {
+    alert('Payment successful! Your wallet will be updated shortly.')
+    // Call onSuccess callback to refresh balance
+    if (onSuccess) {
+      setTimeout(() => {
+        onSuccess()
+      }, 1000) // Give webhook a moment to process
+    }
+  }
+}, [onSuccess])
+The issue is that the browser's native alert() function is being used, which can sometimes get stuck or become unresponsive, especially in embedded environments like Replit's webview.
+
+Additional Issues:
+URL Parameter Persistence: The ?success=1 parameter remains in the URL even after the alert is shown, so if the page refreshes or the component re-renders, the alert will show again
+Balance Not Updating: The wallet balance is still showing $100 (10000 cents) even though the payment was processed successfully
+Native Alert: Using alert() is not user-friendly and can cause browser issues
+Summary:
+The webhook is working correctly (payment is processed), but the frontend user experience is broken due to:
+
+Stuck native browser alert
+URL parameter not being cleared
+Balance not refreshing properly after payment
+The solution would involve replacing the native alert() with a proper React toast notification and ensuring the URL parameters are properly cleaned up after showing the success message.

@@ -1,0 +1,118 @@
+To “fire” a Facebook Pixel from your call-flow, you can’t drop the browser-side pixel JS snippet into a server-to-server webhook. Instead you’ll want to use Facebook’s Conversions API (CAPI), which lets you push the same event data from your backend or anywhere you can make an HTTP call. Here’s how you’d wire that up in your Webhook (or your new Facebook Pixel Webhook) node:
+
+1. Decide Where to Send the Request
+
+Direct to Facebook CAPI
+You can point your node’s URL right at the Facebook endpoint:
+
+POST https://graph.facebook.com/v13.0/<PIXEL_ID>/events
+
+
+with query string ?access_token=<YOUR_PIXEL_ACCESS_TOKEN>.
+
+Via Your Own Proxy
+If you’d rather keep your access token secret or unify event formatting, point the node at a small serverless function you control (e.g., /api/fb-pixel-event) that then forwards the request to Facebook.
+
+2. Configure the Webhook Payload
+
+Facebook expects a JSON payload like this:
+
+{
+  "data": [
+    {
+      "event_name": "Lead",
+      "event_time": 1696348800,         // UNIX timestamp
+      "action_source": "website",       // or "app", "offline"
+      "event_id": "CALL_12345",         // your unique ID
+      "user_data": {
+        "em": "<HASHED_EMAIL>",         // SHA256–hashed PII
+        "ph": "<HASHED_PHONE>"
+      },
+      "custom_data": {
+        "currency": "USD",
+        "value": 0.00
+      }
+    }
+  ]
+}
+
+
+event_name: standard or custom event, e.g. “Lead.”
+
+event_time: seconds since epoch.
+
+user_data: at minimum a hashed identifier (email or phone) so Facebook can match the call back to a user.
+
+custom_data: any additional context you want (e.g. call duration, call outcome).
+
+3. Example Webhook Node Config
+
+In your FacebookPixelWebhookNode you’d set:
+
+URL:
+https://graph.facebook.com/v13.0/123456789/events?access_token=EAAG…
+
+Method: POST
+
+Headers:
+
+{
+  "Content-Type": "application/json"
+}
+
+
+Body (template, using your node’s data fields plus dynamic flow variables):
+
+{
+  "data": [
+    {
+      "event_name": "{{eventName}}",
+      "event_time": {{timestamp}},
+      "action_source": "voice_call",
+      "event_id": "{{callId}}",
+      "user_data": {
+        "ph": "{{hashedCustomerPhone}}"
+      },
+      "custom_data": {
+        "call_duration": "{{callDuration}}"
+      }
+    }
+  ]
+}
+
+
+Where {{…}} placeholders get replaced at runtime by your flow engine.
+
+4. Hashing PII
+
+Facebook requires you hash any personal identifiers with SHA-256 before sending them. In your proxy or right in your flow engine, apply:
+
+import crypto from 'crypto';
+
+function sha256(str) {
+  return crypto.createHash('sha256').update(str).digest('hex');
+}
+
+const hashedPhone = sha256(customerPhone);
+
+5. Bringing It All Together
+
+In your node’s config panel, let the user enter:
+
+Pixel ID
+
+Access Token (or choose your proxy URL)
+
+Event Name
+
+At runtime, the node:
+
+Gathers runtime variables (call ID, customer phone, timestamp, custom call data).
+
+Hashes any PII.
+
+Issues the HTTP POST as above.
+
+Facebook logs the event and attributes it back to your ad campaigns.
+
+This approach gives you the reliability and privacy compliance of the Conversions API, while still “triggering” the equivalent of a Facebook Pixel event every time that node executes. Let me know if you need example code for your proxy or how to wire those dynamic variables into your ReactFlow data model!

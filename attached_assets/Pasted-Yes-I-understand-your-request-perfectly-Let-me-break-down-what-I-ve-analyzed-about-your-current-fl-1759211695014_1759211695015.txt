@@ -1,0 +1,31 @@
+Yes, I understand your request perfectly! Let me break down what I've analyzed about your current flowchart generation setup:
+
+Current Architecture Overview
+1. AI Generation Flow:
+
+User enters a prompt in the "Generate Call Flow with AI" page (app/dashboard/call-flows/generate/page.tsx)
+The prompt goes to /api/generate-pathway which routes to /api/generate-pathway-openrouter
+OpenRouter API generates a JSON response with nodes and edges in a specific conversation flow format
+2. ReactFlow Integration:
+
+The generated JSON gets converted to ReactFlow format using utilities in utils/api-to-flowchart-converter.ts
+ReactFlow renders the flowchart visually in components/flowchart-builder/flowchart-canvas.tsx
+Different node types (greeting, question, customer-response, transfer, end-call, webhook) are rendered as custom components
+3. Bland.ai Conversion:
+
+When saving/updating pathways, the ReactFlow data gets converted to Bland.ai format using services/reactflow-converter.ts
+The convertReactFlowToBland() function strips out UI-specific properties (position, styling, etc.) and keeps only the business logic
+Special handling for webhook nodes to generate responsePathways from connected edges
+The clean data gets sent to Bland.ai via /api/bland-ai/update-pathway
+4. Key Components:
+
+FlowchartBuilder: Main container (components/flowchart-builder/flowchart-builder.tsx)
+FlowchartCanvas: Handles ReactFlow rendering and interactions
+Node Types: Custom components for each conversation step type
+Converters: Transform between different data formats (API → ReactFlow → Bland.ai)
+5. Data Flow:
+
+User Prompt → OpenRouter API → Raw JSON → ReactFlow Format → Visual Editor → Bland.ai Format → Save to Bland.ai
+I can see the system handles the complete lifecycle from AI generation to visual editing to deployment. The webhook node has special logic for conditional branching based on response pathways.
+
+Did I capture the architecture correctly? What specific aspect would you like me to focus on or modify?

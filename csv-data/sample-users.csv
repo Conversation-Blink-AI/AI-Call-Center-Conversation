@@ -1,0 +1,6 @@
+
+email,name,company,role,phone_number,password
+john.doe@example.com,John Doe,Example Corp,user,+1234567890,password123
+jane.smith@example.com,Jane Smith,Tech Solutions,admin,+1987654321,password123
+bob.wilson@example.com,Bob Wilson,Startup Inc,user,+1555123456,password123
+alice.brown@example.com,Alice Brown,Digital Agency,manager,+1777888999,password123

@@ -1,0 +1,147 @@
+Great question. Here’s the clean, safe pattern we use for **one Stripe Customer per app user**.
+
+# 1) Add a place to store the Stripe ID
+
+Add a column on your `users` table:
+
+**Prisma example**
+
+```prisma
+model User {
+  id                String  @id @default(cuid())
+  email             String  @unique
+  name              String?
+  stripeCustomerId  String? @unique
+  // ...other fields
+}
+```
+
+# 2) Stripe SDK setup (server-only)
+
+```ts
+// lib/stripe.ts
+import Stripe from "stripe";
+
+export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2024-06-20",
+});
+```
+
+# 3) “Get or create” helper (idempotent)
+
+* If your DB already has `stripeCustomerId`, reuse it.
+* Otherwise create a Customer and save the ID.
+* Use an **idempotency key** so retries don’t create duplicates.
+* As a last-resort fallback (e.g., DB lost the ID), search by metadata.
+
+```ts
+// lib/getOrCreateStripeCustomer.ts
+import { stripe } from "./stripe";
+import { db } from "./db"; // your ORM
+
+export async function getOrCreateStripeCustomer(userId: string) {
+  const user = await db.user.findUnique({ where: { id: userId }});
+  if (!user) throw new Error("User not found");
+
+  // 1) Already linked
+  if (user.stripeCustomerId) return user.stripeCustomerId;
+
+  // 2) Try to find by metadata (handles rare cases where DB missed the write)
+  const search = await stripe.customers.search({
+    // searchable: email, name, phone, and metadata fields
+    query: `metadata['userId']:'${user.id}'`,
+    limit: 1,
+  });
+  if (search.data.length > 0) {
+    const existing = search.data[0];
+    await db.user.update({
+      where: { id: user.id },
+      data: { stripeCustomerId: existing.id },
+    });
+    return existing.id;
+  }
+
+  // 3) Create new
+  const customer = await stripe.customers.create(
+    {
+      email: user.email ?? undefined,
+      name: user.name ?? undefined,
+      metadata: { userId: user.id },
+    },
+    { idempotencyKey: `customer_create_${user.id}` }
+  );
+
+  await db.user.update({
+    where: { id: user.id },
+    data: { stripeCustomerId: customer.id },
+  });
+
+  return customer.id;
+}
+```
+
+# 4) When to call it
+
+Pick one of these entry points (or all of them):
+
+* **On signup** (eager): create the Customer immediately after user registration.
+* **On first payment** (lazy): before creating a Checkout Session, SetupIntent, or Subscription.
+
+  ```ts
+  // example in a route handler
+  const customerId = await getOrCreateStripeCustomer(auth.userId);
+  const session = await stripe.checkout.sessions.create({
+    mode: "payment",
+    customer: customerId,
+    // ...
+  });
+  ```
+
+# 5) Keep Stripe in sync on profile changes (optional)
+
+If you let users change their name/email, update the Stripe Customer too:
+
+```ts
+export async function syncStripeCustomerProfile(userId: string) {
+  const user = await db.user.findUnique({ where: { id: userId }});
+  if (!user?.stripeCustomerId) return;
+
+  await stripe.customers.update(user.stripeCustomerId, {
+    email: user.email ?? undefined,
+    name: user.name ?? undefined,
+  });
+}
+```
+
+# 6) Backfill existing users (one-time script)
+
+For users that already exist without a `stripeCustomerId`:
+
+```ts
+// scripts/backfillStripeCustomers.ts
+import { db } from "../lib/db";
+import { getOrCreateStripeCustomer } from "../lib/getOrCreateStripeCustomer";
+
+async function main() {
+  const users = await db.user.findMany({ where: { stripeCustomerId: null }});
+  for (const u of users) {
+    try {
+      await getOrCreateStripeCustomer(u.id);
+      console.log("Linked:", u.id);
+    } catch (e) {
+      console.error("Failed:", u.id, e);
+    }
+  }
+}
+main().then(() => process.exit(0));
+```
+
+---
+
+## What you get
+
+* Exactly **one** Stripe Customer per user.
+* Safe against duplicate creation (DB check + idempotency + search fallback).
+* Works for one-time payments, saved cards (SetupIntents), and subscriptions.
+
+If you tell me your stack (Prisma? Supabase? plain SQL?) and where you want this to run (signup vs first payment), I’ll tailor the snippets to your project files.

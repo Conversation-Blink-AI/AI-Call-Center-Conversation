@@ -1,0 +1,143 @@
+I'll help you add a "Send Call" option to the sidebar and create the corresponding page. Based on the images you provided, I can see you want to add it below "Analytics" and create a page similar to Bland.ai's call interface.
+
+Let me first update the sidebar to add the "Send Call" option:
+
+components/dashboard/dashboard-sidebar.tsx
+Now let me create the Send Call page at app/dashboard/sendcall/page.tsx:
+
+app/dashboard/sendcall/page.tsx
+Now I need to update the API route to handle the additional parameters:
+
+app/api/bland-ai/send-test-call/route.ts
+I've successfully added the "Send Call" option to the sidebar and created a comprehensive Send Call page that matches the design you provided. Here's what I implemented:
+
+Changes Made:
+Updated Sidebar: Added "Send Call" navigation item below "Analytics" in the dashboard sidebar
+
+Created Send Call Page: Built a complete page at /dashboard/sendcall with:
+
+Phone number input with country code selector
+Voice selection dropdown
+Toggle between Prompt and Pathway modes
+Quick prompt templates (Telehealth, Small business, etc.)
+Textarea for custom prompts
+Live JavaScript code preview panel
+Send call functionality
+Enhanced API: Updated the send-test-call API to handle:
+
+Optional voice ID parameter
+Support for both pathway and task-based calls
+Proper call configuration matching Bland.ai standards
+Features Included:
+Responsive Design: Split layout with form on left, code preview on right
+Real-time Code Preview: Shows the actual API call being made
+Voice Integration: Fetches and displays available voices
+Pathway Integration: Loads user pathways for selection
+Validation: Proper form validation and error handling
+Toast Notifications: Success/error feedback
+Loading States: Proper loading indicators
+The page now provides a complete interface for sending calls with either custom prompts or existing pathways, matching the Bland.ai interface you showed in the images.
+
+Checkpoint made
+Add Send Call sidebar item and create SendCall page
+25 minutes ago
+•
+we need to use this API
+"curl --request POST
+--url https://api.bland.ai/v1/calls
+--header 'Content-Type: application/json'
+--header 'authorization: <authorization>'
+--data '{
+"phone_number": "<string>",
+"voice": "<string>",
+"pathway_id": "<string>",
+"pathway_version": 123,
+"task": "<string>",
+"first_sentence": "<string>",
+"persona_id": "<string>",
+"model": "<string>",
+"language": "<string>",
+"wait_for_greeting": true,
+"pronunciation_guide": [
+{}
+],
+"temperature": 123,
+"interruption_threshold": 123,
+"from": "<string>",
+"dialing_strategy": {},
+"timezone": "<string>",
+"start_time": "<string>",
+"transfer_phone_number": "<string>",
+"transfer_list": {},
+"max_duration": 123,
+"tools": [
+{}
+],
+"background_track": "<string>",
+"noise_cancellation": true,
+"block_interruptions": true,
+"record": true,
+"voicemail": {},
+"citation_schema_ids": [
+"<string>"
+],
+"summary_prompt": "<string>",
+"retry": {},
+"dispositions": [
+"<string>"
+],
+"request_data": {},
+"metadata": {},
+"webhook": "<string>",
+"webhook_events": [
+"<string>"
+],
+"dynamic_data": [
+{}
+],
+"keywords": [
+"<string>"
+],
+"ignore_button_press": true,
+"precall_dtmf_sequence": "<string>"
+}'"
+
+In this page add the proper Ui that the user can fill and choose Some thing Like this .
+
+DONT MAKE ANY CHANGES NOW first Tell me did you understood this request?
+
+SH
+
+shubhamt8
+Assistant
+1 minute ago
+Yes, I understand your request perfectly!
+
+Looking at the current Send Call page and the API documentation you provided, along with the attached screenshots showing the desired UI, I can see that you want me to:
+
+Enhance the current Send Call page to support the full Bland.ai API with all its parameters
+
+Add comprehensive UI sections similar to the screenshot you provided, including:
+
+Basic settings (phone number, voice, prompt/pathway)
+Model Settings (tune the model and language settings)
+Dispatch Settings (transfer numbers and call duration)
+Knowledge (add tools and pathways)
+Audio (fine tune the audio of the call)
+Voicemail Behavior (enable voicemail behavior for the call)
+Analysis (specify the data you want to extract from the call)
+Post Call (configure post call summaries and events)
+Advanced (configure advanced settings for the call)
+Update the API route (/api/bland-ai/send-test-call/route.ts) to handle all the new parameters from the full Bland.ai API
+
+Maintain the existing functionality while expanding it significantly
+
+Keep the code preview panel on the right side that dynamically updates based on user inputs
+
+The current implementation is quite basic and only handles a few parameters like phone_number, voice_id, pathway_id, and task. You want me to expand it to support the full API with parameters like:
+
+first_sentence, temperature, interruption_threshold
+max_duration, background_track, noise_cancellation
+transfer_phone_number, webhook, metadata
+And many more advanced options
+Should I proceed with implementing this comprehensive upgrade to the Send Call page?
