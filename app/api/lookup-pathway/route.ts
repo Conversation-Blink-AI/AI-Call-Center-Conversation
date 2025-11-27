@@ -40,16 +40,18 @@ export async function GET(request: NextRequest) {
       console.log(`[LOOKUP-PATHWAY] Looking up pathway for phone: ${formattedPhone}`)
 
       // Query for the phone number and its associated pathway
+      // The relationship is: pathways.phone_id -> phone_numbers.id
       const phoneQuery = `
         SELECT 
           pn.id,
           pn.phone_number,
-          pn.pathway_id,
+          pn.pathwayid,
+          p.id as pathway_id_from_phone,
           p.name as pathway_name,
           p.description as pathway_description,
           p.updated_at as last_deployed_at
         FROM phone_numbers pn
-        LEFT JOIN pathways p ON pn.pathway_id = p.id
+        LEFT JOIN pathways p ON p.phone_id = pn.id
         WHERE pn.phone_number = $1 AND pn.user_id = $2
       `
 
@@ -65,7 +67,9 @@ export async function GET(request: NextRequest) {
 
       const phoneData = result.rows[0]
 
-      if (!phoneData.pathway_id) {
+      const pathwayId = phoneData.pathway_id_from_phone || phoneData.pathwayid
+
+      if (!pathwayId) {
         console.log(`[LOOKUP-PATHWAY] Phone number ${formattedPhone} has no pathway assigned`)
         return NextResponse.json({
           success: false,
@@ -73,11 +77,11 @@ export async function GET(request: NextRequest) {
         })
       }
 
-      console.log(`[LOOKUP-PATHWAY] Found pathway ${phoneData.pathway_id} for phone ${formattedPhone}`)
+      console.log(`[LOOKUP-PATHWAY] Found pathway ${pathwayId} for phone ${formattedPhone}`)
 
       return NextResponse.json({
         success: true,
-        pathway_id: phoneData.pathway_id,
+        pathway_id: pathwayId,
         pathway_name: phoneData.pathway_name,
         pathway_description: phoneData.pathway_description,
         last_deployed_at: phoneData.last_deployed_at,

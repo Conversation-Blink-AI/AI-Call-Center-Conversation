@@ -46,56 +46,6 @@ export default function PathwayListingPage() {
   const authLoading = false
 
   useEffect(() => {
-    const fetchUserPathways = async () => {
-      if (!user || !user.id) {
-        console.log('[PATHWAY-PAGE] ❌ No user or user ID available')
-        setLoading(false)
-        return
-      }
-
-      console.log('[PATHWAY-PAGE] 🔍 Fetching pathways for user:', user.id)
-      setLoading(true)
-      setError(null)
-
-      try {
-        const response = await fetch(`/api/pathways?creator_id=${user.id}`, {
-          credentials: 'include',
-          cache: 'no-cache'
-        })
-
-        console.log('[PATHWAY-PAGE] 📊 Response status:', response.status)
-
-        if (!response.ok) {
-          const errorText = await response.text()
-          console.log('[PATHWAY-PAGE] ❌ Error response:', errorText)
-          throw new Error(`Failed to fetch pathways: ${response.status}`)
-        }
-
-        const data = await response.json()
-        console.log('[PATHWAY-PAGE] ✅ Pathways data:', data)
-
-        if (data.pathways) {
-          setPathways(data.pathways)
-        } else {
-          setPathways([])
-        }
-      } catch (error) {
-        console.error('[PATHWAY-PAGE] ❌ Error fetching pathways:', error)
-        setError(error instanceof Error ? error.message : 'Failed to load pathways')
-        setPathways([])
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    if (isInitialized && !authLoading && user) {
-      fetchUserPathways()
-    } else if (isInitialized && !authLoading && !user) {
-      setLoading(false)
-    }
-  }, [user, isInitialized, authLoading])
-
-  useEffect(() => {
     async function fetchData() {
       if (!user) return
 
@@ -141,7 +91,7 @@ export default function PathwayListingPage() {
 
         const pathwaysData = await pathwaysResponse.json()
         console.log("✅ [PATHWAY-PAGE] Pathways data:", pathwaysData)
-        setPathways(pathwaysData || [])
+        setPathways(pathwaysData.pathways || pathwaysData || [])
 
       } catch (err) {
         console.error('❌ [PATHWAY-PAGE] Error fetching data:', err)

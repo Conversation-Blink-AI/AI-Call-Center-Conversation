@@ -96,3 +96,36 @@ export interface Call {
   interruptions: number | null
   phone_number_id: string | null
 }
+
+export interface CallLog {
+  id: string
+  call_id: string
+  user_id: string
+  to_number: string
+  from_number: string
+  duration_seconds: number | null
+  status: string | null
+  created_at: string
+  updated_at: string
+  recording_url: string | null
+  transcript: string | null
+  summary: string | null
+  pathway_id: string | null
+  ended_reason: string | null
+  start_time: string | null
+  end_time: string | null
+  queue_time: number | null
+  latency_ms: number | null
+  interruptions: number | null
+  phone_number_id: string | null
+  // Bland.ai built-in variables
+  phone_number: string | null // The other party's number (always the other party)
+  country: string | null // Country code (e.g., US)
+  state: string | null // State/province abbreviation (e.g., CA)
+  city: string | null // Full city name, capitalized
+  zip: string | null // Zip code
+  short_from: string | null // Outbound number with country code removed
+  short_to: string | null // Inbound number with country code removed
+  call_timezone: string | null // {{now}} - Current time in call's timezone
+  call_time_utc: string | null // {{now_utc}} - Current time in UTC
+}

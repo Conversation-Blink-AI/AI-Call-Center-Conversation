@@ -31,39 +31,69 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 })
     }
 
+    if (!process.env.DATABASE_URL) {
+      console.error("[PATHWAYS-API] ❌ DATABASE_URL not configured")
+      return NextResponse.json({ 
+        error: "Database not configured",
+        details: "DATABASE_URL environment variable is missing"
+      }, { status: 500 })
+    }
+
     const client = new Client({
       connectionString: process.env.DATABASE_URL
     })
 
-    await client.connect()
-
     try {
-      // Get pathways for the authenticated user using their actual UUID
+      await client.connect()
+      console.log("[PATHWAYS-API] ✅ Connected to database")
+      // Get pathways for the authenticated user
+      // The relationship is: pathways.phone_id -> phone_numbers.id
       const query = `
         SELECT 
-          p.*,
+          p.id,
+          p.name,
+          p.description,
+          p.creator_id,
+          p.created_at,
+          p.updated_at,
+          p.data,
+          p.bland_id,
+          p.phone_id,
+          pn.id as phone_number_table_id,
           pn.phone_number,
-          pn.pathway_id,
-          CONCAT(u.first_name, ' ', u.last_name) as phone_display_name
+          pn.location,
+          pn.type,
+          pn.status
         FROM pathways p
-        LEFT JOIN phone_numbers pn ON p.phone_number_id = pn.id
-        LEFT JOIN users u ON p.creator_id = u.id
-        WHERE p.creator_id = $1 AND pn.pathway_id IS NOT NULL
+        LEFT JOIN phone_numbers pn ON p.phone_id = pn.id
+        WHERE p.creator_id = $1
         ORDER BY p.updated_at DESC
       `
 
+      console.log('[PATHWAYS-API] 🔍 Executing query for user:', user.id)
+      console.log('[PATHWAYS-API] 📝 Query:', query.replace(/\s+/g, ' ').trim())
+      
       const result = await client.query(query, [user.id])
       console.log('[PATHWAYS-API] ✅ Found pathways:', result.rows.length)
+      
+      if (result.rows.length > 0) {
+        console.log('[PATHWAYS-API] 📊 Sample pathway data:', JSON.stringify(result.rows[0], null, 2))
+      } else {
+        console.log('[PATHWAYS-API] ⚠️ No pathways found for user:', user.id)
+      }
 
       return NextResponse.json({ 
         pathways: result.rows,
         count: result.rows.length 
       })
+    } catch (dbError) {
+      console.error('[PATHWAYS-API] ❌ Database error:', dbError)
+      throw dbError
     } finally {
       await client.end()
     }
   } catch (error) {
-    console.error("Error fetching pathways:", error)
+    console.error("[PATHWAYS-API] ❌ Error fetching pathways:", error)
 
     // Check if it's a UUID validation error
     if (error instanceof Error && error.message.includes('invalid input syntax for type uuid')) {
@@ -73,7 +103,17 @@ export async function GET(req: NextRequest) {
       }, { status: 400 })
     }
 
-    return NextResponse.json({ error: "Failed to fetch pathways" }, { status: 500 })
+    // Provide more detailed error information
+    const errorMessage = error instanceof Error ? error.message : "Unknown error"
+    console.error("[PATHWAYS-API] ❌ Full error details:", {
+      message: errorMessage,
+      stack: error instanceof Error ? error.stack : undefined
+    })
+
+    return NextResponse.json({ 
+      error: "Failed to fetch pathways",
+      details: errorMessage 
+    }, { status: 500 })
   }
 }
 

@@ -41,12 +41,21 @@ export async function GET(request: Request) {
           pn.type,
           pn.status,
           pn.assigned_to,
-          pn.pathway_id
+          pn.pathwayid,
+          p.id as pathway_id_from_phone,
+          p.name as pathway_name,
+          p.description as pathway_description
          FROM phone_numbers pn
+         LEFT JOIN pathways p ON p.phone_id = pn.id
          WHERE pn.user_id = $1
          ORDER BY pn.purchased_at DESC`,
         [userId]
       )
+
+      console.log("🔍 [USER-PHONE-NUMBERS] Query result rows:", result.rows.length)
+      if (result.rows.length > 0) {
+        console.log("📊 [USER-PHONE-NUMBERS] Sample row:", JSON.stringify(result.rows[0], null, 2))
+      }
 
       const phoneNumbers = result.rows.map(row => ({
         id: row.id,
@@ -59,9 +68,9 @@ export async function GET(request: Request) {
         user_id: row.user_id,
         monthly_fee: parseFloat(row.monthly_fee) || 1.50,
         assigned_to: row.assigned_to || 'Unassigned',
-        pathway_id: row.pathway_id,
-        pathway_name: row.pathway_id ? `Pathway ${row.pathway_id}` : null, // Generate name from ID
-        pathway_description: row.pathway_id ? `Pathway configuration for ${row.pathway_id}` : null
+        pathway_id: row.pathway_id_from_phone || row.pathwayid || null,
+        pathway_name: row.pathway_name || null,
+        pathway_description: row.pathway_description || null
       }))
 
       console.log("✅ [USER-PHONE-NUMBERS] Fetched from PostgreSQL:", phoneNumbers.length, "numbers for user", userId)
@@ -141,7 +150,7 @@ export async function POST(request: NextRequest) {
             location: savedPhone.location,
             status: 'active',
             purchasedAt: savedPhone.purchased_at,
-            pathwayId: savedPhone.pathway_id,
+            pathwayId: savedPhone.pathwayid,
             subscriptionPlan: savedPhone.subscription_plan
           }
         })

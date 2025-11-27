@@ -244,3 +244,100 @@ export async function updateCall(callId: string, updateData: any) {
     RETURNING *
   `, [callId, ...values])
 }
+
+// Call log functions for webhook-based call logging
+export async function createCallLog(callData: {
+  call_id: string
+  user_id: string
+  to_number: string
+  from_number: string
+  duration_seconds?: number
+  status?: string
+  recording_url?: string
+  transcript?: string
+  summary?: string
+  pathway_id?: string
+  ended_reason?: string
+  start_time?: string
+  end_time?: string
+  queue_time?: number
+  latency_ms?: number
+  interruptions?: number
+  phone_number_id?: string
+  // Bland.ai built-in variables
+  phone_number?: string // The other party's number
+  country?: string
+  state?: string
+  city?: string
+  zip?: string
+  short_from?: string
+  short_to?: string
+  call_timezone?: string
+  call_time_utc?: string
+}) {
+  return executeQuery(`
+    INSERT INTO call_logs (
+      call_id, user_id, to_number, from_number, duration_seconds, 
+      status, recording_url, transcript, summary, 
+      pathway_id, ended_reason, start_time, end_time,
+      queue_time, latency_ms, interruptions, phone_number_id,
+      phone_number, country, state, city, zip, short_from, short_to,
+      call_timezone, call_time_utc,
+      created_at, updated_at
+    ) VALUES (
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
+      $18, $19, $20, $21, $22, $23, $24, $25, $26,
+      NOW(), NOW()
+    ) 
+    ON CONFLICT (call_id) 
+    DO UPDATE SET
+      duration_seconds = EXCLUDED.duration_seconds,
+      status = EXCLUDED.status,
+      recording_url = EXCLUDED.recording_url,
+      transcript = EXCLUDED.transcript,
+      summary = EXCLUDED.summary,
+      ended_reason = EXCLUDED.ended_reason,
+      end_time = EXCLUDED.end_time,
+      queue_time = EXCLUDED.queue_time,
+      latency_ms = EXCLUDED.latency_ms,
+      interruptions = EXCLUDED.interruptions,
+      phone_number = EXCLUDED.phone_number,
+      country = EXCLUDED.country,
+      state = EXCLUDED.state,
+      city = EXCLUDED.city,
+      zip = EXCLUDED.zip,
+      short_from = EXCLUDED.short_from,
+      short_to = EXCLUDED.short_to,
+      call_timezone = EXCLUDED.call_timezone,
+      call_time_utc = EXCLUDED.call_time_utc,
+      updated_at = NOW()
+    RETURNING *
+  `, [
+    callData.call_id,
+    callData.user_id,
+    callData.to_number,
+    callData.from_number,
+    callData.duration_seconds || null,
+    callData.status || null,
+    callData.recording_url || null,
+    callData.transcript || null,
+    callData.summary || null,
+    callData.pathway_id || null,
+    callData.ended_reason || null,
+    callData.start_time || null,
+    callData.end_time || null,
+    callData.queue_time || null,
+    callData.latency_ms || null,
+    callData.interruptions || null,
+    callData.phone_number_id || null,
+    callData.phone_number || null,
+    callData.country || null,
+    callData.state || null,
+    callData.city || null,
+    callData.zip || null,
+    callData.short_from || null,
+    callData.short_to || null,
+    callData.call_timezone || null,
+    callData.call_time_utc || null
+  ])
+}

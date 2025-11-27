@@ -126,6 +126,44 @@ export async function POST(request: NextRequest) {
     }
 
     console.log("[API_ROUTE_NEW] ✅ Successfully updated pathway on Bland.ai")
+    
+    // Also save the flowchart data to the local database
+    try {
+      const { Client } = await import('pg')
+      const client = new Client({
+        connectionString: process.env.DATABASE_URL
+      })
+
+      await client.connect()
+
+      // Prepare the flowchart data to save
+      const flowchartData = {
+        name,
+        description: description || `Updated on ${new Date().toISOString()}`,
+        nodes,
+        edges
+      }
+
+      // Update the pathways.data column in the database
+      const dbUpdateResult = await client.query(`
+        UPDATE pathways 
+        SET data = $1, updated_at = NOW()
+        WHERE id = $2
+        RETURNING id, name, updated_at
+      `, [JSON.stringify(flowchartData), pathwayId])
+
+      await client.end()
+
+      if (dbUpdateResult.rows.length > 0) {
+        console.log("[API_ROUTE_NEW] ✅ Successfully saved flowchart data to database")
+      } else {
+        console.log("[API_ROUTE_NEW] ⚠️ Pathway not found in database, but Bland.ai update succeeded")
+      }
+    } catch (dbError) {
+      console.error("[API_ROUTE_NEW] ⚠️ Error saving to database (Bland.ai update succeeded):", dbError)
+      // Don't fail the request if database save fails, since Bland.ai update succeeded
+    }
+
     console.log("=".repeat(80))
 
     return NextResponse.json({

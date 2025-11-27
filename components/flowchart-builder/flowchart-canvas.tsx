@@ -139,12 +139,25 @@ export function FlowchartCanvas({
 
     // Otherwise load saved flowchart data
     const loadSavedFlowchart = async () => {
-      if (!pathwayInfo?.pathway_id) return
+      // Try to load by pathway_id first, then by phone number
+      if (!pathwayInfo?.pathway_id && !phoneNumber) {
+        console.log('[FLOWCHART-CANVAS] No pathway ID or phone number available')
+        return
+      }
 
-      console.log('[FLOWCHART-CANVAS] Loading pathway:', pathwayInfo.pathway_id)
       setIsLoadingFlowchart(true)
       try {
-        const response = await fetch(`/api/pathways/load-flowchart?pathwayId=${pathwayInfo.pathway_id}`, {
+        // Build the API URL - try pathwayId first, then phoneNumber
+        let apiUrl = ''
+        if (pathwayInfo?.pathway_id) {
+          apiUrl = `/api/pathways/load-flowchart?pathwayId=${pathwayInfo.pathway_id}`
+          console.log('[FLOWCHART-CANVAS] Loading pathway by ID:', pathwayInfo.pathway_id)
+        } else if (phoneNumber) {
+          apiUrl = `/api/pathways/load-flowchart?phoneNumber=${encodeURIComponent(phoneNumber)}`
+          console.log('[FLOWCHART-CANVAS] Loading pathway by phone number:', phoneNumber)
+        }
+
+        const response = await fetch(apiUrl, {
           credentials: 'include'
         })
         const result = await response.json()
@@ -155,17 +168,17 @@ export function FlowchartCanvas({
           const flowchartData = result.pathway.flowchart_data
 
           // Convert Bland format back to ReactFlow format
-          if (flowchartData.nodes && flowchartData.edges) {
+          if (flowchartData && flowchartData.nodes && flowchartData.edges) {
             const reactFlowData = convertBlandToReactFlow(flowchartData)
             setNodes(reactFlowData.nodes)
             setEdges(reactFlowData.edges)
 
             toast.success(`Loaded saved pathway: ${result.pathway.name}`)
           } else {
-            console.log('[FLOWCHART-CANVAS] No flowchart data found, starting with empty canvas')
+            console.log('[FLOWCHART-CANVAS] Flowchart data missing nodes or edges, starting with empty canvas')
           }
         } else {
-          console.log('[FLOWCHART-CANVAS] No pathway data found or failed to load')
+          console.log('[FLOWCHART-CANVAS] No pathway data found or failed to load:', result.error || 'Unknown error')
         }
       } catch (error) {
         console.error('[FLOWCHART-CANVAS] Error loading saved flowchart:', error)
@@ -176,7 +189,7 @@ export function FlowchartCanvas({
     }
 
     loadSavedFlowchart()
-  }, [pathwayInfo?.pathway_id]) // Removed unstable dependencies
+  }, [pathwayInfo?.pathway_id, phoneNumber]) // Added phoneNumber as dependency
 
   const onConnect = useCallback(
     (params: Connection) => {

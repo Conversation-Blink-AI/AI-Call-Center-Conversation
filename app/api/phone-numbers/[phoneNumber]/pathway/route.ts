@@ -24,7 +24,7 @@ export async function GET(
     const result = await client.query(`
       SELECT p.*, pn.phone_number 
       FROM pathways p 
-      JOIN phone_numbers pn ON p.id = pn.pathway_id 
+      JOIN phone_numbers pn ON p.phone_id = pn.id 
       WHERE pn.phone_number = $1 AND pn.user_id = $2
     `, [phoneNumber, user.id])
 

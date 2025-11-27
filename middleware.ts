@@ -33,6 +33,7 @@ export async function middleware(req: NextRequest) {
     req.nextUrl.pathname.startsWith("/_next") ||
     req.nextUrl.pathname.startsWith("/api/auth") ||
     req.nextUrl.pathname.startsWith("/api/debug") ||
+    req.nextUrl.pathname.startsWith("/api/webhooks") || // Allow webhooks without auth
     req.nextUrl.pathname.includes(".")
   ) {
     return res

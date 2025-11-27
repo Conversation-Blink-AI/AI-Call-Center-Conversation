@@ -227,8 +227,15 @@ export default function PhoneNumbersPage() {
                 </div>
 
                 <div className="pt-2 border-t border-gray-100">
-                  <Button variant="outline" size="sm" className="w-full">
-                    Manage Number
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="w-full"
+                    asChild
+                  >
+                    <Link href={`/dashboard/phone-numbers/${encodeURIComponent(phoneNumber.number)}/manage`}>
+                      Manage Number
+                    </Link>
                   </Button>
                 </div>
               </CardContent>
