@@ -2,6 +2,9 @@ import Link from 'next/link'
 
 // Force dynamic rendering - not-found pages should not be statically generated
 export const dynamic = 'force-dynamic'
+export const revalidate = 0
+export const fetchCache = 'force-no-store'
+export const runtime = 'nodejs'
 
 export default function NotFound() {
   return (

@@ -30,23 +30,12 @@ const nextConfig = {
       },
     ]
   },
-  // Skip generating error pages
-  experimental: {
-    missingSuspenseWithCSRBailout: false,
-  },
   // Custom webpack config
-  webpack: (config, { isServer, dev }) => {
+  webpack: (config, { isServer }) => {
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
         fs: false,
-      }
-    }
-    // Skip error page generation during build
-    if (!dev) {
-      config.optimization = {
-        ...config.optimization,
-        minimize: true,
       }
     }
     return config
