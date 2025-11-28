@@ -12,6 +12,9 @@ function getSSLConfig() {
 }
 
 export async function connectToDatabase() {
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL environment variable is not set")
+  }
   const client = new Client({
     connectionString: process.env.DATABASE_URL,
     ssl: getSSLConfig()
@@ -121,10 +124,11 @@ export async function createPathway(pathwayData: {
 }
 
 export async function getPathwayById(id: string) {
-  return executeQuery(
-    "SELECT * FROM pathways WHERE pathway_id = $1",
+  const result = await executeQuery(
+    "SELECT * FROM pathways WHERE id = $1",
     [id]
   )
+  return result[0] || null
 }
 
 export async function updatePathway(id: string, pathwayData: Partial<{
@@ -340,4 +344,149 @@ export async function createCallLog(callData: {
     callData.call_timezone || null,
     callData.call_time_utc || null
   ])
+}
+
+// Team management functions
+export async function getTeamById(id: string) {
+  const result = await executeQuery(
+    "SELECT * FROM teams WHERE id = $1",
+    [id]
+  )
+  return result[0] || null
+}
+
+export async function updateTeam(id: string, teamData: Partial<{
+  name: string
+  description: string
+}>) {
+  const updates = Object.keys(teamData).map((key, index) => `${key} = $${index + 2}`).join(', ')
+  const values = Object.values(teamData)
+
+  const result = await executeQuery(`
+    UPDATE teams 
+    SET ${updates}, updated_at = NOW()
+    WHERE id = $1
+    RETURNING *
+  `, [id, ...values])
+  return result[0] || null
+}
+
+export async function deleteTeam(id: string) {
+  const result = await executeQuery(
+    "DELETE FROM teams WHERE id = $1 RETURNING *",
+    [id]
+  )
+  return result[0] || null
+}
+
+export async function checkTeamPermission(teamId: string, userId: string, requiredRole: 'owner' | 'admin' | 'member' = 'member') {
+  const team = await getTeamById(teamId)
+  if (!team) return false
+
+  // Owner has all permissions
+  if (team.owner_id === userId) return true
+
+  // Check team member role
+  const members = await executeQuery(
+    "SELECT role FROM team_members WHERE team_id = $1 AND user_id = $2",
+    [teamId, userId]
+  )
+
+  if (members.length === 0) return false
+
+  const userRole = members[0].role
+  const roleHierarchy = { member: 1, admin: 2, owner: 3 }
+  return roleHierarchy[userRole as keyof typeof roleHierarchy] >= roleHierarchy[requiredRole]
+}
+
+export async function updateTeamMemberRole(teamId: string, userId: string, role: string) {
+  const result = await executeQuery(`
+    UPDATE team_members 
+    SET role = $3, updated_at = NOW()
+    WHERE team_id = $1 AND user_id = $2
+    RETURNING *
+  `, [teamId, userId, role])
+  return result[0] || null
+}
+
+// Pathway permission functions
+export async function canViewPathway(pathwayId: string, userId: string): Promise<boolean> {
+  const pathway = await getPathwayById(pathwayId)
+  if (!pathway) return false
+
+  // Creator can always view
+  if (pathway.creator_id === userId) return true
+
+  // Check if user is team member
+  if (pathway.team_id) {
+    const members = await executeQuery(
+      "SELECT * FROM team_members WHERE team_id = $1 AND user_id = $2",
+      [pathway.team_id, userId]
+    )
+    if (members.length > 0) return true
+  }
+
+  return false
+}
+
+export async function canEditPathway(pathwayId: string, userId: string): Promise<boolean> {
+  const pathway = await getPathwayById(pathwayId)
+  if (!pathway) return false
+
+  // Creator can always edit
+  if (pathway.creator_id === userId) return true
+
+  // Check if user is team admin/owner
+  if (pathway.team_id) {
+    const team = await getTeamById(pathway.team_id)
+    if (team && team.owner_id === userId) return true
+
+    const members = await executeQuery(
+      "SELECT role FROM team_members WHERE team_id = $1 AND user_id = $2 AND role IN ('admin', 'owner')",
+      [pathway.team_id, userId]
+    )
+    if (members.length > 0) return true
+  }
+
+  return false
+}
+
+export async function getActivitiesByPathwayId(pathwayId: string) {
+  return executeQuery(
+    "SELECT * FROM activities WHERE pathway_id = $1 ORDER BY created_at DESC",
+    [pathwayId]
+  )
+}
+
+// Invitation functions
+export async function getInvitationByToken(token: string) {
+  const result = await executeQuery(
+    "SELECT * FROM invitations WHERE token = $1 AND (expires_at IS NULL OR expires_at > NOW())",
+    [token]
+  )
+  return result[0] || null
+}
+
+export async function acceptInvitation(token: string, userId: string) {
+  const invitation = await getInvitationByToken(token)
+  if (!invitation) {
+    throw new Error("Invalid or expired invitation")
+  }
+
+  // Create team member
+  await executeQuery(`
+    INSERT INTO team_members (team_id, user_id, role, created_at, updated_at)
+    VALUES ($1, $2, $3, NOW(), NOW())
+    ON CONFLICT (team_id, user_id) DO UPDATE SET
+      role = EXCLUDED.role,
+      updated_at = NOW()
+  `, [invitation.team_id, userId, invitation.role])
+
+  // Delete invitation
+  await executeQuery(
+    "DELETE FROM invitations WHERE token = $1",
+    [token]
+  )
+
+  return { success: true }
 }

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Database, Table, Key, Index } from "lucide-react"
+import { Database, Table, Key, Hash } from "lucide-react"
 
 interface Column {
   name: string
@@ -231,7 +231,7 @@ export default function SchemaViewer() {
                   {schema.indexes.length > 0 && (
                     <div>
                       <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                        <Index className="h-5 w-5" />
+                        <Hash className="h-5 w-5" />
                         Indexes
                       </h3>
                       <div className="space-y-2">

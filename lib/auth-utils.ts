@@ -247,3 +247,15 @@ export async function validateAuthToken(token?: string): Promise<{ isValid: bool
     }
   }
 }
+
+// Get session token from cookies
+export async function getSessionToken(): Promise<string | null> {
+  try {
+    const cookieStore = await cookies()
+    const token = cookieStore.get("auth-token")?.value
+    return token || null
+  } catch (error) {
+    console.error("Failed to get session token:", error)
+    return null
+  }
+}
