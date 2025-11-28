@@ -4,9 +4,31 @@ import * as crypto from "crypto"
 import * as jwt from "jsonwebtoken"
 import * as bcrypt from "bcryptjs"
 
-const db = new Database()
+// Lazy initialization to prevent build-time database connection
+let dbInstance: Database | null = null
 
-// Export db for use in other server-side files
+function getDb(): Database {
+  if (!dbInstance) {
+    // Only initialize if we have a database URL (prevents build-time errors)
+    if (!process.env.REPLIT_DB_URL && !process.env.DATABASE_URL) {
+      throw new Error("Database not configured. REPLIT_DB_URL or DATABASE_URL must be set.")
+    }
+    dbInstance = new Database()
+  }
+  return dbInstance
+}
+
+// Export db getter for use in other server-side files
+const db = {
+  get: (key: string) => getDb().get(key),
+  set: (key: string, value: any) => getDb().set(key, value),
+  delete: (key: string) => getDb().delete(key),
+  list: () => getDb().list(),
+  empty: () => getDb().empty(),
+  getAll: () => getDb().getAll(),
+  setAll: (data: Record<string, any>) => getDb().setAll(data)
+}
+
 export { db }
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"

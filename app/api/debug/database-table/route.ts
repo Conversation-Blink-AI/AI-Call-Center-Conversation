@@ -1,12 +1,36 @@
-
 import { NextResponse } from "next/server"
 import { listAllKeys, getAllUsers } from "@/lib/replit-db-server"
 import Database from "@replit/database"
 
-const db = new Database()
+// Force dynamic rendering to prevent build-time execution
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
+// Initialize database only when needed (not during build)
+let db: Database | null = null
+
+function getDb() {
+  if (!db) {
+    // Prevent initialization during build
+    if (!process.env.REPLIT_DB_URL && !process.env.DATABASE_URL) {
+      throw new Error("Database not configured")
+    }
+    db = new Database()
+  }
+  return db
+}
 
 export async function GET() {
+  // Prevent execution during build time
+  if (!process.env.REPLIT_DB_URL && !process.env.DATABASE_URL) {
+    return NextResponse.json({ 
+      success: false, 
+      message: "Database not configured" 
+    }, { status: 503 })
+  }
+
   try {
+    const dbInstance = getDb()
     const keys = await listAllKeys()
     
     // Group keys by type for table display
@@ -20,7 +44,7 @@ export async function GET() {
     
     // Fetch data for each key type
     for (const key of keys) {
-      const value = await db.get(key)
+      const value = await dbInstance.get(key)
       
       if (key.startsWith('user:')) {
         const { passwordHash, ...safeUser } = value || {}

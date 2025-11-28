@@ -1,8 +1,19 @@
-
 import { NextResponse } from "next/server"
 import { db } from "@/lib/replit-db-server"
 
+// Force dynamic rendering to prevent build-time execution
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 export async function GET() {
+  // Prevent execution during build time
+  if (!process.env.REPLIT_DB_URL && !process.env.DATABASE_URL) {
+    return NextResponse.json({ 
+      success: false, 
+      message: "Database not configured" 
+    }, { status: 503 })
+  }
+
   try {
     console.log("[DEBUG/DB-USERS] Checking database users...")
     

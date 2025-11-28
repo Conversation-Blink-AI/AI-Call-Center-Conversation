@@ -3,7 +3,19 @@ import { NextResponse } from "next/server"
 import { db } from "@/lib/replit-db-server"
 import * as bcrypt from "bcryptjs"
 
+// Force dynamic rendering to prevent build-time execution
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 export async function POST(request: Request) {
+  // Prevent execution during build time
+  if (!process.env.REPLIT_DB_URL && !process.env.DATABASE_URL) {
+    return NextResponse.json({ 
+      success: false, 
+      message: "Database not configured" 
+    }, { status: 503 })
+  }
+
   try {
     const { email, password } = await request.json()
 
