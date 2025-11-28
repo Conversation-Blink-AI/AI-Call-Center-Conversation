@@ -3,6 +3,10 @@
 
 import { useEffect } from 'react'
 
+// Force dynamic rendering - error pages should not be statically generated
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 export default function Error({
   error,
   reset,
