@@ -25,6 +25,10 @@ const nextConfig = {
       },
     ]
   },
+  // Skip generating error pages during static export
+  experimental: {
+    missingSuspenseWithCSRBailout: false,
+  },
 }
 
 export default nextConfig

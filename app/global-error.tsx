@@ -1,9 +1,8 @@
-
 'use client'
 
 // Force dynamic rendering - error pages should not be statically generated
 export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
+export const revalidate = 0
 
 export default function GlobalError({
   error,
