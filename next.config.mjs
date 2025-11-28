@@ -14,10 +14,6 @@ const nextConfig = {
   generateBuildId: async () => {
     return 'build-' + Date.now()
   },
-  // Disable static optimization for error pages
-  experimental: {
-    missingSuspenseWithCSRBailout: false,
-  },
   // Enable cross-origin requests for Replit environment
   allowedDevOrigins: ['*'],
   // Enable all hosts for Replit environment
@@ -43,6 +39,11 @@ const nextConfig = {
       }
     }
     return config
+  },
+  // Skip generating error pages
+  onDemandEntries: {
+    maxInactiveAge: 25 * 1000,
+    pagesBufferLength: 2,
   },
 }
 
