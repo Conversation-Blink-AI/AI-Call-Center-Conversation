@@ -6,6 +6,12 @@ export const dynamic = "force-dynamic"
 export async function GET(request: NextRequest) {
   try {
     console.log("🔍 [BLAND-CALLS] Starting call fetch...")
+    console.log("🔍 [BLAND-CALLS] Request URL:", request.url)
+    console.log("🔍 [BLAND-CALLS] Request headers:", {
+      origin: request.headers.get('origin'),
+      cookie: request.headers.get('cookie') ? 'present' : 'missing',
+      host: request.headers.get('host')
+    })
 
     const searchParams = request.nextUrl.searchParams
     const page = Number.parseInt(searchParams.get("page") || "1")
@@ -14,24 +20,53 @@ export async function GET(request: NextRequest) {
     // Authenticate user
     const authResult = await validateAuthToken()
     if (!authResult.isValid || !authResult.user) {
-      console.log("🚨 [BLAND-CALLS] Authentication failed")
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      console.log("🚨 [BLAND-CALLS] Authentication failed:", authResult.error)
+      return NextResponse.json({ 
+        error: "Unauthorized",
+        details: authResult.error || "Authentication token missing or invalid",
+        debug: {
+          hasCookie: !!request.headers.get('cookie'),
+          origin: request.headers.get('origin')
+        }
+      }, { status: 401 })
     }
 
     const user = authResult.user
     const userId = user.id
     console.log("✅ [BLAND-CALLS] User authenticated:", userId)
 
+    // Check for required environment variables
+    if (!process.env.DATABASE_URL) {
+      console.error("🚨 [BLAND-CALLS] DATABASE_URL not configured")
+      return NextResponse.json({ 
+        error: "Database not configured",
+        details: "DATABASE_URL environment variable is missing"
+      }, { status: 500 })
+    }
+
     // Get user's phone numbers from PostgreSQL
     const { Client } = await import('pg')
+    
+    // Helper function to get SSL config for DigitalOcean
+    function getSSLConfig() {
+      const dbUrl = process.env.DATABASE_URL || ""
+      if (dbUrl.includes("ondigitalocean.com") || dbUrl.includes("157.245.104.224")) {
+        return { rejectUnauthorized: false }
+      }
+      return undefined
+    }
+
     const client = new Client({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
     })
 
     let userPhoneNumbers: string[] = []
 
     try {
+      console.log("🔍 [BLAND-CALLS] Connecting to database...")
       await client.connect()
+      console.log("✅ [BLAND-CALLS] Database connected")
 
       // Set user context for RLS
       await client.query(`SET app.current_user_id = '${userId}'`)
@@ -41,8 +76,14 @@ export async function GET(request: NextRequest) {
         [userId]
       )
 
-      userPhoneNumbers = result.rows.map(row => row.phone_number.trim())
+      userPhoneNumbers = result.rows.map(row => row.phone_number?.trim()).filter(Boolean)
       console.log("📞 [BLAND-CALLS] User phone numbers:", userPhoneNumbers)
+    } catch (dbError: any) {
+      console.error("🚨 [BLAND-CALLS] Database error:", dbError.message)
+      return NextResponse.json({ 
+        error: "Database connection failed",
+        details: dbError.message
+      }, { status: 500 })
     } finally {
       await client.end()
     }
@@ -190,6 +231,11 @@ export async function GET(request: NextRequest) {
 
   } catch (error: any) {
     console.error("🚨 [BLAND-CALLS] Unexpected error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("🚨 [BLAND-CALLS] Error stack:", error.stack)
+    return NextResponse.json({ 
+      error: "Internal server error",
+      details: error.message,
+      type: error.name
+    }, { status: 500 })
   }
 }

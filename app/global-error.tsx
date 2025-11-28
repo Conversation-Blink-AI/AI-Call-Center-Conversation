@@ -9,7 +9,7 @@ export default function GlobalError({
   reset: () => void
 }) {
   return (
-    <html>
+    <html lang="en">
       <body className="min-h-screen bg-background">
         <div className="min-h-screen flex items-center justify-center">
           <div className="text-center">
