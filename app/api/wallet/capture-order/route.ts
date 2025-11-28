@@ -2,7 +2,19 @@ import { NextResponse } from 'next/server'
 import { paypalClient } from '../../../../lib/paypalClient'
 import paypal from '@paypal/checkout-server-sdk'
 
+// Force dynamic rendering to prevent build-time execution
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 export async function POST(req) {
+  // Prevent execution during build time
+  if (!process.env.PAYPAL_CLIENT_ID || !process.env.PAYPAL_CLIENT_SECRET) {
+    return NextResponse.json(
+      { error: 'PayPal not configured. PAYPAL_CLIENT_ID and PAYPAL_CLIENT_SECRET are required.' },
+      { status: 503 }
+    )
+  }
+
   try {
     // Get user from session/auth
     const { getUser } = await import('../../../../lib/auth-utils')
