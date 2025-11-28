@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
 import { stripe } from '../../../lib/stripeClient'
 
+// Force dynamic rendering to prevent build-time execution
+export const dynamic = 'force-dynamic'
+export const runtime = 'nodejs'
+
 export async function GET() {
   console.log('🧪 [TEST-WEBHOOK] GET request received')
 
@@ -20,6 +24,13 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  // Prevent execution during build time
+  if (!process.env.STRIPE_SECRET_KEY) {
+    return NextResponse.json({ 
+      error: 'Stripe not configured',
+      message: 'STRIPE_SECRET_KEY environment variable is not set'
+    }, { status: 503 })
+  }
   console.log('🧪 [TEST-WEBHOOK] ==================== TEST WEBHOOK CALLED ====================')
 
   try {
