@@ -14,6 +14,10 @@ const nextConfig = {
   generateBuildId: async () => {
     return 'build-' + Date.now()
   },
+  // Disable static optimization for error pages
+  experimental: {
+    missingSuspenseWithCSRBailout: false,
+  },
   // Enable cross-origin requests for Replit environment
   allowedDevOrigins: ['*'],
   // Enable all hosts for Replit environment

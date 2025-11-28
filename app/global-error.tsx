@@ -4,8 +4,9 @@
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 export const fetchCache = 'force-no-store'
-export const runtime = 'nodejs'
 
+// Global error boundary - must be a client component
+// This file must include html and body tags as it replaces the root layout
 export default function GlobalError({
   error,
   reset,
@@ -13,16 +14,48 @@ export default function GlobalError({
   error: Error & { digest?: string }
   reset: () => void
 }) {
+  // Return minimal HTML structure - Next.js requires html and body tags here
+  // Using lowercase tags to avoid detection as Html/Body components from next/document
   return (
-    <html lang="en" suppressHydrationWarning>
-      <body className="min-h-screen bg-background" suppressHydrationWarning>
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <h2 className="text-2xl font-semibold text-foreground mb-4">Something went wrong!</h2>
-            <p className="text-muted-foreground mb-6">A global error occurred.</p>
+    <html>
+      <body>
+        <div style={{ 
+          minHeight: '100vh', 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          backgroundColor: '#000',
+          color: '#fff',
+          fontFamily: 'system-ui, sans-serif'
+        }}>
+          <div style={{ textAlign: 'center', padding: '2rem' }}>
+            <h2 style={{ fontSize: '1.5rem', fontWeight: 600, marginBottom: '1rem' }}>
+              Something went wrong!
+            </h2>
+            <p style={{ marginBottom: '1.5rem', opacity: 0.8 }}>
+              A global error occurred.
+            </p>
             <button
-              onClick={() => reset()}
-              className="inline-flex items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
+              onClick={reset}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '0.5rem 1rem',
+                fontSize: '0.875rem',
+                fontWeight: 500,
+                backgroundColor: '#3b82f6',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '0.375rem',
+                cursor: 'pointer',
+              }}
+              onMouseOver={(e) => {
+                e.currentTarget.style.backgroundColor = '#2563eb'
+              }}
+              onMouseOut={(e) => {
+                e.currentTarget.style.backgroundColor = '#3b82f6'
+              }}
             >
               Try again
             </button>
