@@ -40,7 +40,6 @@ const nextConfig = {
     }
     return config
   },
-  // Note: Removed invalid experimental config option
 }
 
 export default nextConfig
