@@ -20,7 +20,7 @@ export default function GlobalError({
     h: ['h', 't', 'm', 'l'],
     b: ['b', 'o', 'd', 'y']
   }
-  const htmlTag = tagParts.h.join('') + tagParts.h[0] // 'html'
+  const htmlTag = tagParts.h.join('') // 'html'
   const bodyTag = tagParts.b.join('') // 'body'
   
   return createElement(
