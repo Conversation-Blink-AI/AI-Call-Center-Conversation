@@ -40,6 +40,11 @@ const nextConfig = {
     }
     return config
   },
+  // Skip static generation of error pages
+  // This prevents Next.js from trying to statically generate /500 and /404 routes
+  experimental: {
+    missingSuspenseWithCSRBailout: false,
+  },
 }
 
 export default nextConfig
