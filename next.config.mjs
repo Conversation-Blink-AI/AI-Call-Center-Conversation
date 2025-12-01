@@ -45,6 +45,8 @@ const nextConfig = {
   experimental: {
     missingSuspenseWithCSRBailout: false,
   },
+  // Disable static optimization for error pages
+  output: 'standalone',
 }
 
 export default nextConfig
