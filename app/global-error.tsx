@@ -1,5 +1,7 @@
 'use client'
 
+import React from 'react'
+
 // Note: Client components cannot export route segment config
 // global-error must be a client component and must include html/body tags
 
@@ -11,7 +13,6 @@ export default function GlobalError({
   reset: () => void
 }) {
   // Use React.createElement with string literals to avoid Next.js detecting as Html/Body components
-  const React = require('react')
   const htmlTag = 'html'
   const bodyTag = 'body'
   
