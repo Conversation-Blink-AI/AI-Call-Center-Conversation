@@ -1,9 +1,21 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
 // Client component to prevent static generation
+// Use state to ensure it's not statically generated
 export default function NotFound() {
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return null
+  }
+
   return (
     <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="text-center">
