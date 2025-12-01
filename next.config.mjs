@@ -9,11 +9,6 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Skip generating error pages during static export
-  // This prevents Next.js from trying to statically generate /500 and /_error routes
-  generateBuildId: async () => {
-    return 'build-' + Date.now()
-  },
   // Enable cross-origin requests for Replit environment
   allowedDevOrigins: ['*'],
   // Enable all hosts for Replit environment
@@ -30,19 +25,6 @@ const nextConfig = {
       },
     ]
   },
-  // Custom webpack config
-  webpack: (config, { isServer }) => {
-    if (!isServer) {
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        fs: false,
-      }
-    }
-    return config
-  },
-  // Skip static generation of error pages
-  // This prevents Next.js from trying to statically generate /500 and /404 routes
-  output: 'standalone',
 }
 
 export default nextConfig

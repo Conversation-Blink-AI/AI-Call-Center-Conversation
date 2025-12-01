@@ -3,9 +3,6 @@
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 
-// Note: Client components cannot export revalidate, dynamic, or fetchCache
-// These are only for server components
-
 // Sample data for call flows
 const callFlows = [
   {

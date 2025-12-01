@@ -1,29 +1,6 @@
-'use client'
-
-import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
-// Client component to prevent static generation
-// Use dynamic rendering to ensure it's never statically generated
 export default function NotFound() {
-  const [mounted, setMounted] = useState(false)
-  const [shouldRender, setShouldRender] = useState(false)
-
-  useEffect(() => {
-    // Use multiple state updates to ensure it's truly dynamic
-    setMounted(true)
-    // Delay rendering to prevent static analysis
-    const timer = setTimeout(() => {
-      setShouldRender(true)
-    }, 0)
-    return () => clearTimeout(timer)
-  }, [])
-
-  // Return null during SSR and initial render to prevent static generation
-  if (!mounted || !shouldRender) {
-    return null
-  }
-
   return (
     <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="text-center">

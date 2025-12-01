@@ -3,9 +3,6 @@
 
 import { useEffect } from 'react'
 
-// Note: Client components cannot export route segment config
-// These exports are only for server components
-
 export default function Error({
   error,
   reset,
