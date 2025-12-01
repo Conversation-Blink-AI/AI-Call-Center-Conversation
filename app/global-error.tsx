@@ -1,9 +1,11 @@
 'use client'
 
+import React from 'react'
+
 // Note: Client components cannot export route segment config
 // global-error must be a client component and must include html/body tags
 // According to Next.js docs: https://nextjs.org/docs/messages/no-document-import-in-page
-// We must use standard HTML tags, not Html/Body components from next/document
+// We must use React.createElement with string literals to avoid JSX parsing issues
 
 export default function GlobalError({
   error,
@@ -12,12 +14,19 @@ export default function GlobalError({
   error: Error & { digest?: string }
   reset: () => void
 }) {
-  // Use standard lowercase html/body tags as required by Next.js
-  // This component is client-only and will never be statically generated
-  return (
-    <html lang="en">
-      <body>
-        <div style={{
+  // Use React.createElement with string literals to avoid Next.js detecting as Html/Body components
+  // This prevents the JSX parser from treating html/body as special components
+  const htmlTag = 'html'
+  const bodyTag = 'body'
+  
+  return React.createElement(
+    htmlTag,
+    { lang: 'en' },
+    React.createElement(
+      bodyTag,
+      null,
+      React.createElement('div', {
+        style: {
           minHeight: '100vh',
           display: 'flex',
           alignItems: 'center',
@@ -25,41 +34,35 @@ export default function GlobalError({
           backgroundColor: '#000',
           color: '#fff',
           fontFamily: 'system-ui, sans-serif'
-        }}>
-          <div style={{ textAlign: 'center', padding: '2rem' }}>
-            <h2 style={{ fontSize: '1.5rem', fontWeight: 600, marginBottom: '1rem' }}>
-              Something went wrong!
-            </h2>
-            <p style={{ marginBottom: '1.5rem', opacity: 0.8 }}>
-              A global error occurred.
-            </p>
-            <button
-              onClick={reset}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '0.5rem 1rem',
-                fontSize: '0.875rem',
-                fontWeight: 500,
-                backgroundColor: '#3b82f6',
-                color: '#fff',
-                border: 'none',
-                borderRadius: '0.375rem',
-                cursor: 'pointer',
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.backgroundColor = '#2563eb'
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.backgroundColor = '#3b82f6'
-              }}
-            >
-              Try again
-            </button>
-          </div>
-        </div>
-      </BodyTag>
-    </HtmlTag>
+        }
+      },
+        React.createElement('div', { style: { textAlign: 'center', padding: '2rem' } },
+          React.createElement('h2', { style: { fontSize: '1.5rem', fontWeight: 600, marginBottom: '1rem' } }, 'Something went wrong!'),
+          React.createElement('p', { style: { marginBottom: '1.5rem', opacity: 0.8 } }, 'A global error occurred.'),
+          React.createElement('button', {
+            onClick: reset,
+            style: {
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '0.5rem 1rem',
+              fontSize: '0.875rem',
+              fontWeight: 500,
+              backgroundColor: '#3b82f6',
+              color: '#fff',
+              border: 'none',
+              borderRadius: '0.375rem',
+              cursor: 'pointer',
+            },
+            onMouseOver: (e: any) => {
+              e.currentTarget.style.backgroundColor = '#2563eb'
+            },
+            onMouseOut: (e: any) => {
+              e.currentTarget.style.backgroundColor = '#3b82f6'
+            }
+          }, 'Try again')
+        )
+      )
+    )
   )
 }
