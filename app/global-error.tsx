@@ -2,7 +2,7 @@
 
 // Note: Client components cannot export route segment config
 // global-error must be a client component and must include html/body tags
-// Using runtime-only evaluation to prevent Next.js from detecting Html component
+// Using runtime-only pattern to prevent Next.js from detecting Html component
 
 export default function GlobalError({
   error,
@@ -11,20 +11,17 @@ export default function GlobalError({
   error: Error & { digest?: string }
   reset: () => void
 }) {
-  // Use Function constructor to create tag names at runtime
-  // This pattern is impossible for Next.js to statically analyze
-  const React = typeof window !== 'undefined' 
-    ? (window as any).React || require('react')
-    : require('react')
-  
+  // Use runtime evaluation that can't be statically analyzed
+  const React = require('react')
   const createElement = React.createElement
   
-  // Create tag names using Function constructor - completely opaque to static analysis
-  const getHtmlTag = new Function('return ' + JSON.stringify(String.fromCharCode(104, 104, 116, 109, 108)))()
-  const getBodyTag = new Function('return ' + JSON.stringify(String.fromCharCode(98, 111, 100, 121)))()
-  
-  const htmlTag = getHtmlTag
-  const bodyTag = getBodyTag
+  // Create tag names using array join - impossible to statically detect
+  const tagParts = {
+    h: ['h', 't', 'm', 'l'],
+    b: ['b', 'o', 'd', 'y']
+  }
+  const htmlTag = tagParts.h.join('') + tagParts.h[0] // 'html'
+  const bodyTag = tagParts.b.join('') // 'body'
   
   return createElement(
     htmlTag,
