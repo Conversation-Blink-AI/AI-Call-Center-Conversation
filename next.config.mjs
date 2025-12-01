@@ -40,8 +40,6 @@ const nextConfig = {
     }
     return config
   },
-  // Skip static generation of error pages to prevent Html component detection
-  generateStaticParams: false,
 }
 
 export default nextConfig
