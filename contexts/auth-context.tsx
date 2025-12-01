@@ -115,11 +115,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ email, password }),
       })
 
+      // Check if response is ok before parsing JSON
+      if (!response.ok) {
+        // Try to parse error message
+        let errorMessage = "An error occurred during login"
+        try {
+          const errorData = await response.json()
+          errorMessage = errorData.message || errorMessage
+        } catch {
+          // If JSON parsing fails, use status text
+          errorMessage = response.statusText || `Server error (${response.status})`
+        }
+        console.error("❌ [AUTH-CONTEXT] Login error:", errorMessage)
+        return { success: false, message: errorMessage }
+      }
+
       const result = await response.json()
 
       if (!result.success) {
         console.error("❌ [AUTH-CONTEXT] Login error:", result.message)
-        return { success: false, message: result.message }
+        return { success: false, message: result.message || "Login failed" }
       }
 
       console.log("✅ [AUTH-CONTEXT] Login successful")
@@ -141,7 +156,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { success: true, message: result.message || "Login successful" }
     } catch (error: any) {
       console.error("❌ [AUTH-CONTEXT] Unexpected login error:", error)
-      return { success: false, message: error.message || "An unexpected error occurred" }
+      const errorMessage = error.message || "An unexpected error occurred. Please check your network connection and try again."
+      return { success: false, message: errorMessage }
     }
   }
 

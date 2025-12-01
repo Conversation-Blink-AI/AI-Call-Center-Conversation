@@ -2,6 +2,17 @@
 import { NextResponse } from "next/server"
 import { Client } from "pg"
 
+// Helper function to get SSL config for DigitalOcean
+function getSSLConfig() {
+  const dbUrl = process.env.DATABASE_URL || ""
+  // Check if connecting to DigitalOcean (by IP or hostname)
+  if (dbUrl.includes("ondigitalocean.com") || dbUrl.includes("157.245.104.224")) {
+    // DigitalOcean uses self-signed certificates, so we need to allow them
+    return { rejectUnauthorized: false }
+  }
+  return undefined // Use default SSL settings for other databases
+}
+
 export async function GET() {
   if (!process.env.DATABASE_URL) {
     return NextResponse.json({
@@ -11,7 +22,10 @@ export async function GET() {
   }
 
   const client = new Client({
-    connectionString: process.env.DATABASE_URL
+    connectionString: process.env.DATABASE_URL,
+    ssl: getSSLConfig(),
+    connectionTimeoutMillis: 10000, // 10 seconds timeout for connection
+    query_timeout: 30000, // 30 seconds timeout for queries
   })
 
   try {
@@ -46,14 +60,31 @@ export async function GET() {
       }
     })
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("❌ PostgreSQL auth test error:", error)
+    console.error("❌ Error code:", error.code)
+    console.error("❌ Error message:", error.message)
+    
+    let errorMessage = "Failed to verify PostgreSQL authentication"
+    if (error.code === 'ETIMEDOUT' || error.message?.includes('ETIMEDOUT') || error.message?.includes('timeout')) {
+      errorMessage = "Database connection timed out. The database server may be slow to respond or unreachable. Please check your network connection and database server status."
+    } else if (error.code === 'ECONNREFUSED') {
+      errorMessage = "Unable to connect to database. The database server may be down or unreachable."
+    } else if (error.code === 'ENOTFOUND') {
+      errorMessage = "Database host not found. Please check your DATABASE_URL configuration."
+    }
+    
     return NextResponse.json({
       success: false,
-      message: "Failed to verify PostgreSQL authentication",
-      error: error instanceof Error ? error.message : "Unknown error"
+      message: errorMessage,
+      error: error instanceof Error ? error.message : "Unknown error",
+      errorCode: error.code || "UNKNOWN"
     }, { status: 500 })
   } finally {
-    await client.end()
+    try {
+      await client.end()
+    } catch (closeError) {
+      console.error("Error closing database connection:", closeError)
+    }
   }
 }

@@ -5,6 +5,17 @@ import { cookies } from "next/headers"
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
 
+// Helper function to get SSL config for DigitalOcean
+function getSSLConfig() {
+  const dbUrl = process.env.DATABASE_URL || ""
+  // Check if connecting to DigitalOcean (by IP or hostname)
+  if (dbUrl.includes("ondigitalocean.com") || dbUrl.includes("157.245.104.224")) {
+    // DigitalOcean uses self-signed certificates, so we need to allow them
+    return { rejectUnauthorized: false }
+  }
+  return undefined // Use default SSL settings for other databases
+}
+
 export async function POST(request: Request) {
   try {
     const { email, password } = await request.json()
@@ -78,14 +89,27 @@ export async function POST(request: Request) {
     console.log("[AUTH/LOGIN] External authentication successful")
     const externalUserData = externalResult.data
 
+    // Validate DATABASE_URL
+    if (!process.env.DATABASE_URL) {
+      console.error("[AUTH/LOGIN] DATABASE_URL environment variable is not set")
+      return NextResponse.json({
+        success: false,
+        message: "Database configuration missing. Please configure DATABASE_URL environment variable."
+      }, { status: 500 })
+    }
+
     // Connect to PostgreSQL to sync user data
     const client = new Client({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig(),
+      connectionTimeoutMillis: 10000, // 10 seconds timeout for connection
+      query_timeout: 30000, // 30 seconds timeout for queries
     })
 
     let localUser = null
     try {
       await client.connect()
+      console.log("[AUTH/LOGIN] Successfully connected to database")
 
       // Check if user exists in local database
       const existingUserResult = await client.query(
@@ -149,8 +173,50 @@ export async function POST(request: Request) {
         console.log("[AUTH/LOGIN] Created new local user:", localUser.id)
       }
 
+    } catch (dbError: any) {
+      console.error("[AUTH/LOGIN] Database error:", dbError)
+      console.error("[AUTH/LOGIN] Error code:", dbError.code)
+      console.error("[AUTH/LOGIN] Error message:", dbError.message)
+      await client.end().catch(() => {}) // Try to close connection, ignore errors
+      
+      // Return more specific error message
+      if (dbError.code === 'ECONNREFUSED') {
+        return NextResponse.json({
+          success: false,
+          message: "Unable to connect to database. The database server may be down or unreachable. Please check your database configuration."
+        }, { status: 500 })
+      } else if (dbError.code === 'ENOTFOUND') {
+        return NextResponse.json({
+          success: false,
+          message: "Database host not found. Please check your DATABASE_URL configuration."
+        }, { status: 500 })
+      } else if (dbError.code === 'ETIMEDOUT' || dbError.message?.includes('ETIMEDOUT') || dbError.message?.includes('timeout')) {
+        return NextResponse.json({
+          success: false,
+          message: "Database connection timed out. The database server may be slow to respond or unreachable. Please check your network connection and database server status."
+        }, { status: 500 })
+      } else if (dbError.message?.includes('password authentication failed')) {
+        return NextResponse.json({
+          success: false,
+          message: "Database authentication failed. Please check your DATABASE_URL credentials."
+        }, { status: 500 })
+      } else if (dbError.message?.includes('SSL') || dbError.code === 'SELF_SIGNED_CERT_IN_CHAIN') {
+        return NextResponse.json({
+          success: false,
+          message: "Database SSL connection error. Please check your SSL configuration."
+        }, { status: 500 })
+      } else {
+        return NextResponse.json({
+          success: false,
+          message: `Database error: ${dbError.message || 'Unknown database error'}. Please check your database connection and try again.`
+        }, { status: 500 })
+      }
     } finally {
-      await client.end()
+      try {
+        await client.end()
+      } catch (closeError) {
+        console.error("[AUTH/LOGIN] Error closing database connection:", closeError)
+      }
     }
 
     // Create local JWT token for compatibility
@@ -198,19 +264,29 @@ export async function POST(request: Request) {
     })
 
   } catch (error: any) {
-    console.error("[AUTH/LOGIN] Error:", error)
+    console.error("[AUTH/LOGIN] Unexpected error:", error)
+    console.error("[AUTH/LOGIN] Error stack:", error.stack)
 
     // Handle network errors
-    if (error.message?.includes('fetch')) {
+    if (error.message?.includes('fetch') || error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
       return NextResponse.json({
         success: false,
-        message: "Unable to connect to authentication service. Please try again later."
+        message: "Unable to connect to authentication service. Please check your network connection and try again later."
       }, { status: 503 })
     }
 
+    // Handle JSON parsing errors
+    if (error instanceof SyntaxError) {
+      return NextResponse.json({
+        success: false,
+        message: "Invalid response from server. Please try again."
+      }, { status: 500 })
+    }
+
+    // Return more descriptive error message
     return NextResponse.json({
       success: false,
-      message: "Internal server error"
+      message: error.message || "An internal server error occurred. Please try again later."
     }, { status: 500 })
   }
 }
