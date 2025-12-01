@@ -7,6 +7,10 @@ import { StatsSection } from "@/components/stats-section"
 import { CTASection } from "@/components/cta-section"
 import { Footer } from "@/components/footer"
 
+// Force dynamic rendering to prevent build-time errors
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default function Home() {
   return (
     <div className="flex flex-col min-h-screen">

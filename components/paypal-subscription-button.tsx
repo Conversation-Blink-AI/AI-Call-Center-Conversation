@@ -35,7 +35,14 @@ export default function PayPalSubscriptionButton({
     }
 
     const script = document.createElement("script")
-    script.src = `https://www.paypal.com/sdk/js?client-id=${process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID}&vault=true&intent=subscription`
+    const clientId = typeof process !== 'undefined' && process.env?.NEXT_PUBLIC_PAYPAL_CLIENT_ID || ''
+    if (!clientId) {
+      console.error("PayPal client ID is not configured")
+      setError("PayPal is not configured. Please contact support.")
+      onError(new Error("PayPal client ID missing"))
+      return
+    }
+    script.src = `https://www.paypal.com/sdk/js?client-id=${clientId}&vault=true&intent=subscription`
     script.id = "paypal-sdk"
     script.async = true
 
