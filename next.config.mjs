@@ -40,11 +40,6 @@ const nextConfig = {
     }
     return config
   },
-  // Skip generating error pages
-  onDemandEntries: {
-    maxInactiveAge: 25 * 1000,
-    pagesBufferLength: 2,
-  },
 }
 
 export default nextConfig
