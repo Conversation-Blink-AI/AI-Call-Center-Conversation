@@ -3,9 +3,8 @@
 
 import { useEffect } from 'react'
 
-// Force dynamic rendering - error pages should not be statically generated
-export const dynamic = 'force-dynamic'
-export const runtime = 'nodejs'
+// Note: Client components cannot export route segment config
+// These exports are only for server components
 
 export default function Error({
   error,
