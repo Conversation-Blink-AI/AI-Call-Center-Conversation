@@ -2,10 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react"
 
-// Force dynamic rendering - this page requires database access
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
-export const fetchCache = 'force-no-store'
+// Note: Client components cannot export revalidate, dynamic, or fetchCache
+// These are only for server components
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"

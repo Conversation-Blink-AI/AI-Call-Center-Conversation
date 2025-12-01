@@ -1,10 +1,8 @@
+'use client'
+
 import Link from 'next/link'
 
-// Force dynamic rendering - not-found pages should not be statically generated
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
-export const fetchCache = 'force-no-store'
-
+// Client component to prevent static generation
 export default function NotFound() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center">

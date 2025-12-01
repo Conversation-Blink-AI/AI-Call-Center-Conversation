@@ -3,10 +3,8 @@
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 
-// Force dynamic rendering - this page requires authentication and database access
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
-export const fetchCache = 'force-no-store'
+// Note: Client components cannot export revalidate, dynamic, or fetchCache
+// These are only for server components
 
 // Sample data for call flows
 const callFlows = [
