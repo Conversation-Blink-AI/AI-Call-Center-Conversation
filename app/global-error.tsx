@@ -2,7 +2,8 @@
 
 // Note: Client components cannot export route segment config
 // global-error must be a client component and must include html/body tags
-// Using dynamic import to prevent static analysis during build
+// According to Next.js docs: https://nextjs.org/docs/messages/no-document-import-in-page
+// We must use standard HTML tags, not Html/Body components from next/document
 
 export default function GlobalError({
   error,
@@ -11,17 +12,11 @@ export default function GlobalError({
   error: Error & { digest?: string }
   reset: () => void
 }) {
-  // Use dynamic tag names to prevent Next.js from detecting as Html/Body components
-  const htmlElement = typeof document !== 'undefined' ? document.createElement('html') : null
-  const bodyElement = typeof document !== 'undefined' ? document.createElement('body') : null
-  
-  // Fallback to string literals if document is not available (SSR)
-  const HtmlTag = (htmlElement?.tagName.toLowerCase() || 'html') as 'html'
-  const BodyTag = (bodyElement?.tagName.toLowerCase() || 'body') as 'body'
-  
+  // Use standard lowercase html/body tags as required by Next.js
+  // This component is client-only and will never be statically generated
   return (
-    <HtmlTag lang="en">
-      <BodyTag>
+    <html lang="en">
+      <body>
         <div style={{
           minHeight: '100vh',
           display: 'flex',
