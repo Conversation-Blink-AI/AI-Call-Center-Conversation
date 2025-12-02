@@ -117,7 +117,7 @@ export async function GET(request: NextRequest) {
     const options = {
       method: 'GET',
       headers: {
-        authorization: blandApiKey
+        'Authorization': `Bearer ${blandApiKey}`
       },
       body: undefined
     }

@@ -68,88 +68,92 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Bland.ai API key not configured" }, { status: 500 })
     }
 
-    // Fetch calls for each user phone number using Bland.ai's filters
+    // Fetch ALL calls from Bland.ai at once (without phone number filters)
+    // This approach avoids IP blocking issues that occur when filtering by phone number
+    // We'll filter the results server-side to match user's phone numbers
     let allUserCalls: any[] = []
     const apiErrors: any[] = []
 
-    for (const phoneNumber of userPhoneNumbers) {
-      console.log("🌐 [BLAND-CALLS] Fetching calls for phone number:", phoneNumber)
+    try {
+      // Fetch all calls without phone number filters to avoid DigitalOcean IP blocking
+      const blandUrl = `https://api.bland.ai/v1/calls?limit=1000&ascending=false&sort_by=created_at`
       
-      // Properly encode the phone number
-      const encodedNumber = encodeURIComponent(phoneNumber)
-      console.log("🔧 [BLAND-CALLS] Encoded phone number:", encodedNumber)
+      console.log("🌐 [BLAND-CALLS] Fetching ALL calls from Bland.ai (will filter server-side)")
+      console.log("🔍 [BLAND-CALLS] Bland API URL:", blandUrl)
 
-      // Try both to_number and from_number directions
-      for (const direction of ["to_number", "from_number"]) {
-        const blandUrl = new URL('https://api.bland.ai/v1/calls')
-        blandUrl.searchParams.set('limit', '1000')
-        blandUrl.searchParams.set('ascending', 'false')
-        blandUrl.searchParams.set('sort_by', 'created_at')
-        blandUrl.searchParams.set(direction, encodedNumber)
+      const response = await fetch(blandUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${blandApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        // Add timeout to prevent hanging
+        signal: AbortSignal.timeout(30000) // 30 second timeout
+      })
 
-        console.log(`📞 [BLAND-CALLS] Querying with ${direction}=${encodedNumber}`)
-        console.log("🔍 [BLAND-CALLS] Final Bland API URL:", blandUrl.toString())
-
-        try {
-          const response = await fetch(blandUrl.toString(), {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${blandApiKey}`,
-              'Content-Type': 'application/json'
-            },
-            // Add timeout to prevent hanging
-            signal: AbortSignal.timeout(30000) // 30 second timeout
-          })
-
-          if (!response.ok) {
-            const errorText = await response.text()
-            const errorDetails = {
-              phoneNumber,
-              direction,
-              status: response.status,
-              statusText: response.statusText,
-              error: errorText
-            }
-            console.error(`❌ [BLAND-CALLS] Bland.ai API error for ${phoneNumber} (${direction}):`, errorDetails)
-            apiErrors.push(errorDetails)
-            continue // Continue with other directions/phone numbers
-          }
-
-          const data = await response.json()
-          console.log(`✅ [BLAND-CALLS] Received response for ${phoneNumber} (${direction}):`, {
-            status: data.status,
-            total_count: data.total_count,
-            count: data.count,
-            calls_length: data.calls?.length || 0,
-            has_calls: !!data.calls && Array.isArray(data.calls) && data.calls.length > 0
-          })
-
-          if (data.calls && Array.isArray(data.calls) && data.calls.length > 0) {
-            // Avoid duplicates by checking if call_id already exists
-            const newCalls = data.calls.filter(call => 
-              !allUserCalls.some(existingCall => 
-                (existingCall.call_id || existingCall.c_id || existingCall.id) === 
-                (call.call_id || call.c_id || call.id)
-              )
-            )
-            
-            allUserCalls = allUserCalls.concat(newCalls)
-            console.log(`📊 [BLAND-CALLS] Added ${newCalls.length} new calls for ${phoneNumber} (${direction})`)
-          } else {
-            console.log(`⚠️ [BLAND-CALLS] No calls found in response for ${phoneNumber} (${direction})`)
-          }
-        } catch (fetchError: any) {
-          const errorDetails = {
-            phoneNumber,
-            direction,
-            error: fetchError.message,
-            type: fetchError.name
-          }
-          console.error(`❌ [BLAND-CALLS] Fetch error for ${phoneNumber} (${direction}):`, errorDetails)
-          apiErrors.push(errorDetails)
-          // Continue with other directions/phone numbers
+      if (!response.ok) {
+        const errorText = await response.text()
+        const errorDetails = {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText.substring(0, 500) // Limit error length
         }
+        console.error(`❌ [BLAND-CALLS] Bland.ai API error:`, errorDetails)
+        apiErrors.push(errorDetails)
+      } else {
+        const data = await response.json()
+        console.log(`✅ [BLAND-CALLS] Received response from Bland.ai:`, {
+          status: data.status,
+          total_count: data.total_count,
+          count: data.count,
+          calls_length: data.calls?.length || 0
+        })
+
+        const allCalls = data.calls || []
+        console.log(`📊 [BLAND-CALLS] Total calls received from Bland.ai:`, allCalls.length)
+
+        // Filter calls to match user's phone numbers (both to and from)
+        allUserCalls = allCalls.filter((call: any) => {
+          const callToNumber = call.to || call.to_number || ''
+          const callFromNumber = call.from || call.from_number || ''
+
+          // Check if call involves any of user's phone numbers
+          return userPhoneNumbers.some((userPhone) => {
+            // Normalize phone numbers - remove all non-digits
+            const normalizedUserPhone = userPhone.replace(/\D/g, "")
+            const normalizedCallTo = callToNumber.replace(/\D/g, "")
+            const normalizedCallFrom = callFromNumber.replace(/\D/g, "")
+
+            // For US numbers, handle both with and without country code (1)
+            const userWithoutCountryCode = normalizedUserPhone.startsWith("1") ? normalizedUserPhone.slice(1) : normalizedUserPhone
+            const callToWithoutCountryCode = normalizedCallTo.startsWith("1") ? normalizedCallTo.slice(1) : normalizedCallTo
+            const callFromWithoutCountryCode = normalizedCallFrom.startsWith("1") ? normalizedCallFrom.slice(1) : normalizedCallFrom
+
+            return (
+              // Exact match with full numbers
+              normalizedCallTo === normalizedUserPhone || 
+              normalizedCallFrom === normalizedUserPhone ||
+              // Match without country codes  
+              callToWithoutCountryCode === userWithoutCountryCode ||
+              callFromWithoutCountryCode === userWithoutCountryCode ||
+              // Match if numbers contain each other (for different formatting)
+              normalizedCallTo.includes(userWithoutCountryCode) || 
+              normalizedCallFrom.includes(userWithoutCountryCode) ||
+              normalizedUserPhone.includes(callToWithoutCountryCode) ||
+              normalizedUserPhone.includes(callFromWithoutCountryCode)
+            )
+          })
+        })
+
+        console.log(`🎯 [BLAND-CALLS] Filtered ${allUserCalls.length} user-specific calls from ${allCalls.length} total calls`)
       }
+    } catch (fetchError: any) {
+      const errorDetails = {
+        error: fetchError.message,
+        type: fetchError.name
+      }
+      console.error(`❌ [BLAND-CALLS] Fetch error:`, errorDetails)
+      apiErrors.push(errorDetails)
     }
 
     if (apiErrors.length > 0) {
