@@ -162,6 +162,19 @@ export async function GET(request: NextRequest) {
 
     console.log("📊 [BLAND-CALLS] Total calls found for user:", allUserCalls.length)
 
+    // Get server IP for debugging
+    let serverIP: string | null = null
+    try {
+      const ipResponse = await fetch("https://api.ipify.org?format=json", {
+        signal: AbortSignal.timeout(3000)
+      })
+      const ipData = await ipResponse.json()
+      serverIP = ipData.ip
+      console.log("🌐 [BLAND-CALLS] Server public IP:", serverIP)
+    } catch (error) {
+      console.warn("⚠️ [BLAND-CALLS] Could not fetch server IP:", error)
+    }
+
     // Sort calls by created_at (newest first)
     allUserCalls.sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
 
@@ -222,7 +235,8 @@ export async function GET(request: NextRequest) {
         api_errors: apiErrors.length > 0 ? apiErrors : undefined,
         environment: process.env.NODE_ENV,
         has_bland_api_key: !!blandApiKey,
-        user_id: userId
+        user_id: userId,
+        server_public_ip: serverIP || undefined
       }
     })
 
