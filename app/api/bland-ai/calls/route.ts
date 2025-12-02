@@ -1,26 +1,27 @@
 import { NextRequest, NextResponse } from "next/server"
-import { validateAuthToken } from "@/lib/auth-utils"
+import { getUserFromRequest } from "@/lib/auth-utils"
 
 export const dynamic = "force-dynamic"
 
 export async function GET(request: NextRequest) {
   try {
     console.log("🔍 [BLAND-CALLS] Starting call fetch...")
+    console.log("🔍 [BLAND-CALLS] Request URL:", request.url)
+    console.log("🔍 [BLAND-CALLS] Environment:", process.env.NODE_ENV)
 
     const searchParams = request.nextUrl.searchParams
     const page = Number.parseInt(searchParams.get("page") || "1")
     const limit = Number.parseInt(searchParams.get("limit") || "100")
 
-    // Authenticate user
-    const authResult = await validateAuthToken()
-    if (!authResult.isValid || !authResult.user) {
-      console.log("🚨 [BLAND-CALLS] Authentication failed")
+    // Authenticate user - use getUserFromRequest for proper cookie handling
+    const user = await getUserFromRequest(request)
+    if (!user) {
+      console.log("🚨 [BLAND-CALLS] Authentication failed - no user found")
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    const user = authResult.user
     const userId = user.id
-    console.log("✅ [BLAND-CALLS] User authenticated:", userId)
+    console.log("✅ [BLAND-CALLS] User authenticated:", userId, user.email)
 
     // Get user's phone numbers from PostgreSQL
     const { Client } = await import('pg')
@@ -69,6 +70,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch calls for each user phone number using Bland.ai's filters
     let allUserCalls: any[] = []
+    const apiErrors: any[] = []
 
     for (const phoneNumber of userPhoneNumbers) {
       console.log("🌐 [BLAND-CALLS] Fetching calls for phone number:", phoneNumber)
@@ -88,42 +90,70 @@ export async function GET(request: NextRequest) {
         console.log(`📞 [BLAND-CALLS] Querying with ${direction}=${encodedNumber}`)
         console.log("🔍 [BLAND-CALLS] Final Bland API URL:", blandUrl.toString())
 
-        const response = await fetch(blandUrl.toString(), {
-          method: 'GET',
-          headers: {
-            'authorization': blandApiKey,
-            'Content-Type': 'application/json'
+        try {
+          const response = await fetch(blandUrl.toString(), {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${blandApiKey}`,
+              'Content-Type': 'application/json'
+            },
+            // Add timeout to prevent hanging
+            signal: AbortSignal.timeout(30000) // 30 second timeout
+          })
+
+          if (!response.ok) {
+            const errorText = await response.text()
+            const errorDetails = {
+              phoneNumber,
+              direction,
+              status: response.status,
+              statusText: response.statusText,
+              error: errorText
+            }
+            console.error(`❌ [BLAND-CALLS] Bland.ai API error for ${phoneNumber} (${direction}):`, errorDetails)
+            apiErrors.push(errorDetails)
+            continue // Continue with other directions/phone numbers
           }
-        })
 
-        if (!response.ok) {
-          console.error(`❌ [BLAND-CALLS] Bland.ai API error for ${phoneNumber} (${direction}):`, response.status)
-          const errorText = await response.text()
-          console.error("❌ [BLAND-CALLS] Error details:", errorText)
-          continue // Continue with other directions/phone numbers
-        }
+          const data = await response.json()
+          console.log(`✅ [BLAND-CALLS] Received response for ${phoneNumber} (${direction}):`, {
+            status: data.status,
+            total_count: data.total_count,
+            count: data.count,
+            calls_length: data.calls?.length || 0,
+            has_calls: !!data.calls && Array.isArray(data.calls) && data.calls.length > 0
+          })
 
-        const data = await response.json()
-        console.log(`✅ [BLAND-CALLS] Received response for ${phoneNumber} (${direction}):`, {
-          status: data.status,
-          total_count: data.total_count,
-          count: data.count,
-          calls_length: data.calls?.length || 0
-        })
-
-        if (data.calls && Array.isArray(data.calls) && data.calls.length > 0) {
-          // Avoid duplicates by checking if call_id already exists
-          const newCalls = data.calls.filter(call => 
-            !allUserCalls.some(existingCall => 
-              (existingCall.call_id || existingCall.c_id || existingCall.id) === 
-              (call.call_id || call.c_id || call.id)
+          if (data.calls && Array.isArray(data.calls) && data.calls.length > 0) {
+            // Avoid duplicates by checking if call_id already exists
+            const newCalls = data.calls.filter(call => 
+              !allUserCalls.some(existingCall => 
+                (existingCall.call_id || existingCall.c_id || existingCall.id) === 
+                (call.call_id || call.c_id || call.id)
+              )
             )
-          )
-          
-          allUserCalls = allUserCalls.concat(newCalls)
-          console.log(`📊 [BLAND-CALLS] Added ${newCalls.length} new calls for ${phoneNumber} (${direction})`)
+            
+            allUserCalls = allUserCalls.concat(newCalls)
+            console.log(`📊 [BLAND-CALLS] Added ${newCalls.length} new calls for ${phoneNumber} (${direction})`)
+          } else {
+            console.log(`⚠️ [BLAND-CALLS] No calls found in response for ${phoneNumber} (${direction})`)
+          }
+        } catch (fetchError: any) {
+          const errorDetails = {
+            phoneNumber,
+            direction,
+            error: fetchError.message,
+            type: fetchError.name
+          }
+          console.error(`❌ [BLAND-CALLS] Fetch error for ${phoneNumber} (${direction}):`, errorDetails)
+          apiErrors.push(errorDetails)
+          // Continue with other directions/phone numbers
         }
       }
+    }
+
+    if (apiErrors.length > 0) {
+      console.warn(`⚠️ [BLAND-CALLS] ${apiErrors.length} API errors occurred:`, apiErrors)
     }
 
     console.log("📊 [BLAND-CALLS] Total calls found for user:", allUserCalls.length)
@@ -184,12 +214,25 @@ export async function GET(request: NextRequest) {
       user_phone_numbers: userPhoneNumbers,
       debug_info: {
         total_user_calls: allUserCalls.length,
-        phone_numbers_checked: userPhoneNumbers.length
+        phone_numbers_checked: userPhoneNumbers.length,
+        api_errors: apiErrors.length > 0 ? apiErrors : undefined,
+        environment: process.env.NODE_ENV,
+        has_bland_api_key: !!blandApiKey,
+        user_id: userId
       }
     })
 
   } catch (error: any) {
     console.error("🚨 [BLAND-CALLS] Unexpected error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("🚨 [BLAND-CALLS] Error stack:", error?.stack)
+    return NextResponse.json({ 
+      error: "Internal server error",
+      details: process.env.NODE_ENV === "development" ? error.message : undefined,
+      debug_info: {
+        error_type: error?.name,
+        error_message: error?.message,
+        environment: process.env.NODE_ENV
+      }
+    }, { status: 500 })
   }
 }
