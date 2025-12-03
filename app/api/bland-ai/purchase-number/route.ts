@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     console.log(`Purchasing number via Bland.ai: ${phoneNumber}`)
 
     // Get Bland.ai API key from environment variables
-    const blandApiKey = process.env.BLAND_API_KEY
+    const blandApiKey = process.env.BLAND_AI_API_KEY
 
     if (!blandApiKey) {
       console.error("Bland.ai API key not found in environment variables")

@@ -1,7 +1,6 @@
 
 import { type NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
-import jwt from "jsonwebtoken"
+import { getUserFromRequest } from "@/lib/auth-utils"
 
 interface BlandVoice {
   id: string
@@ -15,35 +14,20 @@ interface BlandVoicesResponse {
   voices: BlandVoice[]
 }
 
+export const dynamic = "force-dynamic"
+
 export async function GET(request: NextRequest) {
   console.log("\n=== 🎤 BLAND.AI VOICES API DEBUG TRACE ===")
 
   try {
-    // Get JWT token from cookies using custom auth system
-    const cookieStore = await cookies()
-    const token = cookieStore.get("auth-token")?.value
-
-    if (!token) {
-      console.log("❌ [AUTH] No auth token found")
-      return NextResponse.json({ error: "Unauthorized - No token" }, { status: 401 })
+    // Authenticate user - use getUserFromRequest for proper cookie handling
+    const user = await getUserFromRequest(request)
+    if (!user) {
+      console.log("❌ [AUTH] Authentication failed - no user found")
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
-    // Verify JWT token
-    const jwtSecret = process.env.JWT_SECRET
-    if (!jwtSecret) {
-      console.log("❌ [AUTH] JWT secret not configured")
-      return NextResponse.json({ error: "Internal server error" }, { status: 500 })
-    }
-
-    let userId: string
-    try {
-      const decoded = jwt.verify(token, jwtSecret) as { userId: string }
-      userId = decoded.userId
-      console.log("✅ [AUTH] User authenticated:", userId)
-    } catch (jwtError) {
-      console.log("❌ [AUTH] Invalid token:", jwtError)
-      return NextResponse.json({ error: "Unauthorized - Invalid token" }, { status: 401 })
-    }
+    console.log("✅ [AUTH] User authenticated:", user.id, user.email)
 
     // Get API key from environment
     const blandApiKey = process.env.BLAND_AI_API_KEY
@@ -64,6 +48,7 @@ export async function GET(request: NextRequest) {
         Authorization: `Bearer ${blandApiKey}`,
         "Content-Type": "application/json",
       },
+      signal: AbortSignal.timeout(30000) // 30 second timeout
     })
 
     console.log("📡 [RESPONSE] Status:", blandResponse.status)
@@ -73,11 +58,25 @@ export async function GET(request: NextRequest) {
 
     // Handle non-OK responses
     if (!blandResponse.ok) {
-      console.log("❌ [API ERROR] Non-OK response")
+      console.log("❌ [API ERROR] Non-OK response:", blandResponse.status)
+      
+      // Check if it's an IP blocking error (403)
+      if (blandResponse.status === 403 && rawResponseText.includes('Cloud Providers')) {
+        console.error("❌ [VOICES] IP blocked by Bland.ai - Cloud provider detected")
+        return NextResponse.json(
+          {
+            error: "Access denied - Cloud provider IP blocked",
+            message: "Your server IP is blocked by Bland.ai. Please contact support to whitelist your IP address.",
+            details: "The voices endpoint requires IP whitelisting. Contact hello@bland.ai for assistance.",
+          },
+          { status: 403 },
+        )
+      }
+      
       return NextResponse.json(
         {
           error: `Bland.ai API error: ${blandResponse.status} ${blandResponse.statusText}`,
-          details: rawResponseText,
+          details: rawResponseText.substring(0, 500),
         },
         { status: blandResponse.status },
       )
@@ -100,58 +99,111 @@ export async function GET(request: NextRequest) {
     }
 
     // Filter and sort voices by rating to get top 12
-    const allVoices = blandData.voices || []
+    const allVoices = Array.isArray(blandData.voices) ? blandData.voices : []
+    
+    console.log("📊 [VOICES] Processing voices:", {
+      total_from_api: allVoices.length,
+      first_voice_sample: allVoices[0] ? {
+        id: allVoices[0].id,
+        name: allVoices[0].name,
+        has_rating: !!allVoices[0].average_rating,
+        has_tags: Array.isArray(allVoices[0].tags)
+      } : null
+    })
     
     // Function to check if a voice is Indian-related
     const isIndianVoice = (voice: any) => {
-      const searchTerms = ['india', 'indian', 'hindi', 'tamil', 'bengali', 'marathi', 'gujarati', 'telugu', 'kannada', 'punjabi', 'malayalam', 'urdu']
-      const name = (voice.name || '').toLowerCase()
-      const description = (voice.description || '').toLowerCase()
-      const tags = (voice.tags || []).map((tag: string) => tag.toLowerCase())
+      if (!voice) return false
       
-      const isIndian = searchTerms.some(term => 
-        name.includes(term) ||
-        description.includes(term) || 
-        tags.some((tag: string) => tag.includes(term))
-      )
-      
-      if (isIndian) {
-        console.log("🇮🇳 [INDIAN VOICE FOUND]", {
-          id: voice.id,
-          name: voice.name,
-          description: voice.description,
-          tags: voice.tags
-        })
+      try {
+        const searchTerms = ['india', 'indian', 'hindi', 'tamil', 'bengali', 'marathi', 'gujarati', 'telugu', 'kannada', 'punjabi', 'malayalam', 'urdu']
+        const name = (voice.name || '').toLowerCase()
+        const description = (voice.description || '').toLowerCase()
+        const tags = Array.isArray(voice.tags) ? voice.tags.map((tag: string) => String(tag).toLowerCase()) : []
+        
+        const isIndian = searchTerms.some(term => 
+          name.includes(term) ||
+          description.includes(term) || 
+          tags.some((tag: string) => tag.includes(term))
+        )
+        
+        if (isIndian) {
+          console.log("🇮🇳 [INDIAN VOICE FOUND]", {
+            id: voice.id,
+            name: voice.name,
+            description: voice.description,
+            tags: voice.tags
+          })
+        }
+        
+        return isIndian
+      } catch (error) {
+        console.warn("⚠️ [VOICES] Error checking if voice is Indian:", error)
+        return false
       }
-      
-      return isIndian
     }
     
     // Get Indian voices (regardless of rating)
-    const indianVoices = allVoices.filter((voice: any) => isIndianVoice(voice))
+    const indianVoices = allVoices.filter((voice: any) => {
+      try {
+        return isIndianVoice(voice)
+      } catch (error) {
+        console.warn("⚠️ [VOICES] Error filtering Indian voices:", error)
+        return false
+      }
+    })
     
     // Get top-rated non-Indian voices
     const nonIndianVoices = allVoices
-      .filter((voice: any) => 
-        !isIndianVoice(voice) && 
-        voice.average_rating && 
-        voice.total_ratings > 0
-      )
-      .sort((a: any, b: any) => {
-        // Primary sort: average_rating (higher first)
-        if (b.average_rating !== a.average_rating) {
-          return b.average_rating - a.average_rating
+      .filter((voice: any) => {
+        try {
+          return !isIndianVoice(voice) && 
+                 voice && 
+                 typeof voice.average_rating === 'number' && 
+                 typeof voice.total_ratings === 'number' && 
+                 voice.total_ratings > 0
+        } catch (error) {
+          console.warn("⚠️ [VOICES] Error filtering non-Indian voices:", error)
+          return false
         }
-        // Secondary sort: total_ratings (more ratings = more reliable)
-        return b.total_ratings - a.total_ratings
+      })
+      .sort((a: any, b: any) => {
+        try {
+          // Primary sort: average_rating (higher first)
+          if (b.average_rating !== a.average_rating) {
+            return b.average_rating - a.average_rating
+          }
+          // Secondary sort: total_ratings (more ratings = more reliable)
+          return (b.total_ratings || 0) - (a.total_ratings || 0)
+        } catch (error) {
+          console.warn("⚠️ [VOICES] Error sorting voices:", error)
+          return 0
+        }
       })
     
     // Combine Indian voices with top-rated voices, ensuring we get up to 12 total
+    // If no voices with ratings, just return all voices up to 12
     const remainingSlots = Math.max(0, 12 - indianVoices.length)
-    const selectedVoices = [
-      ...indianVoices,
-      ...nonIndianVoices.slice(0, remainingSlots)
-    ]
+    let selectedVoices: any[] = []
+    
+    try {
+      selectedVoices = [
+        ...indianVoices,
+        ...nonIndianVoices.slice(0, remainingSlots)
+      ]
+      
+      // If we still have slots and not enough voices, add more voices without ratings
+      if (selectedVoices.length < 12 && allVoices.length > selectedVoices.length) {
+        const additionalVoices = allVoices
+          .filter((voice: any) => !selectedVoices.some((v: any) => v.id === voice.id))
+          .slice(0, 12 - selectedVoices.length)
+        selectedVoices = [...selectedVoices, ...additionalVoices]
+      }
+    } catch (error) {
+      console.error("❌ [VOICES] Error combining voices:", error)
+      // Fallback: just return first 12 voices
+      selectedVoices = allVoices.slice(0, 12)
+    }
 
     console.log("🏆 [FILTERING] Voice selection breakdown:", {
       total_available: allVoices.length,
@@ -172,12 +224,18 @@ export async function GET(request: NextRequest) {
       total_available: allVoices.length,
       indian_voices_included: indianVoices.length,
     })
-  } catch (error) {
+  } catch (error: any) {
     console.log("💥 [UNEXPECTED ERROR]", error)
+    console.error("🚨 [VOICES] Error stack:", error?.stack)
     return NextResponse.json(
       {
         error: "Internal server error",
-        message: error instanceof Error ? error.message : "Unknown error",
+        message: process.env.NODE_ENV === "development" ? error.message : "An error occurred while fetching voices",
+        details: process.env.NODE_ENV === "development" ? {
+          error_type: error?.name,
+          error_message: error?.message,
+          stack: error?.stack
+        } : undefined
       },
       { status: 500 },
     )

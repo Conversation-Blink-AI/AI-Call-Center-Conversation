@@ -73,6 +73,8 @@ export async function GET(request: NextRequest) {
     // We'll filter the results server-side to match user's phone numbers
     let allUserCalls: any[] = []
     const apiErrors: any[] = []
+    let totalCallsFromBland = 0
+    let sampleCalls: any[] = []
 
     try {
       // Fetch all calls without phone number filters to avoid DigitalOcean IP blocking
@@ -110,9 +112,22 @@ export async function GET(request: NextRequest) {
         })
 
         const allCalls = data.calls || []
-        console.log(`📊 [BLAND-CALLS] Total calls received from Bland.ai:`, allCalls.length)
+        totalCallsFromBland = allCalls.length
+        console.log(`📊 [BLAND-CALLS] Total calls received from Bland.ai:`, totalCallsFromBland)
+        
+        // Store sample calls for debugging
+        sampleCalls = allCalls.slice(0, 3).map((call: any) => ({
+          to: call.to || call.to_number,
+          from: call.from || call.from_number,
+          call_id: call.call_id || call.id
+        }))
 
         // Filter calls to match user's phone numbers (both to and from)
+        console.log(`🔍 [BLAND-CALLS] Starting phone number filtering...`, {
+          user_phone_numbers: userPhoneNumbers,
+          total_calls_to_filter: allCalls.length
+        })
+
         allUserCalls = allCalls.filter((call: any) => {
           const callToNumber = call.to || call.to_number || ''
           const callFromNumber = call.from || call.from_number || ''
@@ -129,7 +144,8 @@ export async function GET(request: NextRequest) {
             const callToWithoutCountryCode = normalizedCallTo.startsWith("1") ? normalizedCallTo.slice(1) : normalizedCallTo
             const callFromWithoutCountryCode = normalizedCallFrom.startsWith("1") ? normalizedCallFrom.slice(1) : normalizedCallFrom
 
-            return (
+            // Try multiple matching strategies
+            const matches = (
               // Exact match with full numbers
               normalizedCallTo === normalizedUserPhone || 
               normalizedCallFrom === normalizedUserPhone ||
@@ -140,12 +156,39 @@ export async function GET(request: NextRequest) {
               normalizedCallTo.includes(userWithoutCountryCode) || 
               normalizedCallFrom.includes(userWithoutCountryCode) ||
               normalizedUserPhone.includes(callToWithoutCountryCode) ||
-              normalizedUserPhone.includes(callFromWithoutCountryCode)
+              normalizedUserPhone.includes(callFromWithoutCountryCode) ||
+              // Additional: match last 10 digits (US phone number)
+              normalizedCallTo.endsWith(userWithoutCountryCode) ||
+              normalizedCallFrom.endsWith(userWithoutCountryCode)
             )
+
+            return matches
           })
         })
 
         console.log(`🎯 [BLAND-CALLS] Filtered ${allUserCalls.length} user-specific calls from ${allCalls.length} total calls`)
+        
+        // Log sample of unmatched calls for debugging (first 3)
+        if (allUserCalls.length === 0 && allCalls.length > 0) {
+          console.log(`⚠️ [BLAND-CALLS] No calls matched! Sample of first 3 calls from Bland.ai:`, {
+            call1: {
+              to: allCalls[0]?.to || allCalls[0]?.to_number,
+              from: allCalls[0]?.from || allCalls[0]?.from_number,
+              id: allCalls[0]?.call_id || allCalls[0]?.id
+            },
+            call2: allCalls[1] ? {
+              to: allCalls[1]?.to || allCalls[1]?.to_number,
+              from: allCalls[1]?.from || allCalls[1]?.from_number,
+              id: allCalls[1]?.call_id || allCalls[1]?.id
+            } : null,
+            call3: allCalls[2] ? {
+              to: allCalls[2]?.to || allCalls[2]?.to_number,
+              from: allCalls[2]?.from || allCalls[2]?.from_number,
+              id: allCalls[2]?.call_id || allCalls[2]?.id
+            } : null,
+            user_phone_numbers: userPhoneNumbers
+          })
+        }
       }
     } catch (fetchError: any) {
       const errorDetails = {
@@ -223,6 +266,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       status: "success",
       total_count: allUserCalls.length,
+      total: allUserCalls.length, // Add for hook compatibility
       count: transformedCalls.length,
       calls: transformedCalls,
       has_more: endIndex < allUserCalls.length,
@@ -232,11 +276,15 @@ export async function GET(request: NextRequest) {
       debug_info: {
         total_user_calls: allUserCalls.length,
         phone_numbers_checked: userPhoneNumbers.length,
+        user_phone_numbers: userPhoneNumbers,
         api_errors: apiErrors.length > 0 ? apiErrors : undefined,
         environment: process.env.NODE_ENV,
         has_bland_api_key: !!blandApiKey,
         user_id: userId,
-        server_public_ip: serverIP || undefined
+        server_public_ip: serverIP || undefined,
+        api_call_successful: apiErrors.length === 0,
+        total_calls_from_bland: totalCallsFromBland,
+        sample_calls_from_bland: sampleCalls.length > 0 ? sampleCalls : undefined
       }
     })
 

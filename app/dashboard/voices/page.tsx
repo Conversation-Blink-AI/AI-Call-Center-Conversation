@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle, Mic, Globe, Lock, Play, Pause, Loader2 } from "lucide-react"
+import { AlertCircle, Mic, Globe, Lock, Play, Pause, Loader2, RefreshCw } from "lucide-react"
 import { Button } from "@/components/ui/button"
 
 interface BlandVoice {

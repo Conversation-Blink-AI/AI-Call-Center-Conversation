@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     console.log("📋 [INBOUND-UPDATE] Request body:", JSON.stringify(body, null, 2))
 
     // Get the API key
-    const apiKey = process.env.BLAND_AI_API_KEY || process.env.BLAND_API_KEY
+    const apiKey = process.env.BLAND_AI_API_KEY
     if (!apiKey) {
       console.error("🚨 [INBOUND-UPDATE] Bland.ai API key not configured")
       return NextResponse.json({ error: "Bland.ai API key not configured" }, { status: 500 })

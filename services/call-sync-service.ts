@@ -25,7 +25,7 @@ export class CallSyncService {
   private baseUrl = 'https://api.bland.ai/v1'
 
   constructor(apiKey?: string) {
-    this.apiKey = apiKey || process.env.BLAND_API_KEY || ''
+    this.apiKey = apiKey || process.env.BLAND_AI_API_KEY || ''
   }
 
   /**
