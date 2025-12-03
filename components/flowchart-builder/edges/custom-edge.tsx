@@ -51,7 +51,7 @@ export function CustomEdge({
             fontSize: 12,
             pointerEvents: 'all',
           }}
-          className="nodrag nopan bg-white border border-gray-300 rounded px-2 py-1 text-xs font-medium shadow-sm"
+          className="nodrag nopan bg-card border border-border text-foreground rounded px-2 py-1 text-xs font-medium shadow-sm"
         >
           {data?.label || 'next'}
         </div>

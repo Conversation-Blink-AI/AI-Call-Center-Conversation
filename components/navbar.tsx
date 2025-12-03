@@ -29,6 +29,11 @@ export function Navbar() {
     return null
   }
 
+  // Hide on docs pages (docs has its own header)
+  if (pathname.startsWith("/docs")) {
+    return null
+  }
+
   return (
     <header className="fixed w-full z-50 bg-gradient-to-r from-gray-900 to-gray-800 border-b border-gray-800">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">

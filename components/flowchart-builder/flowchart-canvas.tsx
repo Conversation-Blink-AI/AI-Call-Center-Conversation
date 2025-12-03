@@ -15,6 +15,7 @@ import ReactFlow, {
   ReactFlowInstance,
 } from 'reactflow'
 import 'reactflow/dist/style.css'
+import { useTheme } from 'next-themes'
 
 // Import custom nodes
 import { GreetingNode } from './nodes/greeting-node'
@@ -55,6 +56,8 @@ export function FlowchartCanvas({
   initialNodes = [],
   initialEdges = []
 }: FlowchartCanvasProps = {}) {
+  const { theme, resolvedTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
   const reactFlowWrapper = useRef<HTMLDivElement>(null)
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
@@ -68,6 +71,14 @@ export function FlowchartCanvas({
   const [isLoadingFlowchart, setIsLoadingFlowchart] = useState(false)
   const [toolbarNode, setToolbarNode] = useState<Node | null>(null)
   const [toolbarPosition, setToolbarPosition] = useState({ x: 0, y: 0 })
+  
+  // Handle theme mounting to avoid hydration issues
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+  
+  // Determine if dark mode is active
+  const isDarkMode = mounted && (resolvedTheme === 'dark' || theme === 'dark')
 
   const onEditNode = useCallback((node: Node) => {
     setSelectedNode(node)
@@ -391,10 +402,10 @@ export function FlowchartCanvas({
     <>
       <div className="w-full h-full relative" ref={reactFlowWrapper}>
         {isLoadingFlowchart && (
-          <div className="absolute inset-0 bg-white bg-opacity-75 flex items-center justify-center z-50">
+          <div className="absolute inset-0 bg-background/75 backdrop-blur-sm flex items-center justify-center z-50">
             <div className="flex items-center gap-2">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600" />
-              <span className="text-sm text-gray-600">Loading saved pathway...</span>
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+              <span className="text-sm text-foreground">Loading saved pathway...</span>
             </div>
           </div>
         )}
@@ -422,11 +433,16 @@ export function FlowchartCanvas({
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           fitView
-          className="bg-gray-50"
+          className="bg-background"
         >
           <Controls />
           <MiniMap />
-          <Background variant="dots" gap={12} size={1} />
+          <Background 
+            variant="dots" 
+            gap={12} 
+            size={1} 
+            color={isDarkMode ? '#4a5568' : '#cbd5e0'} 
+          />
         </ReactFlow>
 
         {/* Node Toolbar */}
