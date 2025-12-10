@@ -78,12 +78,14 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const serverIP = await getServerIP()
+    
     return NextResponse.json({
       api_key_configured: !!blandApiKey,
       api_key_length: blandApiKey.length,
       api_key_prefix: blandApiKey.substring(0, 10) + "...",
       api_key_type: blandApiKey.startsWith('org_') ? 'organization' : blandApiKey.startsWith('sk_') ? 'secret' : 'unknown',
-      server_ip: await getServerIP(),
+      server_ip: serverIP,
       results,
       summary: {
         total_tested: results.length,
@@ -91,7 +93,25 @@ export async function GET(request: NextRequest) {
         failed: results.filter(r => !r.success).length,
         working_endpoints: results.filter(r => r.success).map(r => r.endpoint),
         failing_endpoints: results.filter(r => !r.success).map(r => r.endpoint)
-      }
+      },
+      action_required: results.every(r => !r.success) ? {
+        issue: "All endpoints failing with 403 - This is likely IP blocking",
+        solution: "Contact Bland.ai support to whitelist your server IP",
+        server_ip: serverIP,
+        email_template: `Subject: IP Whitelist Request - Error B-1
+
+Hi Bland.ai Support,
+
+I'm getting 403 Error B-1 - Access Denied on all API endpoints from my DigitalOcean deployment.
+
+Server IP: ${serverIP}
+API Key Type: ${blandApiKey.startsWith('org_') ? 'Organization' : 'User'}
+API Key Prefix: ${blandApiKey.substring(0, 10)}...
+
+Could you please whitelist my server IP address for API access?
+
+Thank you!`
+      } : null
     })
   } catch (error: any) {
     return NextResponse.json({
