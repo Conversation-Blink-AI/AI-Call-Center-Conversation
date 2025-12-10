@@ -29,6 +29,7 @@ export default function APITestPage() {
     { name: "Get User Info", method: "GET", path: "/api/auth/me" },
     { name: "Test Database", method: "GET", path: "/api/auth/test-postgres" },
     { name: "Database Schema", method: "GET", path: "/api/database/schema" },
+    { name: "Test Bland.ai Endpoints", method: "GET", path: "/api/bland-ai/test-endpoints" },
   ]
 
   const handlePresetClick = (preset: typeof presetEndpoints[0]) => {
