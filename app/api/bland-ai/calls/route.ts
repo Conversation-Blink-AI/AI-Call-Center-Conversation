@@ -67,7 +67,25 @@ export async function GET(request: NextRequest) {
     const blandApiKey = process.env.BLAND_AI_API_KEY
     if (!blandApiKey) {
       console.error("🚨 [BLAND-CALLS] Bland.ai API key not configured")
-      return NextResponse.json({ error: "Bland.ai API key not configured" }, { status: 500 })
+      return NextResponse.json({ 
+        error: "Bland.ai API key not configured",
+        debug_info: {
+          has_api_key: false,
+          environment: process.env.NODE_ENV
+        }
+      }, { status: 500 })
+    }
+
+    // Validate API key format (should not be empty or just whitespace)
+    if (!blandApiKey.trim()) {
+      console.error("🚨 [BLAND-CALLS] Bland.ai API key is empty")
+      return NextResponse.json({ 
+        error: "Bland.ai API key is empty",
+        debug_info: {
+          has_api_key: true,
+          api_key_length: blandApiKey.length
+        }
+      }, { status: 500 })
     }
 
     // Fetch ALL calls from Bland.ai at once (without phone number filters)
@@ -100,7 +118,10 @@ export async function GET(request: NextRequest) {
         const errorDetails = {
           status: response.status,
           statusText: response.statusText,
-          error: errorText.substring(0, 500) // Limit error length
+          error: errorText.substring(0, 500), // Limit error length
+          api_key_configured: !!blandApiKey,
+          api_key_length: blandApiKey ? blandApiKey.length : 0,
+          api_key_prefix: blandApiKey ? blandApiKey.substring(0, 10) + '...' : 'N/A'
         }
         console.error(`❌ [BLAND-CALLS] Bland.ai API error:`, errorDetails)
         apiErrors.push(errorDetails)
@@ -275,19 +296,30 @@ export async function GET(request: NextRequest) {
       page,
       limit,
       user_phone_numbers: userPhoneNumbers,
-      debug_info: {
-        total_user_calls: allUserCalls.length,
-        phone_numbers_checked: userPhoneNumbers.length,
-        user_phone_numbers: userPhoneNumbers,
-        api_errors: apiErrors.length > 0 ? apiErrors : undefined,
-        environment: process.env.NODE_ENV,
-        has_bland_api_key: !!blandApiKey,
-        user_id: userId,
-        server_public_ip: serverIP || undefined,
-        api_call_successful: apiErrors.length === 0,
-        total_calls_from_bland: totalCallsFromBland,
-        sample_calls_from_bland: sampleCalls.length > 0 ? sampleCalls : undefined
-      }
+        debug_info: {
+          total_user_calls: allUserCalls.length,
+          phone_numbers_checked: userPhoneNumbers.length,
+          user_phone_numbers: userPhoneNumbers,
+          api_errors: apiErrors.length > 0 ? apiErrors : undefined,
+          environment: process.env.NODE_ENV,
+          has_bland_api_key: !!blandApiKey,
+          api_key_length: blandApiKey ? blandApiKey.length : 0,
+          api_key_prefix: blandApiKey ? blandApiKey.substring(0, 8) + '...' : 'N/A',
+          user_id: userId,
+          server_public_ip: serverIP || undefined,
+          api_call_successful: apiErrors.length === 0,
+          total_calls_from_bland: totalCallsFromBland,
+          sample_calls_from_bland: sampleCalls.length > 0 ? sampleCalls : undefined,
+          troubleshooting: apiErrors.length > 0 ? {
+            suggestion: "Check if BLAND_AI_API_KEY is set correctly in DigitalOcean environment variables",
+            common_causes: [
+              "API key not set in environment variables",
+              "API key is incorrect or expired",
+              "API key doesn't have required permissions",
+              "IP address might be blocked by Bland.ai"
+            ]
+          } : undefined
+        }
     })
 
   } catch (error: any) {
