@@ -103,11 +103,14 @@ export async function GET(request: NextRequest) {
       console.log("🌐 [BLAND-CALLS] Fetching ALL calls from Bland.ai (will filter server-side)")
       console.log("🔍 [BLAND-CALLS] Bland API URL:", blandUrl)
 
+      // Try different authentication methods
+      // Some Bland.ai endpoints require different header formats
       const response = await fetch(blandUrl, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${blandApiKey}`,
-          'Content-Type': 'application/json'
+          'Authorization': `Bearer ${blandApiKey.trim()}`,
+          'Content-Type': 'application/json',
+          'User-Agent': 'Cursor-Conversation-App/1.0'
         },
         // Add timeout to prevent hanging
         signal: AbortSignal.timeout(30000) // 30 second timeout
@@ -115,13 +118,53 @@ export async function GET(request: NextRequest) {
 
       if (!response.ok) {
         const errorText = await response.text()
+        
+        // Parse error message if it's HTML
+        let errorMessage = errorText
+        if (errorText.includes('Error B-1')) {
+          errorMessage = 'Bland.ai Error B-1: Access Denied - This usually means the API key lacks permissions for this endpoint or is an organization key that needs user-level permissions'
+        } else if (errorText.includes('<!DOCTYPE html>')) {
+          // Try to extract error from HTML
+          const errorMatch = errorText.match(/<title>(.*?)<\/title>/i)
+          if (errorMatch) {
+            errorMessage = errorMatch[1]
+          }
+        }
+        
         const errorDetails = {
           status: response.status,
           statusText: response.statusText,
-          error: errorText.substring(0, 500), // Limit error length
+          error: errorMessage.substring(0, 500), // Limit error length
+          raw_error_preview: errorText.substring(0, 200),
           api_key_configured: !!blandApiKey,
           api_key_length: blandApiKey ? blandApiKey.length : 0,
-          api_key_prefix: blandApiKey ? blandApiKey.substring(0, 10) + '...' : 'N/A'
+          api_key_prefix: blandApiKey ? blandApiKey.substring(0, 10) + '...' : 'N/A',
+          api_key_type: blandApiKey?.startsWith('org_') ? 'organization' : blandApiKey?.startsWith('sk_') ? 'secret' : 'unknown',
+          troubleshooting: {
+            issue: response.status === 403 ? 'Authentication/Authorization failed' : 'API request failed',
+            possible_causes: response.status === 403 ? [
+              'API key is an organization key but needs user-level permissions',
+              'API key does not have access to the /v1/calls endpoint',
+              'API key has IP restrictions that block DigitalOcean IPs',
+              'API key is expired or revoked',
+              'API key needs to be activated in Bland.ai dashboard'
+            ] : [
+              'Network connectivity issue',
+              'Bland.ai API is temporarily unavailable',
+              'Rate limiting or quota exceeded'
+            ],
+            solutions: response.status === 403 ? [
+              'Check if you need a user API key instead of organization key',
+              'Verify API key permissions in Bland.ai dashboard',
+              'Check if IP restrictions need to be updated',
+              'Generate a new API key with proper permissions',
+              'Contact Bland.ai support about Error B-1'
+            ] : [
+              'Check network connectivity',
+              'Verify Bland.ai API status',
+              'Check rate limits and quotas'
+            ]
+          }
         }
         console.error(`❌ [BLAND-CALLS] Bland.ai API error:`, errorDetails)
         apiErrors.push(errorDetails)
