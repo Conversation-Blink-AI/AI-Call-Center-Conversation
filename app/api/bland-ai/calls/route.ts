@@ -104,14 +104,24 @@ export async function GET(request: NextRequest) {
       console.log("🔍 [BLAND-CALLS] Bland API URL:", blandUrl)
 
       // Try different authentication methods
-      // Some Bland.ai endpoints require different header formats
+      // Organization keys might need different header format
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Cursor-Conversation-App/1.0'
+      }
+      
+      // Try different auth header formats for organization keys
+      if (blandApiKey.startsWith('org_')) {
+        // Organization keys might need 'X-API-Key' header instead
+        headers['X-API-Key'] = blandApiKey.trim()
+        headers['Authorization'] = `Bearer ${blandApiKey.trim()}`
+      } else {
+        headers['Authorization'] = `Bearer ${blandApiKey.trim()}`
+      }
+      
       const response = await fetch(blandUrl, {
         method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${blandApiKey.trim()}`,
-          'Content-Type': 'application/json',
-          'User-Agent': 'Cursor-Conversation-App/1.0'
-        },
+        headers,
         // Add timeout to prevent hanging
         signal: AbortSignal.timeout(30000) // 30 second timeout
       })
