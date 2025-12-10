@@ -12,8 +12,9 @@ export async function POST() {
   }
 
   const client = new Client({
-    connectionString: process.env.DATABASE_URL
-  })
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
+    })
 
   try {
     await client.connect()
@@ -30,6 +31,7 @@ VALUES
     ('550e8400-e29b-41d4-a716-446655440002', 'user@test.com', 'Test', 'User', 'Test Company', 'user', '+1-555-0102', '${passwordHash}'),
     ('550e8400-e29b-41d4-a716-446655440003', 'manager@example.com', 'Manager', 'User', 'Example Corp', 'manager', '+1-555-0103', '${passwordHash}')
 ON CONFLICT (id) DO NOTHING;
+import { getSSLConfig } from "@/lib/db-client"
 
 -- Insert sample teams
 INSERT INTO teams (id, name, description, owner_id)

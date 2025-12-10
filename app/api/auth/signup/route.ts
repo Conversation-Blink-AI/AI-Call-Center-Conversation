@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { Client } from "pg"
 import * as jwt from "jsonwebtoken"
 import { cookies } from "next/headers"
+import { getSSLConfig } from "@/lib/db-client"
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
 
@@ -95,7 +96,8 @@ export async function POST(request: Request) {
 
     // Only proceed to store locally if external API succeeded
     const client = new Client({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
     })
 
     try {

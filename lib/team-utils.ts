@@ -1,6 +1,7 @@
 
 import { Client } from "pg"
 import { getUserFromRequest } from "./auth-utils"
+import { getSSLConfig } from "./db-client"
 
 export async function getUserTeams() {
   try {
@@ -10,7 +11,8 @@ export async function getUserTeams() {
     }
 
     const client = new Client({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
     })
 
     await client.connect()
@@ -42,7 +44,8 @@ export async function getTeamById(teamId: string) {
     }
 
     const client = new Client({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
     })
 
     await client.connect()
@@ -79,7 +82,8 @@ export async function createTeam(teamData: {
     }
 
     const client = new Client({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
     })
 
     await client.connect()

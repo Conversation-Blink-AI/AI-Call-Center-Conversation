@@ -1,6 +1,7 @@
 
 import { NextResponse } from "next/server"
 import { Client } from "pg"
+import { getSSLConfig } from "@/lib/db-client"
 
 
 export async function POST(request: Request) {
@@ -18,7 +19,8 @@ export async function POST(request: Request) {
 
     // Connect to PostgreSQL
     const client = new Client({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
     })
 
     let user = null
@@ -106,7 +108,8 @@ export async function POST(request: Request) {
 export async function GET() {
   try {
     const client = new Client({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
     })
 
     try {

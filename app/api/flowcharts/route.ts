@@ -17,7 +17,8 @@ export async function POST(req: NextRequest) {
     }
 
     const client = new Client({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
     })
 
     await client.connect()
@@ -27,6 +28,7 @@ export async function POST(req: NextRequest) {
       "SELECT id FROM pathways WHERE phone_number = $1 AND creator_id = $2",
       [phoneNumber, user.id]
     );
+import { getSSLConfig } from "@/lib/db-client"
 
     const flowchartPayload = {
       name: name || "Bland.ai Pathway",
@@ -96,7 +98,8 @@ export async function GET(req: NextRequest) {
     }
 
     const client = new Client({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
     })
 
     await client.connect()

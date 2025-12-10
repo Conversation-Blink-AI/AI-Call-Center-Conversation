@@ -1,5 +1,6 @@
 
 import { type NextRequest, NextResponse } from "next/server"
+import { getSSLConfig } from "@/lib/db-client"
 
 export async function POST(request: NextRequest) {
   try {
@@ -131,8 +132,9 @@ export async function POST(request: NextRequest) {
     try {
       const { Client } = await import('pg')
       const client = new Client({
-        connectionString: process.env.DATABASE_URL
-      })
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
+    })
 
       await client.connect()
 

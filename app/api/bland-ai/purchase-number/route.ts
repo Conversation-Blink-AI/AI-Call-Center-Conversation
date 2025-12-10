@@ -1,6 +1,7 @@
 
 import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
+import { getSSLConfig } from "@/lib/db-client"
 
 export async function POST(request: Request) {
   try {
@@ -52,8 +53,9 @@ export async function POST(request: Request) {
       // Store the purchased number in PostgreSQL database
       const { Client } = await import('pg')
       const client = new Client({
-        connectionString: process.env.DATABASE_URL
-      })
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
+    })
 
       try {
         await client.connect()

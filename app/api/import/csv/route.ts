@@ -4,6 +4,7 @@ import * as fs from "fs"
 import * as path from "path"
 import csv from "csv-parser"
 import * as bcrypt from "bcryptjs"
+import { getSSLConfig } from "@/lib/db-client"
 
 export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) {
@@ -14,8 +15,9 @@ export async function POST(request: Request) {
   }
 
   const pgClient = new Client({
-    connectionString: process.env.DATABASE_URL
-  })
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
+    })
 
   try {
     const { fileName, tableName } = await request.json()

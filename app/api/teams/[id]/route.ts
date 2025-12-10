@@ -2,6 +2,7 @@ import { type NextRequest, NextResponse } from "next/server"
 import { getUserFromRequest } from "@/lib/auth-utils"
 import { getTeamById, updateTeam, deleteTeam, checkTeamPermission } from "@/lib/db-utils"
 import { Client } from "pg"
+import { getSSLConfig } from "@/lib/db-client"
 
 // Get a specific team
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
@@ -20,7 +21,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     }
 
     const client = new Client({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
     })
 
     try {

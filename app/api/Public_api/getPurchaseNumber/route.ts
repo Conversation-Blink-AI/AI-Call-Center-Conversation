@@ -1,6 +1,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { Client } from "pg"
+import { getSSLConfig } from "@/lib/db-client"
 
 // Add OPTIONS handler for CORS preflight requests
 export async function OPTIONS(request: NextRequest) {
@@ -36,7 +37,8 @@ export async function GET(request: NextRequest) {
     console.log(`[GET-PURCHASE-NUMBER] Looking up phone numbers for email: ${email}`)
 
     const client = new Client({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
     })
 
     try {

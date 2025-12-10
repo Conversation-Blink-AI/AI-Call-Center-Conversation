@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { validateAuthToken } from "@/lib/auth-utils"
 import { Client } from "pg"
+import { getSSLConfig } from "@/lib/db-client"
 
 export async function GET(request: Request) {
   try {
@@ -21,7 +22,8 @@ export async function GET(request: Request) {
 
     // Use PostgreSQL with RLS to fetch phone numbers
     const client = new Client({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
     })
 
     try {
@@ -115,7 +117,8 @@ export async function POST(request: NextRequest) {
     })
 
     const client = new Client({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
     })
 
     try {

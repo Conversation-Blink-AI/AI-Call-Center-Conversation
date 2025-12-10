@@ -5,7 +5,8 @@ import { supabase } from "@/lib/supabase"
 import { Client } from "pg"
 
 // Update a team member's role
-export async function PUT(req: NextRequest, { params }: { params: { id: string; userId: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: { id: string;
+import { getSSLConfig } from "@/lib/db-client" userId: string } }) {
   try {
     const user = await getUserFromRequest(req)
     if (!user) {
@@ -74,7 +75,8 @@ export async function DELETE(
     const userId = params.userId
 
     const client = new Client({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
     })
 
     await client.connect()

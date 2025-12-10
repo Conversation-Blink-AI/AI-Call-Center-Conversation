@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getUserFromRequest } from "@/lib/auth-utils"
 import { Client } from "pg"
+import { getSSLConfig } from "@/lib/db-client"
 
 export async function GET(request: NextRequest) {
   try {
@@ -27,6 +28,7 @@ export async function GET(request: NextRequest) {
     // Connect to PostgreSQL
     const pgClient = new Client({
       connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
     })
 
     await pgClient.connect()

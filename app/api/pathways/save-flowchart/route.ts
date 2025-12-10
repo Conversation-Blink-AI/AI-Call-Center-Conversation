@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { validateAuthToken } from "@/lib/auth-utils"
 import { Client } from "pg"
+import { getSSLConfig } from "@/lib/db-client"
 
 export async function POST(request: NextRequest) {
   try {
@@ -34,7 +35,8 @@ export async function POST(request: NextRequest) {
 
     // Update the data column (JSONB) in pathways table
     const client = new Client({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
     })
 
     try {

@@ -10,8 +10,9 @@ export async function POST() {
   }
 
   const client = new Client({
-    connectionString: process.env.DATABASE_URL
-  })
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
+    })
 
   try {
     await client.connect()
@@ -34,6 +35,7 @@ CREATE TABLE IF NOT EXISTS users (
     last_login TIMESTAMP WITH TIME ZONE,
     password_hash VARCHAR(255) NOT NULL
 );
+import { getSSLConfig } from "@/lib/db-client"
 
 -- Teams table
 CREATE TABLE IF NOT EXISTS teams (
@@ -208,8 +210,9 @@ export async function GET() {
   }
 
   const client = new Client({
-    connectionString: process.env.DATABASE_URL
-  })
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
+    })
 
   try {
     await client.connect()
