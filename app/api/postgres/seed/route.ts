@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server"
 import { Client } from "pg"
 import * as bcrypt from "bcryptjs"
+import { getSSLConfig } from "@/lib/db-client"
 
 export async function POST() {
   if (!process.env.DATABASE_URL) {
@@ -31,7 +32,6 @@ VALUES
     ('550e8400-e29b-41d4-a716-446655440002', 'user@test.com', 'Test', 'User', 'Test Company', 'user', '+1-555-0102', '${passwordHash}'),
     ('550e8400-e29b-41d4-a716-446655440003', 'manager@example.com', 'Manager', 'User', 'Example Corp', 'manager', '+1-555-0103', '${passwordHash}')
 ON CONFLICT (id) DO NOTHING;
-import { getSSLConfig } from "@/lib/db-client"
 
 -- Insert sample teams
 INSERT INTO teams (id, name, description, owner_id)

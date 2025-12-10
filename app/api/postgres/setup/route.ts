@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { Client } from "pg"
+import { getSSLConfig } from "@/lib/db-client"
 
 export async function POST() {
   if (!process.env.DATABASE_URL) {
@@ -35,7 +36,6 @@ CREATE TABLE IF NOT EXISTS users (
     last_login TIMESTAMP WITH TIME ZONE,
     password_hash VARCHAR(255) NOT NULL
 );
-import { getSSLConfig } from "@/lib/db-client"
 
 -- Teams table
 CREATE TABLE IF NOT EXISTS teams (

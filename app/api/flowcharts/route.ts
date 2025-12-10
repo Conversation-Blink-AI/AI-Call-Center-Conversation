@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getUserFromRequest } from "@/lib/auth-utils"
 import { Client } from "pg"
+import { getSSLConfig } from "@/lib/db-client"
 
 // Save/update a flowchart  
 export async function POST(req: NextRequest) {
@@ -28,7 +29,6 @@ export async function POST(req: NextRequest) {
       "SELECT id FROM pathways WHERE phone_number = $1 AND creator_id = $2",
       [phoneNumber, user.id]
     );
-import { getSSLConfig } from "@/lib/db-client"
 
     const flowchartPayload = {
       name: name || "Bland.ai Pathway",

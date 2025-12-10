@@ -9,9 +9,10 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  // Enable cross-origin requests for Replit environment
+  // Enable standalone output for better deployment
+  output: 'standalone',
+  // Enable cross-origin requests
   allowedDevOrigins: ['*'],
-  // Enable all hosts for Replit environment
   async headers() {
     return [
       {

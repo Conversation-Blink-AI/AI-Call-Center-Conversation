@@ -3,10 +3,10 @@ import { getUserFromRequest } from "@/lib/auth-utils"
 import { checkTeamPermission, updateTeamMemberRole, removeTeamMember } from "@/lib/db-utils"
 import { supabase } from "@/lib/supabase"
 import { Client } from "pg"
+import { getSSLConfig } from "@/lib/db-client"
 
 // Update a team member's role
-export async function PUT(req: NextRequest, { params }: { params: { id: string;
-import { getSSLConfig } from "@/lib/db-client" userId: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: { id: string; userId: string } }) {
   try {
     const user = await getUserFromRequest(req)
     if (!user) {
