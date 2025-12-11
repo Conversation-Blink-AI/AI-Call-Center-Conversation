@@ -18,6 +18,17 @@ frontend:
           echo "STRIPE_WEBHOOK_SECRET=$STRIPE_WEBHOOK_SECRET" >> .env.production
           echo "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=$NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY" >> .env.production
           echo "NODE_ENV=production" >> .env.production
+          echo "Environment variables written to .env.production"
+          echo "Verifying critical environment variables..."
+          if [ -z "$JWT_SECRET" ]; then
+            echo "WARNING: JWT_SECRET is not set in AWS Amplify environment variables"
+          fi
+          if [ -z "$FOREX_URL" ]; then
+            echo "WARNING: FOREX_URL is not set in AWS Amplify environment variables"
+          fi
+          if [ -z "$BLAND_AI_API_KEY" ]; then
+            echo "WARNING: BLAND_AI_API_KEY is not set in AWS Amplify environment variables"
+          fi
         - npm run build
   artifacts:
     baseDirectory: .next
