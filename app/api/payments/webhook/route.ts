@@ -1,7 +1,7 @@
 
 import { NextResponse } from 'next/server'
 import { stripe } from '../../../../lib/stripeClient'
-import { db } from '../../../../lib/db'
+import { createDatabaseClient } from '../../../../lib/db-client'
 import type StripeType from 'stripe'
 
 export const runtime = 'nodejs'
@@ -217,10 +217,36 @@ export async function POST(req: Request) {
 
         console.log('🔔 [WEBHOOK] Processing payment for user:', userId, 'amount:', amount)
 
+        // Use a single database connection with transaction support
+        const client = createDatabaseClient()
+        
         try {
-          // Insert payment record using direct database query
+          await client.connect()
+          console.log('🔔 [WEBHOOK] Database connection established')
+          
+          // Start transaction
+          await client.query('BEGIN')
+          console.log('🔔 [WEBHOOK] Transaction started')
+
+          // Idempotency check: Check if payment already exists
+          console.log('🔔 [WEBHOOK] Checking for existing payment...')
+          const existingPayment = await client.query(
+            'SELECT id FROM payments WHERE gateway = $1 AND gateway_payment_id = $2',
+            ['stripe', session.id]
+          )
+
+          if (existingPayment.rows.length > 0) {
+            console.log('⚠️ [WEBHOOK] Payment already exists, skipping duplicate processing:', existingPayment.rows[0].id)
+            // Rollback since we didn't make any changes (read-only transaction)
+            await client.query('ROLLBACK')
+            await client.end()
+            console.log('✅ [WEBHOOK] Transaction rolled back (idempotency check - no changes needed)')
+            break
+          }
+
+          // Insert payment record
           console.log('🔔 [WEBHOOK] Creating payment record...')
-          const paymentResult = await db.query(`
+          const paymentResult = await client.query(`
             INSERT INTO payments (gateway, gateway_payment_id, amount_cents, status, user_id, created_at, updated_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING id
@@ -236,9 +262,9 @@ export async function POST(req: Request) {
 
           console.log('✅ [WEBHOOK] Payment record created:', paymentResult.rows[0]?.id)
 
-          // Find or create wallet using direct database query
+          // Find or create wallet
           console.log('🔔 [WEBHOOK] Finding/creating wallet...')
-          const existingWallet = await db.query(
+          const existingWallet = await client.query(
             'SELECT id, balance_cents FROM wallets WHERE user_id = $1',
             [userId]
           )
@@ -254,7 +280,7 @@ export async function POST(req: Request) {
 
             console.log('🔔 [WEBHOOK] Updating existing wallet:', walletId, 'from', currentBalance, 'to', newBalance)
 
-            const updateResult = await db.query(`
+            const updateResult = await client.query(`
               UPDATE wallets 
               SET balance_cents = $1, updated_at = $2 
               WHERE id = $3
@@ -263,16 +289,15 @@ export async function POST(req: Request) {
             console.log('✅ [WEBHOOK] Updated wallet balance:', walletId, 'new balance:', newBalance)
             console.log('✅ [WEBHOOK] Balance update result:', updateResult.rowCount, 'rows affected')
           } else {
-            // Create new wallet
+            // Create new wallet (removed created_at as wallets table doesn't have this column)
             console.log('🔔 [WEBHOOK] Creating new wallet for user:', userId)
-            const newWalletResult = await db.query(`
-              INSERT INTO wallets (user_id, balance_cents, created_at, updated_at)
-              VALUES ($1, $2, $3, $4)
+            const newWalletResult = await client.query(`
+              INSERT INTO wallets (user_id, balance_cents, updated_at)
+              VALUES ($1, $2, $3)
               RETURNING id
             `, [
               userId,
               amount,
-              new Date().toISOString(),
               new Date().toISOString()
             ])
 
@@ -281,10 +306,10 @@ export async function POST(req: Request) {
             console.log('✅ [WEBHOOK] Created new wallet:', walletId, 'balance:', newBalance)
           }
 
-          // Insert wallet transaction using direct database query
+          // Insert wallet transaction
           if (walletId) {
             console.log('🔔 [WEBHOOK] Creating wallet transaction...')
-            const transactionResult = await db.query(`
+            const transactionResult = await client.query(`
               INSERT INTO wallet_transactions (wallet_id, amount_cents, type, gateway, provider_txn_id, created_at)
               VALUES ($1, $2, $3, $4, $5, $6)
               RETURNING id
@@ -300,11 +325,30 @@ export async function POST(req: Request) {
             console.log('✅ [WEBHOOK] Wallet transaction created:', transactionResult.rows[0]?.id)
           }
 
+          // Commit transaction
+          await client.query('COMMIT')
+          console.log('✅ [WEBHOOK] Transaction committed successfully')
           console.log(`✅ [WEBHOOK] Successfully processed Stripe payment: ${session.id} for user ${userId}, amount: $${amount / 100}`)
 
         } catch (error) {
+          // Rollback transaction on error
+          try {
+            await client.query('ROLLBACK')
+            console.error('❌ [WEBHOOK] Transaction rolled back due to error')
+          } catch (rollbackError) {
+            console.error('❌ [WEBHOOK] Error during rollback:', rollbackError)
+          }
+          
           console.error('❌ [WEBHOOK] Error processing checkout.session.completed:', error)
-          // Don't throw here, we want to return 200 to Stripe even if our processing fails
+          console.error('❌ [WEBHOOK] Error details:', error instanceof Error ? error.message : String(error))
+          console.error('❌ [WEBHOOK] Error stack:', error instanceof Error ? error.stack : 'No stack trace')
+          
+          // Re-throw error so Stripe can retry the webhook
+          throw error
+        } finally {
+          // Always close the database connection
+          await client.end()
+          console.log('🔔 [WEBHOOK] Database connection closed')
         }
         break
 
