@@ -1,0 +1,44 @@
+version: 1
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - npm ci
+    build:
+      commands:
+        # Write environment variables to .env.production for Next.js
+        # AWS Amplify doesn't automatically expose env vars to Next.js runtime
+        - |
+          echo "Writing environment variables to .env.production..."
+          echo "FOREX_URL=$FOREX_URL" >> .env.production
+          echo "EXTERNAL_API_URL=$EXTERNAL_API_URL" >> .env.production
+          echo "DATABASE_URL=$DATABASE_URL" >> .env.production
+          echo "JWT_SECRET=$JWT_SECRET" >> .env.production
+          echo "BLAND_AI_API_KEY=$BLAND_AI_API_KEY" >> .env.production
+          echo "STRIPE_SECRET_KEY=$STRIPE_SECRET_KEY" >> .env.production
+          echo "STRIPE_WEBHOOK_SECRET=$STRIPE_WEBHOOK_SECRET" >> .env.production
+          echo "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=$NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY" >> .env.production
+          echo "NODE_ENV=production" >> .env.production
+          echo "Environment variables written to .env.production"
+          echo "Verifying critical environment variables..."
+          if [ -z "$JWT_SECRET" ]; then
+            echo "WARNING: JWT_SECRET is not set in AWS Amplify environment variables"
+          fi
+          if [ -z "$FOREX_URL" ]; then
+            echo "WARNING: FOREX_URL is not set in AWS Amplify environment variables"
+          fi
+          if [ -z "$BLAND_AI_API_KEY" ]; then
+            echo "WARNING: BLAND_AI_API_KEY is not set in AWS Amplify environment variables"
+          fi
+          if [ -z "$DATABASE_URL" ]; then
+            echo "WARNING: DATABASE_URL is not set in AWS Amplify environment variables"
+          fi
+        - npm run build
+  artifacts:
+    baseDirectory: .next
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - node_modules/**/*
+      - .next/cache/**/*
