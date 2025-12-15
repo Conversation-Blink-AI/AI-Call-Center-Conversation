@@ -339,7 +339,6 @@ export async function POST(req: Request) {
         }
 
         const amount = session.amount_total ?? 0 // cents
-        const userId = session.metadata?.user_id
         const stripeCustomerId = session.customer
 
         console.log('🔔 [WEBHOOK] Extracted data:', {
