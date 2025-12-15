@@ -4,10 +4,11 @@ import { stripe } from '../../../../lib/stripeClient'
 import { createDatabaseClient, getSSLConfig } from '../../../../lib/db-client'
 import type StripeType from 'stripe'
 import { Client } from 'pg'
+import { Twilio } from 'twilio'
 
 export const runtime = 'nodejs'
 
-// Helper function to handle phone number purchase from Bland.ai
+// Helper function to handle phone number purchase via Twilio
 async function handlePhoneNumberPurchase(
   userId: string,
   phoneNumber: string,
@@ -15,7 +16,7 @@ async function handlePhoneNumberPurchase(
   countryCode: string,
   sessionId: string
 ) {
-  console.log('📞 [WEBHOOK] Starting phone number purchase process:', {
+  console.log('📞 [WEBHOOK] Starting phone number purchase process (Twilio):', {
     userId,
     phoneNumber,
     areaCode,
@@ -23,63 +24,62 @@ async function handlePhoneNumberPurchase(
     sessionId
   })
 
-  const blandApiKey = process.env.BLAND_AI_API_KEY
-  if (!blandApiKey) {
-    console.error('❌ [WEBHOOK] Bland.ai API key not configured')
-    throw new Error('Bland.ai API key not configured')
+  // Get Twilio credentials from environment variables
+  const accountSid =
+    process.env.TWILIO_ACCOUNT_SID || process.env.REPLIT_SECRET_TWILIO_ACCOUNT_SID
+  const authToken =
+    process.env.TWILIO_AUTH_TOKEN || process.env.REPLIT_SECRET_TWILIO_AUTH_TOKEN
+
+  if (!accountSid || !authToken) {
+    console.error('❌ [WEBHOOK] Twilio credentials not configured')
+    throw new Error('Twilio credentials not configured')
   }
 
   try {
-    // Call Bland.ai number purchase API
-    console.log('📞 [WEBHOOK] Calling Bland.ai API to purchase number...')
-    const blandResponse = await fetch('https://api.bland.ai/numbers/purchase', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${blandApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        phone_number: phoneNumber,
-        area_code: areaCode,
-        country_code: countryCode
-      })
+    // Initialize Twilio client
+    const twilioClient = new Twilio(accountSid, authToken)
+
+    // Purchase the phone number from Twilio
+    console.log('📞 [WEBHOOK] Calling Twilio API to purchase number...')
+    const purchasedNumber = await twilioClient.incomingPhoneNumbers.create({
+      phoneNumber,
     })
 
-    if (!blandResponse.ok) {
-      const errorText = await blandResponse.text()
-      console.error('❌ [WEBHOOK] Bland.ai purchase failed:', errorText)
-      throw new Error(`Bland.ai purchase failed: ${blandResponse.status} - ${errorText}`)
-    }
-
-    const blandData = await blandResponse.json()
-    console.log('✅ [WEBHOOK] Bland.ai purchase successful:', blandData)
+    console.log('✅ [WEBHOOK] Twilio purchase successful:', {
+      sid: purchasedNumber.sid,
+      phoneNumber: purchasedNumber.phoneNumber,
+      friendlyName: purchasedNumber.friendlyName,
+    })
 
     // Store the purchased number in PostgreSQL database
     const client = new Client({
       connectionString: process.env.DATABASE_URL,
-      ssl: getSSLConfig()
+      ssl: getSSLConfig(),
     })
 
     try {
       await client.connect()
-      
+
       // Extract area code and location from phone number
       const extractedAreaCode = phoneNumber.replace(/\D/g, '').slice(1, 4) // Remove country code and get area code
       const location = getLocationFromAreaCode(extractedAreaCode)
-      
+
       // Check if number already exists for this user
       const existingNumber = await client.query(
         'SELECT id FROM phone_numbers WHERE phone_number = $1 AND user_id = $2',
-        [phoneNumber, userId]
+        [phoneNumber, userId],
       )
 
       if (existingNumber.rows.length > 0) {
         console.log('⚠️ [WEBHOOK] Phone number already exists for user, updating status')
-        await client.query(`
+        await client.query(
+          `
           UPDATE phone_numbers 
           SET status = 'active', updated_at = NOW()
           WHERE phone_number = $1 AND user_id = $2
-        `, [phoneNumber, userId])
+        `,
+          [phoneNumber, userId],
+        )
       } else {
         // Insert new phone number
         const result = await client.query(
@@ -93,21 +93,20 @@ async function handlePhoneNumberPurchase(
             'Local',
             'active',
             extractedAreaCode,
-            countryCode
-          ]
+            countryCode,
+          ],
         )
-        
+
         const savedPhone = result.rows[0]
         console.log('✅ [WEBHOOK] Phone number saved to database:', savedPhone)
       }
-
     } finally {
       await client.end()
     }
 
     console.log('✅ [WEBHOOK] Phone number purchase completed successfully')
   } catch (error) {
-    console.error('❌ [WEBHOOK] Error purchasing phone number:', error)
+    console.error('❌ [WEBHOOK] Error purchasing phone number via Twilio:', error)
     throw error
   }
 }
@@ -140,7 +139,7 @@ function getLocationFromAreaCode(areaCode: string): string {
     '438': 'Montreal, QC',
     '604': 'Vancouver, BC',
     '778': 'Vancouver, BC',
-    '236': 'Vancouver, BC'
+    '236': 'Vancouver, BC',
   }
 
   return areaCodeMap[areaCode] || 'Unknown Location'
