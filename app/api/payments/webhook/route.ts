@@ -179,14 +179,35 @@ async function handlePhoneNumberPurchase(
 
       if (existingNumber.rows.length > 0) {
         console.log('⚠️ [WEBHOOK] Phone number already exists for user, updating status')
-        await client.query(
+        const updateResult = await client.query(
           `
           UPDATE phone_numbers 
-          SET status = 'active', updated_at = NOW()
+          SET status = 'active'
           WHERE phone_number = $1 AND user_id = $2
+          RETURNING *
         `,
           [phoneNumber, userId],
         )
+        
+        const savedPhone = updateResult.rows[0]
+        console.log('✅ [WEBHOOK] Phone number status updated:', savedPhone)
+
+        // Still register with Bland.ai in case it wasn't registered before (idempotent)
+        try {
+          await registerNumbersWithBland([phoneNumber])
+          console.log('✅ [WEBHOOK] Phone number registered with Bland.ai')
+        } catch (blandError) {
+          console.warn('⚠️ [WEBHOOK] Bland.ai registration failed (may already be registered):', blandError)
+          // Don't throw - number exists, Bland registration is best-effort
+        }
+
+        try {
+          await updateBlandInboundConfig(phoneNumber)
+          console.log('✅ [WEBHOOK] Bland inbound webhook configured for phone number')
+        } catch (blandError) {
+          console.warn('⚠️ [WEBHOOK] Bland inbound config update failed:', blandError)
+          // Don't throw - number exists, config update is best-effort
+        }
       } else {
         // Insert new phone number
         const result = await client.query(
