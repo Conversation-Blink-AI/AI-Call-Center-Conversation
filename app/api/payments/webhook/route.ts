@@ -8,6 +8,113 @@ import { Twilio } from 'twilio'
 
 export const runtime = 'nodejs'
 
+// Helper to register purchased numbers with Bland.ai
+async function registerNumbersWithBland(numbers: string[]): Promise<void> {
+  console.log('📨 [WEBHOOK] Registering numbers with Bland.ai:', numbers)
+
+  const apiKey = process.env.BLAND_AI_API_KEY
+  const encryptedKey = process.env.BLAND_TWILIO_ENCRYPTED_KEY
+
+  if (!apiKey || !encryptedKey) {
+    console.error('❌ [WEBHOOK] Bland.ai credentials not configured', {
+      hasApiKey: !!apiKey,
+      hasEncryptedKey: !!encryptedKey,
+    })
+    throw new Error('Bland.ai API key or encrypted key not configured')
+  }
+
+  const response = await fetch('https://api.bland.ai/v1/inbound/insert', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      authorization: apiKey,
+      encrypted_key: encryptedKey,
+    } as any,
+    body: JSON.stringify({ numbers }),
+  })
+
+  const text = await response.text()
+  let data: any
+  try {
+    data = text ? JSON.parse(text) : {}
+  } catch {
+    data = { raw: text }
+  }
+
+  if (!response.ok) {
+    console.error('❌ [WEBHOOK] Bland.ai inbound insert failed:', {
+      status: response.status,
+      statusText: response.statusText,
+      body: data,
+    })
+    throw new Error(
+      `Bland.ai inbound insert failed: ${response.status} ${response.statusText}`,
+    )
+  }
+
+  if (data.status !== 'success') {
+    console.error('❌ [WEBHOOK] Bland.ai responded with non-success status:', data)
+    throw new Error(`Bland.ai inbound insert status: ${data.status || 'unknown'}`)
+  }
+
+  console.log('✅ [WEBHOOK] Bland.ai inbound insert success:', {
+    inserted: data.inserted,
+    message: data.message,
+  })
+}
+
+// Helper to update Bland.ai inbound config (webhook URL etc.) for a specific number
+async function updateBlandInboundConfig(phoneNumber: string): Promise<void> {
+  const apiKey = process.env.BLAND_AI_API_KEY
+  if (!apiKey) {
+    console.error('❌ [WEBHOOK] BLAND_AI_API_KEY is not configured')
+    throw new Error('BLAND_AI_API_KEY is not configured')
+  }
+
+  // Bland inbound endpoints expect the number without leading + or %2B
+  const formatted = phoneNumber.replace(/^\+|^%2B/, '')
+  const blandUrl = `https://api.bland.ai/v1/inbound/${encodeURIComponent(formatted)}`
+
+  console.log('🌐 [WEBHOOK] Updating Bland inbound config:', {
+    phoneNumber,
+    formatted,
+    blandUrl,
+  })
+
+  const response = await fetch(blandUrl, {
+    method: 'POST',
+    headers: {
+      authorization: apiKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      // Set the inbound webhook to your Bland webhook endpoint
+      webhook_url: 'https://dev.conversation.blinklab.in/api/webhooks/bland',
+    }),
+  })
+
+  const text = await response.text()
+  let data: any
+  try {
+    data = text ? JSON.parse(text) : {}
+  } catch {
+    data = { raw: text }
+  }
+
+  if (!response.ok) {
+    console.error('❌ [WEBHOOK] Failed to update Bland inbound config:', {
+      status: response.status,
+      statusText: response.statusText,
+      body: data,
+    })
+    throw new Error(
+      `Failed to update Bland inbound config: ${response.status} ${response.statusText}`,
+    )
+  }
+
+  console.log('✅ [WEBHOOK] Bland inbound config updated:', data)
+}
+
 // Helper function to handle phone number purchase via Twilio
 async function handlePhoneNumberPurchase(
   userId: string,
@@ -99,6 +206,13 @@ async function handlePhoneNumberPurchase(
 
         const savedPhone = result.rows[0]
         console.log('✅ [WEBHOOK] Phone number saved to database:', savedPhone)
+
+        // Register the number with Bland.ai and configure inbound webhook
+        await registerNumbersWithBland([phoneNumber])
+        console.log('✅ [WEBHOOK] Phone number registered with Bland.ai')
+
+        await updateBlandInboundConfig(phoneNumber)
+        console.log('✅ [WEBHOOK] Bland inbound webhook configured for phone number')
       }
     } finally {
       await client.end()
