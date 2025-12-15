@@ -121,9 +121,10 @@ export default function PurchaseNumberPage() {
     setActiveNumber(number.number)
 
     try {
-      setDebugInfo((prev) => prev + `\nPurchasing via Bland.ai: ${number.display}`)
+      setDebugInfo((prev) => prev + `\nCreating Stripe checkout session for: ${number.display}`)
 
-      const response = await fetch("/api/bland-ai/purchase-number", {
+      // Create Stripe Checkout Session for phone number subscription
+      const response = await fetch("/api/payments/stripe/create-phone-number-checkout", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -137,27 +138,26 @@ export default function PurchaseNumberPage() {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: "Unknown error" }))
-        throw new Error(errorData.error || `Failed to purchase number: ${response.status}`)
+        throw new Error(errorData.error || `Failed to create checkout session: ${response.status}`)
       }
 
       const data = await response.json()
-      setDebugInfo((prev) => prev + `\nPurchase successful: ${JSON.stringify(data)}`)
+      setDebugInfo((prev) => prev + `\nCheckout session created: ${data.id}`)
 
-      toast({
-        title: "Number Purchased Successfully",
-        description: `You have successfully purchased ${number.display} via Bland.ai.`,
-        duration: 5000,
-      })
+      if (!data.url) {
+        throw new Error("No checkout URL received from server")
+      }
 
-      // Redirect to the phone numbers page
-      router.push("/dashboard/phone-numbers")
+      // Redirect user to Stripe Checkout
+      window.location.href = data.url
+      
     } catch (err) {
-      console.error("Error purchasing number:", err)
-      setDebugInfo((prev) => prev + `\nError purchasing: ${err instanceof Error ? err.message : String(err)}`)
+      console.error("Error creating checkout session:", err)
+      setDebugInfo((prev) => prev + `\nError: ${err instanceof Error ? err.message : String(err)}`)
       setError(err instanceof Error ? err.message : "An unexpected error occurred")
       toast({
-        title: "Purchase Failed",
-        description: err instanceof Error ? err.message : "Failed to purchase number",
+        title: "Checkout Failed",
+        description: err instanceof Error ? err.message : "Failed to create checkout session",
         variant: "destructive",
         duration: 5000,
       })

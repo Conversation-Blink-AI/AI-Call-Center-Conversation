@@ -1,10 +1,150 @@
 
 import { NextResponse } from 'next/server'
 import { stripe } from '../../../../lib/stripeClient'
-import { createDatabaseClient } from '../../../../lib/db-client'
+import { createDatabaseClient, getSSLConfig } from '../../../../lib/db-client'
 import type StripeType from 'stripe'
+import { Client } from 'pg'
 
 export const runtime = 'nodejs'
+
+// Helper function to handle phone number purchase from Bland.ai
+async function handlePhoneNumberPurchase(
+  userId: string,
+  phoneNumber: string,
+  areaCode: string,
+  countryCode: string,
+  sessionId: string
+) {
+  console.log('📞 [WEBHOOK] Starting phone number purchase process:', {
+    userId,
+    phoneNumber,
+    areaCode,
+    countryCode,
+    sessionId
+  })
+
+  const blandApiKey = process.env.BLAND_AI_API_KEY
+  if (!blandApiKey) {
+    console.error('❌ [WEBHOOK] Bland.ai API key not configured')
+    throw new Error('Bland.ai API key not configured')
+  }
+
+  try {
+    // Call Bland.ai number purchase API
+    console.log('📞 [WEBHOOK] Calling Bland.ai API to purchase number...')
+    const blandResponse = await fetch('https://api.bland.ai/numbers/purchase', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${blandApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        phone_number: phoneNumber,
+        area_code: areaCode,
+        country_code: countryCode
+      })
+    })
+
+    if (!blandResponse.ok) {
+      const errorText = await blandResponse.text()
+      console.error('❌ [WEBHOOK] Bland.ai purchase failed:', errorText)
+      throw new Error(`Bland.ai purchase failed: ${blandResponse.status} - ${errorText}`)
+    }
+
+    const blandData = await blandResponse.json()
+    console.log('✅ [WEBHOOK] Bland.ai purchase successful:', blandData)
+
+    // Store the purchased number in PostgreSQL database
+    const client = new Client({
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
+    })
+
+    try {
+      await client.connect()
+      
+      // Extract area code and location from phone number
+      const extractedAreaCode = phoneNumber.replace(/\D/g, '').slice(1, 4) // Remove country code and get area code
+      const location = getLocationFromAreaCode(extractedAreaCode)
+      
+      // Check if number already exists for this user
+      const existingNumber = await client.query(
+        'SELECT id FROM phone_numbers WHERE phone_number = $1 AND user_id = $2',
+        [phoneNumber, userId]
+      )
+
+      if (existingNumber.rows.length > 0) {
+        console.log('⚠️ [WEBHOOK] Phone number already exists for user, updating status')
+        await client.query(`
+          UPDATE phone_numbers 
+          SET status = 'active', updated_at = NOW()
+          WHERE phone_number = $1 AND user_id = $2
+        `, [phoneNumber, userId])
+      } else {
+        // Insert new phone number
+        const result = await client.query(
+          `INSERT INTO phone_numbers (phone_number, user_id, location, type, status, purchased_at, area_code, country_code)
+           VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7)
+           RETURNING *`,
+          [
+            phoneNumber,
+            userId,
+            location,
+            'Local',
+            'active',
+            extractedAreaCode,
+            countryCode
+          ]
+        )
+        
+        const savedPhone = result.rows[0]
+        console.log('✅ [WEBHOOK] Phone number saved to database:', savedPhone)
+      }
+
+    } finally {
+      await client.end()
+    }
+
+    console.log('✅ [WEBHOOK] Phone number purchase completed successfully')
+  } catch (error) {
+    console.error('❌ [WEBHOOK] Error purchasing phone number:', error)
+    throw error
+  }
+}
+
+// Helper function to get location from area code
+function getLocationFromAreaCode(areaCode: string): string {
+  const areaCodeMap: { [key: string]: string } = {
+    '415': 'San Francisco, CA',
+    '510': 'Oakland, CA',
+    '628': 'San Francisco, CA',
+    '212': 'New York, NY',
+    '646': 'New York, NY',
+    '917': 'New York, NY',
+    '213': 'Los Angeles, CA',
+    '310': 'Los Angeles, CA',
+    '424': 'Los Angeles, CA',
+    '312': 'Chicago, IL',
+    '773': 'Chicago, IL',
+    '872': 'Chicago, IL',
+    '305': 'Miami, FL',
+    '786': 'Miami, FL',
+    '954': 'Fort Lauderdale, FL',
+    '206': 'Seattle, WA',
+    '425': 'Seattle, WA',
+    '253': 'Tacoma, WA',
+    '416': 'Toronto, ON',
+    '647': 'Toronto, ON',
+    '437': 'Toronto, ON',
+    '514': 'Montreal, QC',
+    '438': 'Montreal, QC',
+    '604': 'Vancouver, BC',
+    '778': 'Vancouver, BC',
+    '236': 'Vancouver, BC'
+  }
+
+  return areaCodeMap[areaCode] || 'Unknown Location'
+}
 
 export async function GET() {
   console.log('🔔 [WEBHOOK] GET request to webhook endpoint')
@@ -160,9 +300,41 @@ export async function POST(req: Request) {
         console.log('🔔 [WEBHOOK] Session ID:', session.id)
         console.log('🔔 [WEBHOOK] Session metadata:', session.metadata)
         
-        // Only handle payment mode sessions
+        const purchaseType = session.metadata?.purchase_type
+        const userId = session.metadata?.user_id
+        
+        // Handle phone number purchase (subscription mode)
+        if (session.mode === 'subscription' && purchaseType === 'phone_number') {
+          console.log('📞 [WEBHOOK] Processing phone number purchase subscription')
+          
+          const phoneNumber = session.metadata?.phone_number
+          const areaCode = session.metadata?.area_code
+          const countryCode = session.metadata?.country_code || 'US'
+          
+          if (!phoneNumber || !userId) {
+            console.error('❌ [WEBHOOK] Missing phone number or user ID in subscription metadata:', {
+              phoneNumber,
+              userId,
+              metadata: session.metadata
+            })
+            break
+          }
+          
+          // Purchase phone number from Bland.ai
+          try {
+            await handlePhoneNumberPurchase(userId, phoneNumber, areaCode, countryCode, session.id)
+            console.log('✅ [WEBHOOK] Phone number purchase completed successfully')
+          } catch (error) {
+            console.error('❌ [WEBHOOK] Error purchasing phone number:', error)
+            // Re-throw error so Stripe can retry the webhook
+            throw error
+          }
+          break
+        }
+        
+        // Handle wallet top-up (payment mode)
         if (session.mode !== 'payment') {
-          console.log('🔔 [WEBHOOK] Skipping non-payment session')
+          console.log('🔔 [WEBHOOK] Skipping non-payment session (not wallet top-up or phone purchase)')
           break
         }
 
