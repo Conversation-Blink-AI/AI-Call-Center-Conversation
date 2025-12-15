@@ -207,6 +207,38 @@ async function handlePhoneNumberPurchase(
         const savedPhone = result.rows[0]
         console.log('✅ [WEBHOOK] Phone number saved to database:', savedPhone)
 
+        // Create a default pathway linked to this phone number if one doesn't already exist
+        const existingPathway = await client.query(
+          'SELECT id FROM pathways WHERE phone_id = $1',
+          [savedPhone.id],
+        )
+
+        if (existingPathway.rows.length === 0) {
+          const pathwayName = `Pathway for ${userId}`
+          const pathwayDescription = 'Pathway for current number'
+
+          const pathwayResult = await client.query(
+            `INSERT INTO pathways (name, description, creator_id, phone_number, phone_id, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+             RETURNING *`,
+            [
+              pathwayName,
+              pathwayDescription,
+              userId,
+              savedPhone.phone_number,
+              savedPhone.id,
+            ],
+          )
+
+          const newPathway = pathwayResult.rows[0]
+          console.log('✅ [WEBHOOK] Pathway created for phone number:', newPathway)
+        } else {
+          console.log(
+            '⚠️ [WEBHOOK] Pathway already exists for phone_id, skipping create',
+            existingPathway.rows[0].id,
+          )
+        }
+
         // Register the number with Bland.ai and configure inbound webhook
         await registerNumbersWithBland([phoneNumber])
         console.log('✅ [WEBHOOK] Phone number registered with Bland.ai')
