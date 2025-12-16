@@ -321,6 +321,27 @@ async function handlePhoneNumberPurchase(
           throw new Error(`Failed to create Bland.ai pathway: ${blandPathwayError instanceof Error ? blandPathwayError.message : String(blandPathwayError)}`)
         }
 
+        // Create local pathway entry in pathways table
+        console.log('💾 [WEBHOOK] Creating local pathway entry in pathways table...')
+        const pathwayName = `Pathway for ${phoneNumber}`
+        const pathwayDescription = `Default pathway for ${phoneNumber}`
+        
+        const pathwayResult = await client.query(
+          `INSERT INTO pathways (name, description, creator_id, phone_number_id, bland_id, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+           RETURNING *`,
+          [
+            pathwayName,
+            pathwayDescription,
+            userId,
+            savedPhone.id,
+            blandPathwayId,
+          ],
+        )
+        
+        const newPathway = pathwayResult.rows[0]
+        console.log('✅ [WEBHOOK] Local pathway created in pathways table:', newPathway.id)
+
         // Update phone_numbers.pathwayid with the Bland.ai pathway_id
         console.log('💾 [WEBHOOK] Updating phone_numbers.pathwayid with Bland.ai pathway_id...')
         await client.query(
