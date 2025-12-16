@@ -159,7 +159,7 @@ export async function POST(request: Request) {
 
         return NextResponse.json({
           success: true,
-          message: externalResult.message || "Account updated successfully",
+          message: "Account updated successfully. Please verify your email to access the platform.",
           user: {
             id: localUser.id,
             email: localUser.email,
@@ -167,8 +167,9 @@ export async function POST(request: Request) {
             lastName: localUser.last_name,
             company: localUser.company,
             phoneNumber: localUser.phone_number,
-            isVerified: true
-          }
+            isVerified: localUser.is_verified || false
+          },
+          requiresVerification: !localUser.is_verified
         })
       }
 
@@ -186,7 +187,7 @@ export async function POST(request: Request) {
           'user',
           externalResult.data?._id || externalResult.data?.id || null,
           externalResult.data?.token || null,
-          true, // Set as verified since external API succeeded
+          false, // Set as unverified - user must verify account before accessing platform
           'AI Call',
           password
         ]
@@ -212,7 +213,7 @@ export async function POST(request: Request) {
       // Return success with external API message
       return NextResponse.json({
         success: true,
-        message: externalResult.message || "Account created successfully",
+        message: "Account created successfully. Please verify your email to access the platform.",
         user: {
           id: localUser.id,
           email: localUser.email,
@@ -220,8 +221,9 @@ export async function POST(request: Request) {
           lastName: localUser.last_name,
           company: localUser.company,
           phoneNumber: localUser.phone_number,
-          isVerified: true
-        }
+          isVerified: false
+        },
+        requiresVerification: true
       })
 
     } catch (dbError: any) {
