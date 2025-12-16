@@ -131,7 +131,7 @@ async function handlePhoneNumberPurchase(
     sessionId
   })
 
-  // Get Twilio credentials from environment variables
+  // Validate Twilio credentials BEFORE starting purchase
   const accountSid =
     process.env.TWILIO_ACCOUNT_SID || process.env.REPLIT_SECRET_TWILIO_ACCOUNT_SID
   const authToken =
@@ -141,6 +141,20 @@ async function handlePhoneNumberPurchase(
     console.error('❌ [WEBHOOK] Twilio credentials not configured')
     throw new Error('Twilio credentials not configured')
   }
+
+  // Validate Bland.ai credentials BEFORE starting purchase
+  const blandApiKey = process.env.BLAND_AI_API_KEY
+  const blandEncryptedKey = process.env.BLAND_TWILIO_ENCRYPTED_KEY
+
+  if (!blandApiKey || !blandEncryptedKey) {
+    console.error('❌ [WEBHOOK] Bland.ai credentials not configured', {
+      hasApiKey: !!blandApiKey,
+      hasEncryptedKey: !!blandEncryptedKey,
+    })
+    throw new Error('Bland.ai API key or encrypted key not configured - cannot register number')
+  }
+
+  console.log('✅ [WEBHOOK] All credentials validated (Twilio + Bland.ai)')
 
   try {
     // Initialize Twilio client
@@ -261,11 +275,26 @@ async function handlePhoneNumberPurchase(
         }
 
         // Register the number with Bland.ai and configure inbound webhook
-        await registerNumbersWithBland([phoneNumber])
-        console.log('✅ [WEBHOOK] Phone number registered with Bland.ai')
+        // This MUST succeed for new numbers - we've already purchased from Twilio
+        console.log('📨 [WEBHOOK] Registering new number with Bland.ai...')
+        try {
+          await registerNumbersWithBland([phoneNumber])
+          console.log('✅ [WEBHOOK] Phone number registered with Bland.ai')
+        } catch (blandRegError) {
+          console.error('❌ [WEBHOOK] CRITICAL: Bland.ai registration failed for new number:', blandRegError)
+          // Re-throw because this is critical - number is purchased but not registered
+          throw new Error(`Failed to register number with Bland.ai: ${blandRegError instanceof Error ? blandRegError.message : String(blandRegError)}`)
+        }
 
-        await updateBlandInboundConfig(phoneNumber)
-        console.log('✅ [WEBHOOK] Bland inbound webhook configured for phone number')
+        console.log('🌐 [WEBHOOK] Configuring Bland inbound webhook...')
+        try {
+          await updateBlandInboundConfig(phoneNumber)
+          console.log('✅ [WEBHOOK] Bland inbound webhook configured for phone number')
+        } catch (blandConfigError) {
+          console.error('❌ [WEBHOOK] CRITICAL: Bland inbound config failed for new number:', blandConfigError)
+          // Re-throw because this is critical - number won't receive calls properly
+          throw new Error(`Failed to configure Bland inbound webhook: ${blandConfigError instanceof Error ? blandConfigError.message : String(blandConfigError)}`)
+        }
       }
     } finally {
       await client.end()
