@@ -29,9 +29,9 @@ export default function VerificationPendingPage() {
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-yellow-100">
             <Mail className="h-6 w-6 text-yellow-600" />
           </div>
-          <CardTitle className="text-xl font-semibold">Email Not Verified</CardTitle>
+          <CardTitle className="text-xl font-semibold">Verify Your Account</CardTitle>
           <CardDescription>
-            You have not verified your email address yet
+            Please verify your email address to access the platform
           </CardDescription>
         </CardHeader>
         <CardContent className="text-center space-y-4">
@@ -70,8 +70,8 @@ export default function VerificationPendingPage() {
             </Button>
             
             <Button variant="outline" asChild className="w-full">
-              <Link href="/signup">
-                Back to Sign Up
+              <Link href="/login">
+                Go to Login
               </Link>
             </Button>
           </div>
