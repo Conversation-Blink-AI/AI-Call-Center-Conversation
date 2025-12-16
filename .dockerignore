@@ -1,0 +1,81 @@
+# Dependencies
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Testing
+coverage
+.nyc_output
+
+# Next.js
+.next
+out
+build
+dist
+
+# Production
+*.log
+
+# Misc
+.DS_Store
+*.pem
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local env files
+.env*.local
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Vercel
+.vercel
+
+# Typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+
+# SSL Certificates (local dev only)
+.cert/
+
+# Scripts
+*.sh
+migrate*.js
+migrate*.sh
+
+# Database backups
+*.sql
+database_backup_*.sql
+production_backup_*.sql
+development_export.sql
+
+# Documentation
+*.md
+docs/
+New_Help/
+TempDoc/
+
+# Attached assets (if not needed in production)
+attached_assets/
+

@@ -1,6 +1,7 @@
 
 import { NextRequest, NextResponse } from "next/server"
 import { Client } from "pg"
+import { getSSLConfig } from "@/lib/db-client"
 
 // Add OPTIONS handler for CORS preflight requests
 export async function OPTIONS(request: NextRequest) {
@@ -35,8 +36,24 @@ export async function GET(request: NextRequest) {
 
     console.log(`[GET-PURCHASE-NUMBER] Looking up phone numbers for email: ${email}`)
 
+    if (!process.env.DATABASE_URL) {
+      console.error("[GET-PURCHASE-NUMBER] DATABASE_URL is not set")
+      return NextResponse.json({
+        success: false,
+        message: "Database configuration error"
+      }, { 
+        status: 500,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        }
+      })
+    }
+
     const client = new Client({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
     })
 
     try {
@@ -69,6 +86,7 @@ export async function GET(request: NextRequest) {
       console.log(`[GET-PURCHASE-NUMBER] User found: ${user.id}`)
 
       // Get all phone numbers for this user
+      // Simplified query - pathway info can be added via JOIN if needed
       const phoneResult = await client.query(
         `SELECT 
           pn.id,
@@ -76,8 +94,9 @@ export async function GET(request: NextRequest) {
           pn.location,
           pn.purchased_at,
           pn.user_id,
-          pn.subscription_plan,
-          pn.pathway_id
+          pn.monthly_fee,
+          pn.status,
+          pn.type
          FROM phone_numbers pn
          WHERE pn.user_id = $1
          ORDER BY pn.purchased_at DESC`,
@@ -87,14 +106,14 @@ export async function GET(request: NextRequest) {
       const phoneNumbers = phoneResult.rows.map(row => ({
         id: row.id,
         number: row.number ? row.number.trim() : '',
-        status: 'active',
+        status: row.status || 'active',
         location: row.location || 'Unknown',
-        type: 'Local',
+        type: row.type || 'Local',
         purchased_at: row.purchased_at,
         user_id: row.user_id,
-        monthly_fee: parseFloat(row.subscription_plan) || 1.50,
-        pathway_id: row.pathway_id,
-        pathway_name: row.pathway_id ? `Pathway ${row.pathway_id}` : null
+        monthly_fee: row.monthly_fee ? parseFloat(row.monthly_fee) : 1.50,
+        pathway_id: null,
+        pathway_name: null
       }))
 
       console.log(`[GET-PURCHASE-NUMBER] Found ${phoneNumbers.length} phone numbers for user ${user.id}`)
@@ -119,9 +138,13 @@ export async function GET(request: NextRequest) {
 
   } catch (error: any) {
     console.error("[GET-PURCHASE-NUMBER] Error:", error)
+    const errorMessage = error?.message || "Internal server error"
+    const errorDetails = process.env.NODE_ENV === 'development' ? errorMessage : undefined
+    
     return NextResponse.json({
       success: false,
-      message: "Internal server error"
+      message: "Internal server error",
+      ...(errorDetails && { error: errorDetails })
     }, { 
       status: 500,
       headers: {

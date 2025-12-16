@@ -1,10 +1,345 @@
 
 import { NextResponse } from 'next/server'
 import { stripe } from '../../../../lib/stripeClient'
-import { db } from '../../../../lib/db'
+import { createDatabaseClient, getSSLConfig } from '../../../../lib/db-client'
 import type StripeType from 'stripe'
+import { Client } from 'pg'
+import { Twilio } from 'twilio'
 
 export const runtime = 'nodejs'
+
+// Helper to register purchased numbers with Bland.ai
+async function registerNumbersWithBland(numbers: string[]): Promise<void> {
+  console.log('📨 [WEBHOOK] Registering numbers with Bland.ai:', numbers)
+
+  const apiKey = process.env.BLAND_AI_API_KEY
+  const encryptedKey = process.env.BLAND_TWILIO_ENCRYPTED_KEY
+
+  if (!apiKey || !encryptedKey) {
+    console.error('❌ [WEBHOOK] Bland.ai credentials not configured', {
+      hasApiKey: !!apiKey,
+      hasEncryptedKey: !!encryptedKey,
+    })
+    throw new Error('Bland.ai API key or encrypted key not configured')
+  }
+
+  const response = await fetch('https://api.bland.ai/v1/inbound/insert', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      authorization: apiKey,
+      encrypted_key: encryptedKey,
+    } as any,
+    body: JSON.stringify({ numbers }),
+  })
+
+  const text = await response.text()
+  let data: any
+  try {
+    data = text ? JSON.parse(text) : {}
+  } catch {
+    data = { raw: text }
+  }
+
+  if (!response.ok) {
+    console.error('❌ [WEBHOOK] Bland.ai inbound insert failed:', {
+      status: response.status,
+      statusText: response.statusText,
+      body: data,
+    })
+    throw new Error(
+      `Bland.ai inbound insert failed: ${response.status} ${response.statusText}`,
+    )
+  }
+
+  if (data.status !== 'success') {
+    console.error('❌ [WEBHOOK] Bland.ai responded with non-success status:', data)
+    throw new Error(`Bland.ai inbound insert status: ${data.status || 'unknown'}`)
+  }
+
+  console.log('✅ [WEBHOOK] Bland.ai inbound insert success:', {
+    inserted: data.inserted,
+    message: data.message,
+  })
+}
+
+// Helper to update Bland.ai inbound config (webhook URL etc.) for a specific number
+async function updateBlandInboundConfig(phoneNumber: string): Promise<void> {
+  const apiKey = process.env.BLAND_AI_API_KEY
+  if (!apiKey) {
+    console.error('❌ [WEBHOOK] BLAND_AI_API_KEY is not configured')
+    throw new Error('BLAND_AI_API_KEY is not configured')
+  }
+
+  // Bland inbound endpoints expect the number without leading + or %2B
+  const formatted = phoneNumber.replace(/^\+|^%2B/, '')
+  const blandUrl = `https://api.bland.ai/v1/inbound/${encodeURIComponent(formatted)}`
+
+  console.log('🌐 [WEBHOOK] Updating Bland inbound config:', {
+    phoneNumber,
+    formatted,
+    blandUrl,
+  })
+
+  const response = await fetch(blandUrl, {
+    method: 'POST',
+    headers: {
+      authorization: apiKey,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      // Set the inbound webhook to your Bland webhook endpoint
+      webhook_url: 'https://dev.conversation.blinklab.in/api/webhooks/bland',
+    }),
+  })
+
+  const text = await response.text()
+  let data: any
+  try {
+    data = text ? JSON.parse(text) : {}
+  } catch {
+    data = { raw: text }
+  }
+
+  if (!response.ok) {
+    console.error('❌ [WEBHOOK] Failed to update Bland inbound config:', {
+      status: response.status,
+      statusText: response.statusText,
+      body: data,
+    })
+    throw new Error(
+      `Failed to update Bland inbound config: ${response.status} ${response.statusText}`,
+    )
+  }
+
+  console.log('✅ [WEBHOOK] Bland inbound config updated:', data)
+}
+
+// Helper function to handle phone number purchase via Twilio
+async function handlePhoneNumberPurchase(
+  userId: string,
+  phoneNumber: string,
+  areaCode: string,
+  countryCode: string,
+  sessionId: string
+) {
+  console.log('📞 [WEBHOOK] Starting phone number purchase process (Twilio):', {
+    userId,
+    phoneNumber,
+    areaCode,
+    countryCode,
+    sessionId
+  })
+
+  // Validate Twilio credentials BEFORE starting purchase
+  const accountSid =
+    process.env.TWILIO_ACCOUNT_SID || process.env.REPLIT_SECRET_TWILIO_ACCOUNT_SID
+  const authToken =
+    process.env.TWILIO_AUTH_TOKEN || process.env.REPLIT_SECRET_TWILIO_AUTH_TOKEN
+
+  if (!accountSid || !authToken) {
+    console.error('❌ [WEBHOOK] Twilio credentials not configured')
+    throw new Error('Twilio credentials not configured')
+  }
+
+  // Validate Bland.ai credentials BEFORE starting purchase
+  const blandApiKey = process.env.BLAND_AI_API_KEY
+  const blandEncryptedKey = process.env.BLAND_TWILIO_ENCRYPTED_KEY
+
+  if (!blandApiKey || !blandEncryptedKey) {
+    console.error('❌ [WEBHOOK] Bland.ai credentials not configured', {
+      hasApiKey: !!blandApiKey,
+      hasEncryptedKey: !!blandEncryptedKey,
+    })
+    throw new Error('Bland.ai API key or encrypted key not configured - cannot register number')
+  }
+
+  console.log('✅ [WEBHOOK] All credentials validated (Twilio + Bland.ai)')
+
+  try {
+    // Initialize Twilio client
+    const twilioClient = new Twilio(accountSid, authToken)
+
+    // Purchase the phone number from Twilio
+    console.log('📞 [WEBHOOK] Calling Twilio API to purchase number...')
+    const purchasedNumber = await twilioClient.incomingPhoneNumbers.create({
+      phoneNumber,
+    })
+
+    console.log('✅ [WEBHOOK] Twilio purchase successful:', {
+      sid: purchasedNumber.sid,
+      phoneNumber: purchasedNumber.phoneNumber,
+      friendlyName: purchasedNumber.friendlyName,
+    })
+
+    // Store the purchased number in PostgreSQL database
+    const client = new Client({
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig(),
+    })
+
+    try {
+      await client.connect()
+
+      // Extract area code and location from phone number
+      const extractedAreaCode = phoneNumber.replace(/\D/g, '').slice(1, 4) // Remove country code and get area code
+      const location = getLocationFromAreaCode(extractedAreaCode)
+
+      // Check if number already exists for this user
+      const existingNumber = await client.query(
+        'SELECT id FROM phone_numbers WHERE phone_number = $1 AND user_id = $2',
+        [phoneNumber, userId],
+      )
+
+      if (existingNumber.rows.length > 0) {
+        console.log('⚠️ [WEBHOOK] Phone number already exists for user, updating status')
+        const updateResult = await client.query(
+          `
+          UPDATE phone_numbers 
+          SET status = 'active'
+          WHERE phone_number = $1 AND user_id = $2
+          RETURNING *
+        `,
+          [phoneNumber, userId],
+        )
+        
+        const savedPhone = updateResult.rows[0]
+        console.log('✅ [WEBHOOK] Phone number status updated:', savedPhone)
+
+        // Still register with Bland.ai in case it wasn't registered before (idempotent)
+        try {
+          await registerNumbersWithBland([phoneNumber])
+          console.log('✅ [WEBHOOK] Phone number registered with Bland.ai')
+        } catch (blandError) {
+          console.warn('⚠️ [WEBHOOK] Bland.ai registration failed (may already be registered):', blandError)
+          // Don't throw - number exists, Bland registration is best-effort
+        }
+
+        try {
+          await updateBlandInboundConfig(phoneNumber)
+          console.log('✅ [WEBHOOK] Bland inbound webhook configured for phone number')
+        } catch (blandError) {
+          console.warn('⚠️ [WEBHOOK] Bland inbound config update failed:', blandError)
+          // Don't throw - number exists, config update is best-effort
+        }
+      } else {
+        // Insert new phone number
+        const result = await client.query(
+          `INSERT INTO phone_numbers (phone_number, user_id, location, type, status, purchased_at, area_code, country_code)
+           VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7)
+           RETURNING *`,
+          [
+            phoneNumber,
+            userId,
+            location,
+            'Local',
+            'active',
+            extractedAreaCode,
+            countryCode,
+          ],
+        )
+
+        const savedPhone = result.rows[0]
+        console.log('✅ [WEBHOOK] Phone number saved to database:', savedPhone)
+
+        // Create a default pathway linked to this phone number if one doesn't already exist
+        const existingPathway = await client.query(
+          'SELECT id FROM pathways WHERE phone_id = $1',
+          [savedPhone.id],
+        )
+
+        if (existingPathway.rows.length === 0) {
+          const pathwayName = `Pathway for ${userId}`
+          const pathwayDescription = 'Pathway for current number'
+
+          const pathwayResult = await client.query(
+            `INSERT INTO pathways (name, description, creator_id, phone_number, phone_id, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+             RETURNING *`,
+            [
+              pathwayName,
+              pathwayDescription,
+              userId,
+              savedPhone.phone_number,
+              savedPhone.id,
+            ],
+          )
+
+          const newPathway = pathwayResult.rows[0]
+          console.log('✅ [WEBHOOK] Pathway created for phone number:', newPathway)
+        } else {
+          console.log(
+            '⚠️ [WEBHOOK] Pathway already exists for phone_id, skipping create',
+            existingPathway.rows[0].id,
+          )
+        }
+
+        // Register the number with Bland.ai and configure inbound webhook
+        // This MUST succeed for new numbers - we've already purchased from Twilio
+        console.log('📨 [WEBHOOK] Registering new number with Bland.ai...')
+        try {
+          await registerNumbersWithBland([phoneNumber])
+          console.log('✅ [WEBHOOK] Phone number registered with Bland.ai')
+        } catch (blandRegError) {
+          console.error('❌ [WEBHOOK] CRITICAL: Bland.ai registration failed for new number:', blandRegError)
+          // Re-throw because this is critical - number is purchased but not registered
+          throw new Error(`Failed to register number with Bland.ai: ${blandRegError instanceof Error ? blandRegError.message : String(blandRegError)}`)
+        }
+
+        console.log('🌐 [WEBHOOK] Configuring Bland inbound webhook...')
+        try {
+          await updateBlandInboundConfig(phoneNumber)
+          console.log('✅ [WEBHOOK] Bland inbound webhook configured for phone number')
+        } catch (blandConfigError) {
+          console.error('❌ [WEBHOOK] CRITICAL: Bland inbound config failed for new number:', blandConfigError)
+          // Re-throw because this is critical - number won't receive calls properly
+          throw new Error(`Failed to configure Bland inbound webhook: ${blandConfigError instanceof Error ? blandConfigError.message : String(blandConfigError)}`)
+        }
+      }
+    } finally {
+      await client.end()
+    }
+
+    console.log('✅ [WEBHOOK] Phone number purchase completed successfully')
+  } catch (error) {
+    console.error('❌ [WEBHOOK] Error purchasing phone number via Twilio:', error)
+    throw error
+  }
+}
+
+// Helper function to get location from area code
+function getLocationFromAreaCode(areaCode: string): string {
+  const areaCodeMap: { [key: string]: string } = {
+    '415': 'San Francisco, CA',
+    '510': 'Oakland, CA',
+    '628': 'San Francisco, CA',
+    '212': 'New York, NY',
+    '646': 'New York, NY',
+    '917': 'New York, NY',
+    '213': 'Los Angeles, CA',
+    '310': 'Los Angeles, CA',
+    '424': 'Los Angeles, CA',
+    '312': 'Chicago, IL',
+    '773': 'Chicago, IL',
+    '872': 'Chicago, IL',
+    '305': 'Miami, FL',
+    '786': 'Miami, FL',
+    '954': 'Fort Lauderdale, FL',
+    '206': 'Seattle, WA',
+    '425': 'Seattle, WA',
+    '253': 'Tacoma, WA',
+    '416': 'Toronto, ON',
+    '647': 'Toronto, ON',
+    '437': 'Toronto, ON',
+    '514': 'Montreal, QC',
+    '438': 'Montreal, QC',
+    '604': 'Vancouver, BC',
+    '778': 'Vancouver, BC',
+    '236': 'Vancouver, BC',
+  }
+
+  return areaCodeMap[areaCode] || 'Unknown Location'
+}
 
 export async function GET() {
   console.log('🔔 [WEBHOOK] GET request to webhook endpoint')
@@ -160,14 +495,45 @@ export async function POST(req: Request) {
         console.log('🔔 [WEBHOOK] Session ID:', session.id)
         console.log('🔔 [WEBHOOK] Session metadata:', session.metadata)
         
-        // Only handle payment mode sessions
+        const purchaseType = session.metadata?.purchase_type
+        const userId = session.metadata?.user_id
+        
+        // Handle phone number purchase (subscription mode)
+        if (session.mode === 'subscription' && purchaseType === 'phone_number') {
+          console.log('📞 [WEBHOOK] Processing phone number purchase subscription')
+          
+          const phoneNumber = session.metadata?.phone_number
+          const areaCode = session.metadata?.area_code
+          const countryCode = session.metadata?.country_code || 'US'
+          
+          if (!phoneNumber || !userId) {
+            console.error('❌ [WEBHOOK] Missing phone number or user ID in subscription metadata:', {
+              phoneNumber,
+              userId,
+              metadata: session.metadata
+            })
+            break
+          }
+          
+          // Purchase phone number from Bland.ai
+          try {
+            await handlePhoneNumberPurchase(userId, phoneNumber, areaCode, countryCode, session.id)
+            console.log('✅ [WEBHOOK] Phone number purchase completed successfully')
+          } catch (error) {
+            console.error('❌ [WEBHOOK] Error purchasing phone number:', error)
+            // Re-throw error so Stripe can retry the webhook
+            throw error
+          }
+          break
+        }
+        
+        // Handle wallet top-up (payment mode)
         if (session.mode !== 'payment') {
-          console.log('🔔 [WEBHOOK] Skipping non-payment session')
+          console.log('🔔 [WEBHOOK] Skipping non-payment session (not wallet top-up or phone purchase)')
           break
         }
 
         const amount = session.amount_total ?? 0 // cents
-        const userId = session.metadata?.user_id
         const stripeCustomerId = session.customer
 
         console.log('🔔 [WEBHOOK] Extracted data:', {
@@ -217,10 +583,36 @@ export async function POST(req: Request) {
 
         console.log('🔔 [WEBHOOK] Processing payment for user:', userId, 'amount:', amount)
 
+        // Use a single database connection with transaction support
+        const client = createDatabaseClient()
+        
         try {
-          // Insert payment record using direct database query
+          await client.connect()
+          console.log('🔔 [WEBHOOK] Database connection established')
+          
+          // Start transaction
+          await client.query('BEGIN')
+          console.log('🔔 [WEBHOOK] Transaction started')
+
+          // Idempotency check: Check if payment already exists
+          console.log('🔔 [WEBHOOK] Checking for existing payment...')
+          const existingPayment = await client.query(
+            'SELECT id FROM payments WHERE gateway = $1 AND gateway_payment_id = $2',
+            ['stripe', session.id]
+          )
+
+          if (existingPayment.rows.length > 0) {
+            console.log('⚠️ [WEBHOOK] Payment already exists, skipping duplicate processing:', existingPayment.rows[0].id)
+            // Rollback since we didn't make any changes (read-only transaction)
+            await client.query('ROLLBACK')
+            await client.end()
+            console.log('✅ [WEBHOOK] Transaction rolled back (idempotency check - no changes needed)')
+            break
+          }
+
+          // Insert payment record
           console.log('🔔 [WEBHOOK] Creating payment record...')
-          const paymentResult = await db.query(`
+          const paymentResult = await client.query(`
             INSERT INTO payments (gateway, gateway_payment_id, amount_cents, status, user_id, created_at, updated_at)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING id
@@ -236,9 +628,9 @@ export async function POST(req: Request) {
 
           console.log('✅ [WEBHOOK] Payment record created:', paymentResult.rows[0]?.id)
 
-          // Find or create wallet using direct database query
+          // Find or create wallet
           console.log('🔔 [WEBHOOK] Finding/creating wallet...')
-          const existingWallet = await db.query(
+          const existingWallet = await client.query(
             'SELECT id, balance_cents FROM wallets WHERE user_id = $1',
             [userId]
           )
@@ -254,7 +646,7 @@ export async function POST(req: Request) {
 
             console.log('🔔 [WEBHOOK] Updating existing wallet:', walletId, 'from', currentBalance, 'to', newBalance)
 
-            const updateResult = await db.query(`
+            const updateResult = await client.query(`
               UPDATE wallets 
               SET balance_cents = $1, updated_at = $2 
               WHERE id = $3
@@ -263,16 +655,15 @@ export async function POST(req: Request) {
             console.log('✅ [WEBHOOK] Updated wallet balance:', walletId, 'new balance:', newBalance)
             console.log('✅ [WEBHOOK] Balance update result:', updateResult.rowCount, 'rows affected')
           } else {
-            // Create new wallet
+            // Create new wallet (removed created_at as wallets table doesn't have this column)
             console.log('🔔 [WEBHOOK] Creating new wallet for user:', userId)
-            const newWalletResult = await db.query(`
-              INSERT INTO wallets (user_id, balance_cents, created_at, updated_at)
-              VALUES ($1, $2, $3, $4)
+            const newWalletResult = await client.query(`
+              INSERT INTO wallets (user_id, balance_cents, updated_at)
+              VALUES ($1, $2, $3)
               RETURNING id
             `, [
               userId,
               amount,
-              new Date().toISOString(),
               new Date().toISOString()
             ])
 
@@ -281,10 +672,10 @@ export async function POST(req: Request) {
             console.log('✅ [WEBHOOK] Created new wallet:', walletId, 'balance:', newBalance)
           }
 
-          // Insert wallet transaction using direct database query
+          // Insert wallet transaction
           if (walletId) {
             console.log('🔔 [WEBHOOK] Creating wallet transaction...')
-            const transactionResult = await db.query(`
+            const transactionResult = await client.query(`
               INSERT INTO wallet_transactions (wallet_id, amount_cents, type, gateway, provider_txn_id, created_at)
               VALUES ($1, $2, $3, $4, $5, $6)
               RETURNING id
@@ -300,11 +691,30 @@ export async function POST(req: Request) {
             console.log('✅ [WEBHOOK] Wallet transaction created:', transactionResult.rows[0]?.id)
           }
 
+          // Commit transaction
+          await client.query('COMMIT')
+          console.log('✅ [WEBHOOK] Transaction committed successfully')
           console.log(`✅ [WEBHOOK] Successfully processed Stripe payment: ${session.id} for user ${userId}, amount: $${amount / 100}`)
 
         } catch (error) {
+          // Rollback transaction on error
+          try {
+            await client.query('ROLLBACK')
+            console.error('❌ [WEBHOOK] Transaction rolled back due to error')
+          } catch (rollbackError) {
+            console.error('❌ [WEBHOOK] Error during rollback:', rollbackError)
+          }
+          
           console.error('❌ [WEBHOOK] Error processing checkout.session.completed:', error)
-          // Don't throw here, we want to return 200 to Stripe even if our processing fails
+          console.error('❌ [WEBHOOK] Error details:', error instanceof Error ? error.message : String(error))
+          console.error('❌ [WEBHOOK] Error stack:', error instanceof Error ? error.stack : 'No stack trace')
+          
+          // Re-throw error so Stripe can retry the webhook
+          throw error
+        } finally {
+          // Always close the database connection
+          await client.end()
+          console.log('🔔 [WEBHOOK] Database connection closed')
         }
         break
 

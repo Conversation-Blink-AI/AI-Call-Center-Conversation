@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import { validateAuthToken } from "@/lib/auth-utils"
 import { Client } from "pg"
+import { getSSLConfig } from "@/lib/db-client"
 
 export async function GET(request: NextRequest) {
   try {
@@ -39,7 +40,8 @@ export async function GET(request: NextRequest) {
     }
 
     const client = new Client({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
     })
 
     try {

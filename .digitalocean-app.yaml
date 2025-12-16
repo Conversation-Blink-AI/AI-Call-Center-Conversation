@@ -1,0 +1,33 @@
+# DigitalOcean App Platform Configuration
+# This file helps DigitalOcean understand your app structure
+# You can also configure this through the DigitalOcean dashboard
+
+name: cursor-conversation-app
+region: nyc
+
+services:
+  - name: web
+    github:
+      repo: Team-AI-Blink-Digital/Cursor_Conversation_Dev_v2
+      branch: develop_ashi
+      deploy_on_push: true
+    
+    build_command: npm install && npm run build
+    run_command: npm start
+    
+    environment_slug: node-js
+    instance_count: 1
+    instance_size_slug: basic-xxs  # Start small, scale as needed
+    
+    http_port: 3000
+    
+    health_check:
+      http_path: /
+      initial_delay_seconds: 60
+    
+    # Environment variables should be set in the DigitalOcean dashboard
+    # Do not commit sensitive values here
+    
+    routes:
+      - path: /
+

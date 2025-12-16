@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server"
 import { getUserFromRequest } from "@/lib/auth-utils"
 import { Client } from "pg"
+import { getSSLConfig } from "@/lib/db-client"
 
 export async function GET() {
   try {
@@ -11,7 +12,8 @@ export async function GET() {
     }
 
     const client = new Client({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
     })
 
     await client.connect()

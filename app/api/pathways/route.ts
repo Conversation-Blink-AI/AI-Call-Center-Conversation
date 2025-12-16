@@ -4,6 +4,7 @@ import { createPathway, getPathwaysByUserId } from "@/lib/db-utils"
 import { validateAuthToken } from "@/lib/auth-utils"
 import { Client } from "pg"
 import { getUserFromRequest } from "@/lib/auth-utils"
+import { getSSLConfig } from "@/lib/db-client"
 
 export async function GET(req: NextRequest) {
   try {
@@ -40,7 +41,8 @@ export async function GET(req: NextRequest) {
     }
 
     const client = new Client({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
     })
 
     try {

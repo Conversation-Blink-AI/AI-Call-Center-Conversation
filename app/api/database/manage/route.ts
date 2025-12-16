@@ -7,6 +7,7 @@ import {
   getUserPhoneNumbers,
   getDatabaseStats
 } from "@/lib/init-replit-database"
+import { getSSLConfig } from "@/lib/db-client"
 
 export async function GET(request: Request) {
   try {
@@ -77,8 +78,9 @@ export async function POST(request: Request) {
       // Use PostgreSQL to save phone number with RLS
       const { Client } = await import('pg')
       const client = new Client({
-        connectionString: process.env.DATABASE_URL
-      })
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
+    })
 
       try {
         await client.connect()

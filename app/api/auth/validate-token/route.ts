@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { cookies } from "next/headers"
 import * as jwt from "jsonwebtoken"
 import { Client } from "pg"
+import { getSSLConfig } from "@/lib/db-client"
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
 const EXTERNAL_API_URL = process.env.FOREX_URL || process.env.EXTERNAL_API_URL
@@ -70,7 +71,8 @@ export async function POST(request: NextRequest) {
 
     // Get or sync user in local database
     const client = new Client({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
     })
 
     let user: any

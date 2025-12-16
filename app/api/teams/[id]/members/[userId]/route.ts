@@ -3,6 +3,7 @@ import { getUserFromRequest } from "@/lib/auth-utils"
 import { checkTeamPermission, updateTeamMemberRole, removeTeamMember } from "@/lib/db-utils"
 import { supabase } from "@/lib/supabase"
 import { Client } from "pg"
+import { getSSLConfig } from "@/lib/db-client"
 
 // Update a team member's role
 export async function PUT(req: NextRequest, { params }: { params: { id: string; userId: string } }) {
@@ -74,7 +75,8 @@ export async function DELETE(
     const userId = params.userId
 
     const client = new Client({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
     })
 
     await client.connect()

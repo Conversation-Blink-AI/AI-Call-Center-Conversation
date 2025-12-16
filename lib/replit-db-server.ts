@@ -212,8 +212,10 @@ export async function savePhoneNumber(phoneData: {
   status?: string
 }) {
   const { Client } = await import('pg')
+  const { getSSLConfig } = await import('./db-client')
   const client = new Client({
-    connectionString: process.env.DATABASE_URL
+    connectionString: process.env.DATABASE_URL,
+    ssl: getSSLConfig()
   })
 
   try {

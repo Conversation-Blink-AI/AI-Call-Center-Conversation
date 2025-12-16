@@ -1,17 +1,7 @@
 
 import { NextResponse } from "next/server"
 import { Client } from "pg"
-
-// Helper function to get SSL config for DigitalOcean
-function getSSLConfig() {
-  const dbUrl = process.env.DATABASE_URL || ""
-  // Check if connecting to DigitalOcean (by IP or hostname)
-  if (dbUrl.includes("ondigitalocean.com") || dbUrl.includes("157.245.104.224")) {
-    // DigitalOcean uses self-signed certificates, so we need to allow them
-    return { rejectUnauthorized: false }
-  }
-  return undefined // Use default SSL settings for other databases
-}
+import { getSSLConfig } from "@/lib/db-client"
 
 export async function GET() {
   if (!process.env.DATABASE_URL) {

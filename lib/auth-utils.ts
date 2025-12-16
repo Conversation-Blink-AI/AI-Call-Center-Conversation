@@ -2,6 +2,7 @@ import { cookies } from "next/headers"
 import * as jwt from "jsonwebtoken"
 import { Client } from "pg"
 import { NextRequest } from "next/server" // Assuming NextRequest is needed for the getUserFromRequest signature
+import { getSSLConfig } from "./db-client"
 
 // Define User type for clarity, assuming it has at least 'id' and 'email'
 interface User {
@@ -21,7 +22,8 @@ const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
 // Helper function to get user by ID from the database
 async function getUserById(userId: string): Promise<any | null> {
   const client = new Client({
-    connectionString: process.env.DATABASE_URL
+    connectionString: process.env.DATABASE_URL,
+    ssl: getSSLConfig()
   })
 
   try {

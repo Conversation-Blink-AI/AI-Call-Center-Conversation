@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getUserFromRequest } from "@/lib/auth-utils"
+import { getSSLConfig } from "@/lib/db-client"
 
 export const dynamic = "force-dynamic"
 
@@ -18,7 +19,8 @@ export async function GET(request: NextRequest) {
     // Get user's phone numbers
     const { Client } = await import('pg')
     const client = new Client({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
     })
 
     let userPhoneNumbers: string[] = []

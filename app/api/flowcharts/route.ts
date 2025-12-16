@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from "next/server"
 import { getUserFromRequest } from "@/lib/auth-utils"
 import { Client } from "pg"
+import { getSSLConfig } from "@/lib/db-client"
 
 // Save/update a flowchart  
 export async function POST(req: NextRequest) {
@@ -17,7 +18,8 @@ export async function POST(req: NextRequest) {
     }
 
     const client = new Client({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
     })
 
     await client.connect()
@@ -96,7 +98,8 @@ export async function GET(req: NextRequest) {
     }
 
     const client = new Client({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
     })
 
     await client.connect()

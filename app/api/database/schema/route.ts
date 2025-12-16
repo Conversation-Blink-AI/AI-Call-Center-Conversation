@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server"
 import { Client } from "pg"
+import { getSSLConfig } from "@/lib/db-client"
 
 export async function GET() {
   if (!process.env.DATABASE_URL) {
@@ -10,8 +11,9 @@ export async function GET() {
   }
 
   const client = new Client({
-    connectionString: process.env.DATABASE_URL
-  })
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
+    })
 
   try {
     await client.connect()

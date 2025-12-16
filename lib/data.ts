@@ -1,5 +1,6 @@
 import { Client } from "pg"
 import { getUserFromRequest } from "./auth-utils"
+import { getSSLConfig } from "./db-client"
 
 /**
  * Fetches call summary data for a specific user's phone numbers
@@ -26,7 +27,8 @@ export async function fetchCallSummary(userId: string) {
 
     // Fetch call data for these phone numbers
     const client = new Client({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
     })
     await client.connect()
     const { rows: calls, error: callsError } = await client.query(
@@ -97,7 +99,8 @@ export async function getUserData() {
     }
 
     const client = new Client({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
     })
 
     await client.connect()
@@ -123,7 +126,8 @@ export async function getUserData() {
 export async function getUserPhoneNumbers(userId: string) {
   try {
     const client = new Client({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
     })
 
     await client.connect()
@@ -145,7 +149,8 @@ export async function getUserPhoneNumbers(userId: string) {
 export async function getUserPathways(userId: string) {
   try {
     const client = new Client({
-      connectionString: process.env.DATABASE_URL
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig()
     })
 
     await client.connect()

@@ -2,19 +2,9 @@ import { NextResponse } from "next/server"
 import { Client } from "pg"
 import * as jwt from "jsonwebtoken"
 import { cookies } from "next/headers"
+import { getSSLConfig } from "@/lib/db-client"
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
-
-// Helper function to get SSL config for DigitalOcean
-function getSSLConfig() {
-  const dbUrl = process.env.DATABASE_URL || ""
-  // Check if connecting to DigitalOcean (by IP or hostname)
-  if (dbUrl.includes("ondigitalocean.com") || dbUrl.includes("157.245.104.224")) {
-    // DigitalOcean uses self-signed certificates, so we need to allow them
-    return { rejectUnauthorized: false }
-  }
-  return undefined // Use default SSL settings for other databases
-}
 
 export async function POST(request: Request) {
   try {
