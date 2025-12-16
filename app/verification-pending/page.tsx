@@ -41,7 +41,7 @@ export default function VerificationPendingPage() {
           </div>
 
           <div className="flex flex-col space-y-3 pt-4">
-            <Button variant="outline" asChild className="w-full">
+            <Button asChild className="w-full bg-blue-600 hover:bg-blue-700 text-white">
               <Link href="/login">
                 Go to Login
               </Link>
