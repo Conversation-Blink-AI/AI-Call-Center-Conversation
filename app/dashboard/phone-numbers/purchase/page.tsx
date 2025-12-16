@@ -30,7 +30,6 @@ export default function PurchaseNumberPage() {
   const [error, setError] = useState("")
   const [activeNumber, setActiveNumber] = useState<string | null>(null)
   const [usingMockData, setUsingMockData] = useState(false)
-  const [debugInfo, setDebugInfo] = useState<string>("")
 
   // Search filters
   const [areaCode, setAreaCode] = useState("415")
@@ -48,7 +47,6 @@ export default function PurchaseNumberPage() {
     setLoading(true)
     setError("")
     setUsingMockData(false)
-    setDebugInfo("Fetching available numbers...")
 
     try {
       const searchParams = new URLSearchParams({
@@ -61,25 +59,18 @@ export default function PurchaseNumberPage() {
 
       if (!response.ok) {
         const errorText = await response.text()
-        setDebugInfo((prev) => prev + `\nAPI error: ${response.status} - ${errorText}`)
         throw new Error(`Failed to fetch available numbers: ${response.status}`)
       }
 
       let data
       try {
         data = await response.json()
-        setDebugInfo((prev) => prev + `\nFetched ${data.numbers?.length || 0} numbers`)
       } catch (parseError) {
-        setDebugInfo(
-          (prev) =>
-            prev + `\nJSON parse error: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
-        )
         throw new Error("Invalid response format from server")
       }
 
       if (data.usingMockData) {
         setUsingMockData(true)
-        setDebugInfo((prev) => prev + "\nUsing mock data")
       }
 
       // Handle different response formats
@@ -97,19 +88,15 @@ export default function PurchaseNumberPage() {
         id: number.number, // Use the phone number as the ID
       }))
 
-      setDebugInfo((prev) => prev + `\nProcessed ${phoneNumbers.length} phone numbers`)
-
       // Filter for available numbers (case insensitive)
       const availableNumbers = phoneNumbers.filter((number) => {
         const status = (number.status || "").toLowerCase()
         return status === "available" || status === "active"
       })
 
-      setDebugInfo((prev) => prev + `\nAfter filtering, ${availableNumbers.length} numbers are available`)
       setNumbers(availableNumbers)
     } catch (err) {
       console.error("Error fetching available numbers:", err)
-      setDebugInfo((prev) => prev + `\nError: ${err instanceof Error ? err.message : String(err)}`)
       setError(err instanceof Error ? err.message : "An unexpected error occurred")
     } finally {
       setLoading(false)
@@ -117,12 +104,9 @@ export default function PurchaseNumberPage() {
   }
 
   const handlePurchaseClick = async (number: PhoneNumber) => {
-    setDebugInfo(`Purchase clicked for: ${number.display}`)
     setActiveNumber(number.number)
 
     try {
-      setDebugInfo((prev) => prev + `\nCreating Stripe checkout session for: ${number.display}`)
-
       // Create Stripe Checkout Session for phone number subscription
       const response = await fetch("/api/payments/stripe/create-phone-number-checkout", {
         method: "POST",
@@ -142,7 +126,6 @@ export default function PurchaseNumberPage() {
       }
 
       const data = await response.json()
-      setDebugInfo((prev) => prev + `\nCheckout session created: ${data.id}`)
 
       if (!data.url) {
         throw new Error("No checkout URL received from server")
@@ -153,7 +136,6 @@ export default function PurchaseNumberPage() {
       
     } catch (err) {
       console.error("Error creating checkout session:", err)
-      setDebugInfo((prev) => prev + `\nError: ${err instanceof Error ? err.message : String(err)}`)
       setError(err instanceof Error ? err.message : "An unexpected error occurred")
       toast({
         title: "Checkout Failed",
@@ -226,22 +208,6 @@ export default function PurchaseNumberPage() {
         </CardContent>
       </Card>
 
-      {/* Debug information panel */}
-      {debugInfo && (
-        <Alert className="bg-gray-100 border-gray-300">
-          <AlertTitle className="flex items-center gap-2">
-            <AlertCircle className="h-4 w-4" />
-            Debug Information
-            <Button variant="outline" size="sm" className="ml-auto" onClick={() => setDebugInfo("")}>
-              Clear
-            </Button>
-          </AlertTitle>
-          <AlertDescription>
-            <pre className="whitespace-pre-wrap text-xs mt-2 max-h-40 overflow-auto">{debugInfo}</pre>
-          </AlertDescription>
-        </Alert>
-      )}
-
       {usingMockData && !error && (
         <Alert>
           <AlertCircle className="h-4 w-4" />
@@ -301,7 +267,7 @@ export default function PurchaseNumberPage() {
                   <div className="flex justify-between items-center">
                     <div>
                       <p className="text-sm text-muted-foreground">Monthly Fee</p>
-                      <p className="text-lg font-medium">${number.monthlyFee}</p>
+                      <p className="text-lg font-medium">${number.monthlyFee.replace(/^\$/, '')}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground">Billing</p>
@@ -321,7 +287,7 @@ export default function PurchaseNumberPage() {
                       onClick={() => handlePurchaseClick(number)}
                       disabled={activeNumber !== null || loading}
                     >
-                      Purchase via Bland.ai
+                      Purchase
                     </Button>
                   )}
                 </CardFooter>

@@ -88,7 +88,7 @@ export async function GET() {
         COUNT(CASE WHEN created_at >= NOW() - INTERVAL '24 hours' THEN 1 END) as last_24h,
         COUNT(CASE WHEN created_at >= NOW() - INTERVAL '7 days' THEN 1 END) as last_7d,
         MAX(created_at) as last_sync
-      FROM calls
+      FROM call_logs
     `)
 
     return NextResponse.json({

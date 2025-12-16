@@ -53,9 +53,30 @@ export async function GET(request: NextRequest) {
 
   } catch (error: any) {
     console.error('🚨 [DATABASE-CALLS] Error:', error)
+    console.error('🚨 [DATABASE-CALLS] Error stack:', error.stack)
+    console.error('🚨 [DATABASE-CALLS] Error details:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      hint: error.hint
+    })
+    
+    // Provide more specific error messages
+    let errorMessage = 'Internal server error'
+    if (error.message?.includes('relation') && error.message?.includes('does not exist')) {
+      errorMessage = 'Database table "call_logs" does not exist. Please run the migration script.'
+    } else if (error.message?.includes('permission denied')) {
+      errorMessage = 'Database permission denied. Check user permissions.'
+    } else if (error.message?.includes('connection')) {
+      errorMessage = 'Database connection failed. Check DATABASE_URL configuration.'
+    } else if (error.message) {
+      errorMessage = error.message
+    }
+    
     return NextResponse.json({ 
-      error: 'Internal server error',
-      details: error.message 
+      error: errorMessage,
+      details: error.message,
+      code: error.code
     }, { status: 500 })
   }
 }

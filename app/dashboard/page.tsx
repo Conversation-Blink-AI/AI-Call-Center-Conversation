@@ -211,7 +211,9 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               {callDataLoading ? (
-                <div className="h-8 w-24 bg-gray-200 animate-pulse rounded"></div>
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-400"></div>
+                </div>
               ) : (
                 <>
                   <div className="text-2xl font-bold text-foreground">{totalCalls.toLocaleString()}</div>
@@ -235,7 +237,9 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               {callDataLoading ? (
-                <div className="h-8 w-16 bg-gray-200 animate-pulse rounded"></div>
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-400"></div>
+                </div>
               ) : (
                 <div className="text-2xl font-bold text-foreground">{metrics.activeFlows}</div>
               )}
@@ -252,7 +256,9 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               {callDataLoading ? (
-                <div className="h-8 w-20 bg-gray-200 animate-pulse rounded"></div>
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-400"></div>
+                </div>
               ) : (
                 <div className="text-2xl font-bold text-foreground">{metrics.successRate.toFixed(1)}%</div>
               )}
@@ -269,7 +275,9 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               {callDataLoading ? (
-                <div className="h-8 w-12 bg-gray-200 animate-pulse rounded"></div>
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-400"></div>
+                </div>
               ) : (
                 <div className="text-2xl font-bold text-foreground">{userPhoneNumber ? "1" : "0"}</div>
               )}
@@ -286,7 +294,9 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               {walletLoading ? (
-                <div className="h-8 w-20 bg-gray-200 animate-pulse rounded"></div>
+                <div className="flex items-center">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-400"></div>
+                </div>
               ) : (
                 <div className="text-2xl font-bold text-foreground">{walletBalance}</div>
               )}

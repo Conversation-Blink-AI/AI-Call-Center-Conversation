@@ -293,7 +293,7 @@ export function CallHistoryClient({ phoneNumber }: { phoneNumber?: string }) {
             {filteredAndSortedCalls.length === 0 ? (
               <div className="py-12 flex flex-col items-center justify-center text-center">
                 <Phone className="h-12 w-12 text-muted-foreground mb-4" />
-                <h3 className="text-lg font-medium">No calls found</h3>
+                <h3 className="text-lg font-medium text-foreground">No calls found</h3>
                 <p className="text-muted-foreground mt-2">
                   {searchTerm || statusFilter !== "all" 
                     ? "No calls match your current filters." 

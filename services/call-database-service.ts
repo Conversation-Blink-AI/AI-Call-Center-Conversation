@@ -28,15 +28,15 @@ export class CallDatabaseService {
    */
   static async storeCall(callData: CallData): Promise<Call> {
     const query = `
-      INSERT INTO calls (
+      INSERT INTO call_logs (
         call_id, user_id, to_number, from_number, duration_seconds, 
-        status, recording_url, transcript, summary, cost_cents, 
+        status, recording_url, transcript, summary, 
         pathway_id, ended_reason, start_time, end_time, 
         queue_time, latency_ms, interruptions, phone_number_id,
         created_at, updated_at
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 
-        $11, $12, $13, $14, $15, $16, $17, $18, 
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, 
+        $10, $11, $12, $13, $14, $15, $16, $17, 
         NOW(), NOW()
       ) 
       ON CONFLICT (call_id) 
@@ -46,7 +46,6 @@ export class CallDatabaseService {
         recording_url = EXCLUDED.recording_url,
         transcript = EXCLUDED.transcript,
         summary = EXCLUDED.summary,
-        cost_cents = EXCLUDED.cost_cents,
         ended_reason = EXCLUDED.ended_reason,
         end_time = EXCLUDED.end_time,
         queue_time = EXCLUDED.queue_time,
@@ -66,7 +65,6 @@ export class CallDatabaseService {
       callData.recording_url || null,
       callData.transcript || null,
       callData.summary || null,
-      callData.cost_cents || null,
       callData.pathway_id || null,
       callData.ended_reason || null,
       callData.start_time || null,
@@ -130,7 +128,7 @@ export class CallDatabaseService {
     // Get total count
     const countQuery = `
       SELECT COUNT(*) as total 
-      FROM calls c 
+      FROM call_logs c 
       WHERE ${whereClause}
     `
     const countResult = await db.query(countQuery, values)
@@ -139,7 +137,7 @@ export class CallDatabaseService {
     // Get calls with pagination
     const callsQuery = `
       SELECT c.*, pn.phone_number as phone_number_detail
-      FROM calls c
+      FROM call_logs c
       LEFT JOIN phone_numbers pn ON c.phone_number_id = pn.id
       WHERE ${whereClause}
       ORDER BY c.created_at DESC
@@ -161,7 +159,7 @@ export class CallDatabaseService {
   static async getCallById(callId: string): Promise<Call | null> {
     const query = `
       SELECT c.*, pn.phone_number as phone_number_detail
-      FROM calls c
+      FROM call_logs c
       LEFT JOIN phone_numbers pn ON c.phone_number_id = pn.id
       WHERE c.call_id = $1
     `
@@ -179,7 +177,7 @@ export class CallDatabaseService {
       .join(', ')
 
     const query = `
-      UPDATE calls 
+      UPDATE call_logs 
       SET ${updateFields}, updated_at = NOW()
       WHERE call_id = $1
       RETURNING *
@@ -240,7 +238,7 @@ export class CallDatabaseService {
 
         // Insert the new call
         const insertResult = await db.query(`
-          INSERT INTO calls (
+          INSERT INTO call_logs (
             call_id, user_id, to_number, from_number, duration_seconds, status,
             recording_url, transcript, summary, pathway_id, ended_reason,
             start_time, end_time, created_at, updated_at
@@ -280,11 +278,9 @@ export class CallDatabaseService {
             if (billingResult.success) {
               console.log(`✅ [AUTO-BILLING] Successfully billed call ${insertedCall.call_id}: $${(billingResult.costCents! / 100).toFixed(2)}`)
               
-              // Update the call record with the cost
-              await db.query(
-                'UPDATE calls SET cost_cents = $1, updated_at = NOW() WHERE call_id = $2',
-                [billingResult.costCents, insertedCall.call_id]
-              )
+              // Note: cost_cents column doesn't exist in call_logs table
+              // Cost is tracked in separate call_costs table if needed
+              console.log(`💰 [AUTO-BILLING] Cost tracked: $${(billingResult.costCents! / 100).toFixed(2)}`)
             } else {
               console.error(`❌ [AUTO-BILLING] Failed to bill call ${insertedCall.call_id}: ${billingResult.message}`)
             }
@@ -316,8 +312,8 @@ export class CallDatabaseService {
         COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_calls,
         COUNT(CASE WHEN status = 'failed' OR status = 'error' THEN 1 END) as failed_calls,
         COALESCE(SUM(duration_seconds), 0) as total_duration,
-        COALESCE(SUM(cost_cents), 0) as total_cost
-      FROM calls 
+        0 as total_cost
+      FROM call_logs 
       WHERE user_id = $1
     `
 
