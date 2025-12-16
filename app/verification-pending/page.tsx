@@ -4,27 +4,17 @@
 import { useSearchParams } from 'next/navigation'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Mail, RefreshCw } from "lucide-react"
+import { Mail } from "lucide-react"
 import Link from "next/link"
-import { useState } from "react"
 
 export default function VerificationPendingPage() {
   const searchParams = useSearchParams()
   const email = searchParams.get('email')
-  const [isRefreshing, setIsRefreshing] = useState(false)
-
-  const handleRefresh = () => {
-    setIsRefreshing(true)
-    // Simulate refresh action
-    setTimeout(() => {
-      setIsRefreshing(false)
-      window.location.reload()
-    }, 1000)
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
+      {/* Force light mode styles on this page regardless of global theme */}
+      <Card className="w-full max-w-md bg-white text-slate-900">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-yellow-100">
             <Mail className="h-6 w-6 text-yellow-600" />
@@ -34,7 +24,7 @@ export default function VerificationPendingPage() {
             Please verify your email address to access the platform
           </CardDescription>
         </CardHeader>
-        <CardContent className="text-center space-y-4">
+        <CardContent className="text-center space-y-4 text-slate-900">
           <div className="space-y-2">
             <p className="text-sm text-gray-600">
               We sent a verification email to:
@@ -51,24 +41,6 @@ export default function VerificationPendingPage() {
           </div>
 
           <div className="flex flex-col space-y-3 pt-4">
-            <Button 
-              onClick={handleRefresh}
-              disabled={isRefreshing}
-              className="w-full"
-            >
-              {isRefreshing ? (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
-                  Checking...
-                </>
-              ) : (
-                <>
-                  <RefreshCw className="mr-2 h-4 w-4" />
-                  Refresh Status
-                </>
-              )}
-            </Button>
-            
             <Button variant="outline" asChild className="w-full">
               <Link href="/login">
                 Go to Login
