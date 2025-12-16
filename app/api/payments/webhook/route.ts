@@ -112,21 +112,26 @@ async function createBlandPathway(phoneNumber: string): Promise<string> {
     )
   }
 
-  if (data.status !== 'success') {
-    console.error('❌ [WEBHOOK] Bland.ai responded with non-success status:', data)
-    throw new Error(`Bland.ai pathway creation status: ${data.status || 'unknown'}`)
+  // Bland.ai API returns { data: { pathway_id: '...' }, errors: null } on success
+  // Check for errors first
+  if (data.errors !== null && data.errors !== undefined) {
+    console.error('❌ [WEBHOOK] Bland.ai pathway creation returned errors:', data)
+    throw new Error(`Bland.ai pathway creation errors: ${JSON.stringify(data.errors)}`)
   }
 
-  if (!data.pathway_id) {
+  // Extract pathway_id from nested data structure
+  const pathwayId = data.data?.pathway_id || data.pathway_id
+
+  if (!pathwayId) {
     console.error('❌ [WEBHOOK] Bland.ai pathway creation response missing pathway_id:', data)
     throw new Error('Bland.ai pathway creation response missing pathway_id')
   }
 
   console.log('✅ [WEBHOOK] Bland.ai pathway created successfully:', {
-    pathway_id: data.pathway_id,
+    pathway_id: pathwayId,
   })
 
-  return data.pathway_id
+  return pathwayId
 }
 
 // Helper to update Bland.ai inbound config (webhook URL etc.) for a specific number
