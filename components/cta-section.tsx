@@ -1,6 +1,6 @@
 
 import { Button } from "@/components/ui/button"
-import { ArrowRight, Workflow } from "lucide-react"
+import { Workflow } from "lucide-react"
 import Link from "next/link"
 
 export function CTASection() {
@@ -27,17 +27,10 @@ export function CTASection() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
             <Link href="/signup">
               <Button className="bg-white text-blue-900 hover:bg-gray-100 text-lg px-8 py-6 h-auto">
-                Start Building Free
-              </Button>
-            </Link>
-            <Link href="/dashboard/call-flows/editor">
-              <Button variant="outline" className="border-white text-white hover:bg-white/10 text-lg px-8 py-6 h-auto">
-                Try Live Demo <ArrowRight className="ml-2 h-5 w-5" />
+                Sing Up
               </Button>
             </Link>
           </div>
-
-          <p className="text-blue-200">No credit card required. Build unlimited flows on our free plan.</p>
         </div>
       </div>
     </section>

@@ -6,7 +6,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Skeleton } from "@/components/ui/skeleton"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { 
   Phone, 
@@ -26,7 +25,8 @@ import {
   Calendar,
   CreditCard,
   AlertTriangle,
-  CheckCircle
+  CheckCircle,
+  X
 } from "lucide-react"
 import { toast } from "sonner"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -103,7 +103,7 @@ export default function CallsPage() {
   const [walletLoading, setWalletLoading] = useState(false)
 
   // State for auto-refresh
-  const [autoRefresh, setAutoRefresh] = useState(true)
+  const [autoRefresh, setAutoRefresh] = useState(false)
 
   // Fetch wallet balance
   const fetchWalletBalance = async () => {
@@ -138,17 +138,41 @@ export default function CallsPage() {
     try {
       setError(null)
       // Fetch calls from database
-      const callsResponse = await fetch(`/api/calls/database?userId=${user.id}&limit=50&offset=${(page - 1) * 50}`)
+      const callsResponse = await fetch(`/api/calls/database?userId=${user.id}&limit=50&offset=${(page - 1) * 50}`, {
+        credentials: 'include'
+      })
+      
       if (callsResponse.ok) {
         const callsData = await callsResponse.json()
         setCalls(callsData.calls || [])
-        setTotalPages(Math.ceil(callsData.total / 50))
+        setTotalPages(Math.ceil((callsData.total || 0) / 50))
       } else {
-        throw new Error('Failed to fetch calls')
+        const errorData = await callsResponse.json().catch(() => ({}))
+        const errorMessage = errorData.error || errorData.message || `HTTP ${callsResponse.status}: Failed to fetch calls`
+        console.error('Error fetching calls:', errorMessage, errorData)
+        
+        // Only set error for actual failures, not for empty data
+        if (callsResponse.status >= 500) {
+          setError(`Server error: ${errorMessage}`)
+        } else if (callsResponse.status === 401 || callsResponse.status === 403) {
+          setError('Authentication error: Please refresh the page and try again')
+        } else {
+          // For other errors (like 400), just log but don't block the UI
+          console.warn('Non-critical error fetching calls:', errorMessage)
+          setCalls([])
+          setTotalPages(1)
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching calls:', error)
-      setError('Failed to fetch call data')
+      // Only show error for network errors or unexpected failures
+      if (error.message?.includes('fetch') || error.message?.includes('network')) {
+        setError('Network error: Please check your connection and try again')
+      } else {
+        // For other errors, just set empty data
+        setCalls([])
+        setTotalPages(1)
+      }
     }
   }
 
@@ -157,17 +181,43 @@ export default function CallsPage() {
 
     try {
       // Fetch enhanced stats
-      const statsResponse = await fetch(`/api/calls/stats?userId=${user.id}&timeframe=${timeframe}`)
+      const statsResponse = await fetch(`/api/calls/stats?userId=${user.id}&timeframe=${timeframe}`, {
+        credentials: 'include'
+      })
+      
       if (statsResponse.ok) {
         const statsData = await statsResponse.json()
         setCallStats(statsData.stats)
         setTimeframeCounts(statsData.timeframeCounts)
       } else {
-        throw new Error('Failed to fetch call stats')
+        const errorData = await statsResponse.json().catch(() => ({}))
+        const errorMessage = errorData.error || errorData.message || `HTTP ${statsResponse.status}: Failed to fetch stats`
+        console.error('Error fetching call stats:', errorMessage, errorData)
+        
+        // Only set error for actual failures, not for empty data
+        if (statsResponse.status >= 500) {
+          // Don't overwrite existing error if it's more critical
+          setError(prev => prev || `Server error: ${errorMessage}`)
+        } else if (statsResponse.status === 401 || statsResponse.status === 403) {
+          setError('Authentication error: Please refresh the page and try again')
+        } else {
+          // For other errors (like 400), just log but don't block the UI
+          console.warn('Non-critical error fetching stats:', errorMessage)
+          // Set default empty stats instead of blocking
+          setCallStats(null)
+          setTimeframeCounts(null)
+        }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching call stats:', error)
-      setError('Failed to fetch call data')
+      // Only show error for network errors or unexpected failures
+      if (error.message?.includes('fetch') || error.message?.includes('network')) {
+        setError(prev => prev || 'Network error: Please check your connection and try again')
+      } else {
+        // For other errors, just set empty stats
+        setCallStats(null)
+        setTimeframeCounts(null)
+      }
     }
   }
 
@@ -176,7 +226,10 @@ export default function CallsPage() {
 
     try {
       setSyncing(true)
-      setError(null)
+      // Only clear error if this is a manual sync (user-initiated)
+      if (showToast) {
+        setError(null)
+      }
 
       const response = await fetch('/api/calls/sync', {
         method: 'POST',
@@ -190,7 +243,9 @@ export default function CallsPage() {
       })
 
       if (!response.ok) {
-        throw new Error('Failed to sync calls')
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.error || errorData.message || 'Failed to sync calls'
+        throw new Error(errorMessage)
       }
 
       const result = await response.json()
@@ -208,12 +263,16 @@ export default function CallsPage() {
 
       return result
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Sync error:', error)
+      // Only show error/toast for manual syncs (user-initiated)
       if (showToast) {
-        toast.error('Failed to sync calls')
+        toast.error(error.message || 'Failed to sync calls')
+        setError('Failed to sync calls')
+      } else {
+        // For auto-sync, just log the error but don't block the UI
+        console.warn('⚠️ [CALLS-PAGE] Auto-sync failed silently:', error.message)
       }
-      setError('Failed to sync calls')
       throw error
     } finally {
       setSyncing(false)
@@ -307,18 +366,8 @@ export default function CallsPage() {
             <p className="text-muted-foreground">View and manage your synced call data from the database</p>
           </div>
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <Card key={i}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <Skeleton className="h-4 w-20" />
-                <Skeleton className="h-4 w-4" />
-              </CardHeader>
-              <CardContent>
-                <Skeleton className="h-8 w-16" />
-              </CardContent>
-            </Card>
-          ))}
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
       </div>
     )
@@ -356,9 +405,17 @@ export default function CallsPage() {
       </div>
 
       {error && (
-        <Alert variant="destructive">
+        <Alert variant="destructive" className="relative">
           <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription className="pr-8">{error}</AlertDescription>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="absolute right-2 top-2 h-6 w-6 p-0"
+            onClick={() => setError(null)}
+          >
+            <X className="h-4 w-4" />
+          </Button>
         </Alert>
       )}
 
@@ -520,7 +577,9 @@ export default function CallsPage() {
             </CardHeader>
             <CardContent>
               {walletLoading ? (
-                <div className="h-8 w-20 bg-gray-200 animate-pulse rounded"></div>
+                <div className="flex items-center justify-center">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+                </div>
               ) : (
                 <div className="text-2xl font-bold">{walletBalance}</div>
               )}
@@ -544,7 +603,7 @@ export default function CallsPage() {
           {calls.length === 0 ? (
             <div className="text-center py-8">
               <Phone className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No calls found in database</p>
+              <p className="text-muted-foreground">No Call Data Available</p>
               <Button onClick={() => syncCalls(true)} className="mt-4">
                 <RefreshCcw className="h-4 w-4 mr-2" />
                 Sync Calls
@@ -585,7 +644,7 @@ export default function CallsPage() {
                         {formatDuration(call.duration_seconds)}
                       </TableCell>
                       <TableCell>
-                        {formatCost(call.cost_cents || 0)}
+                        {formatCost(0)}
                       </TableCell>
                       <TableCell className="text-muted-foreground text-sm">
                         {call.ended_reason || 'unknown'}

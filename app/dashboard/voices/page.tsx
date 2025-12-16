@@ -184,33 +184,43 @@ export default function VoicesPage() {
 
   const getTagColor = (tag: string) => {
     const lowerTag = tag.toLowerCase()
-    if (lowerTag.includes("male") || lowerTag.includes("female")) return "bg-pink-100 text-pink-700"
+    if (lowerTag.includes("male") || lowerTag.includes("female")) return "bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-pink-800"
     if (lowerTag.includes("english") || lowerTag.includes("spanish") || lowerTag.includes("language"))
-      return "bg-blue-100 text-blue-700"
+      return "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800"
     if (lowerTag.includes("young") || lowerTag.includes("old") || lowerTag.includes("age"))
-      return "bg-green-100 text-green-700"
-    return "bg-gray-100 text-gray-700"
+      return "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
+    return "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700"
+  }
+
+  const shouldDisplayDescription = (description: any): boolean => {
+    if (description == null || description === undefined) return false
+    if (description === 0 || description === "0") return false
+    const descStr = String(description).trim()
+    if (descStr === "" || descStr === "0" || descStr === "null" || descStr === "undefined") return false
+    // Check if it's only whitespace or zero-like values
+    if (/^0+$/.test(descStr)) return false
+    return true
   }
 
   if (loading) {
     return (
       <div className="container mx-auto py-8">
         <div className="mb-6">
-          <div className="h-8 w-48 bg-gray-200 rounded mb-2 animate-pulse" />
-          <div className="h-4 w-96 bg-gray-200 rounded animate-pulse" />
+          <div className="h-8 w-48 bg-muted rounded mb-2 animate-pulse" />
+          <div className="h-4 w-96 bg-muted rounded animate-pulse" />
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Card key={i} className="bg-white shadow-sm animate-pulse">
+            <Card key={i} className="shadow-sm animate-pulse">
               <CardHeader className="pb-4">
-                <div className="h-6 w-24 bg-gray-200 rounded" />
-                <div className="h-4 w-full bg-gray-200 rounded mt-2" />
+                <div className="h-6 w-24 bg-muted rounded" />
+                <div className="h-4 w-full bg-muted rounded mt-2" />
               </CardHeader>
               <CardContent>
                 <div className="flex flex-wrap gap-2">
-                  <div className="h-6 w-16 bg-gray-200 rounded" />
-                  <div className="h-6 w-20 bg-gray-200 rounded" />
-                  <div className="h-6 w-14 bg-gray-200 rounded" />
+                  <div className="h-6 w-16 bg-muted rounded" />
+                  <div className="h-6 w-20 bg-muted rounded" />
+                  <div className="h-6 w-14 bg-muted rounded" />
                 </div>
               </CardContent>
             </Card>
@@ -223,8 +233,8 @@ export default function VoicesPage() {
   return (
     <div className="container mx-auto py-8 h-screen overflow-hidden flex flex-col">
       <div className="mb-6 flex-shrink-0">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Voice Library</h1>
-        <p className="text-gray-600">
+        <h1 className="text-3xl font-bold text-foreground mb-2">Voice Library</h1>
+        <p className="text-muted-foreground">
           Top rated voices + Indian voices from {totalAvailable} available voices
         </p>
       </div>
@@ -271,14 +281,14 @@ export default function VoicesPage() {
 
             <div className="flex-1 overflow-y-auto scrollbar-smooth pr-2">
               {voices.length === 0 ? (
-                <Card className="bg-white shadow-sm">
+                <Card className="shadow-sm">
                   <CardContent className="py-12">
                     <div className="text-center">
                       <div className="text-6xl mx-auto mb-4">🗣️</div>
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">
+                      <h3 className="text-lg font-medium text-foreground mb-2">
                         No voices available
                       </h3>
-                      <p className="text-gray-500">
+                      <p className="text-muted-foreground">
                         There are no voices available at the moment.
                       </p>
                     </div>
@@ -287,11 +297,11 @@ export default function VoicesPage() {
               ) : (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 pb-6">
                   {voices.map((voice) => (
-                    <Card key={voice.id} className="bg-white shadow-sm hover:shadow-md transition-shadow">
+                    <Card key={voice.id} className="shadow-sm hover:shadow-md transition-shadow">
                       <CardHeader className="pb-4">
                         <div className="flex items-center justify-between">
-                          <CardTitle className="text-lg font-semibold capitalize flex items-center">
-                            <span className="mr-2 text-blue-600">🗣️</span>
+                          <CardTitle className="text-lg font-semibold capitalize flex items-center text-foreground">
+                            <span className="mr-2 text-blue-600 dark:text-blue-400">🗣️</span>
                             {voice.name}
                           </CardTitle>
                           <div className="flex items-center space-x-2">
@@ -319,8 +329,8 @@ export default function VoicesPage() {
                               )}
                             </Button>
                             
-                            {voice.average_rating && (
-                              <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-200">
+                            {voice.average_rating && voice.average_rating > 0 && (
+                              <Badge variant="outline" className="bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800">
                                 ⭐ {voice.average_rating.toFixed(1)}
                               </Badge>
                             )}
@@ -339,11 +349,15 @@ export default function VoicesPage() {
                             </Badge>
                           </div>
                         </div>
-                        <CardDescription className="text-sm text-gray-600 mt-2">
-                          {voice.description}
-                        </CardDescription>
-                        {voice.total_ratings && (
-                          <div className="text-xs text-gray-500 mt-1">
+                        {shouldDisplayDescription(voice.description) && (
+                          <CardDescription className="text-sm mt-2">
+                            {voice.description}
+                          </CardDescription>
+                        )}
+                        {voice.total_ratings && 
+                         typeof voice.total_ratings === 'number' && 
+                         voice.total_ratings > 0 && (
+                          <div className="text-xs text-muted-foreground mt-1">
                             Based on {voice.total_ratings} rating{voice.total_ratings !== 1 ? 's' : ''}
                           </div>
                         )}
@@ -351,7 +365,7 @@ export default function VoicesPage() {
                       <CardContent>
                         {voice.tags && voice.tags.length > 0 && (
                           <div>
-                            <span className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 block">
+                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 block">
                               Tags
                             </span>
                             <div className="flex flex-wrap gap-2">

@@ -88,10 +88,34 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(response)
 
-  } catch (error) {
-    console.error('Error fetching call stats:', error)
+  } catch (error: any) {
+    console.error('🚨 [CALLS-STATS] Error:', error)
+    console.error('🚨 [CALLS-STATS] Error stack:', error.stack)
+    console.error('🚨 [CALLS-STATS] Error details:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      hint: error.hint
+    })
+    
+    // Provide more specific error messages
+    let errorMessage = 'Failed to fetch call stats'
+    if (error.message?.includes('relation') && error.message?.includes('does not exist')) {
+      errorMessage = 'Database table "call_logs" does not exist. Please run the migration script.'
+    } else if (error.message?.includes('permission denied')) {
+      errorMessage = 'Database permission denied. Check user permissions.'
+    } else if (error.message?.includes('connection')) {
+      errorMessage = 'Database connection failed. Check DATABASE_URL configuration.'
+    } else if (error.message) {
+      errorMessage = error.message
+    }
+    
     return NextResponse.json(
-      { error: 'Failed to fetch call stats' },
+      { 
+        error: errorMessage,
+        details: error.message,
+        code: error.code
+      },
       { status: 500 }
     )
   }
@@ -101,46 +125,47 @@ async function getEnhancedStats(userId: string, dates: any) {
   const { db } = await import('@/lib/db')
 
   // Get calls by timeframe
+  // Note: cost_cents column doesn't exist in call_logs table, so cost is set to 0
   const queries = await Promise.all([
     // Today
     db.query(`
-      SELECT COUNT(*) as count, COALESCE(SUM(cost_cents), 0) as cost 
-      FROM calls 
+      SELECT COUNT(*) as count, 0 as cost 
+      FROM call_logs 
       WHERE user_id = $1 AND created_at >= $2
     `, [userId, dates.today.toISOString()]),
 
     // Yesterday
     db.query(`
-      SELECT COUNT(*) as count, COALESCE(SUM(cost_cents), 0) as cost 
-      FROM calls 
+      SELECT COUNT(*) as count, 0 as cost 
+      FROM call_logs 
       WHERE user_id = $1 AND created_at >= $2 AND created_at < $3
     `, [userId, dates.yesterday.toISOString(), dates.today.toISOString()]),
 
     // This week
     db.query(`
-      SELECT COUNT(*) as count, COALESCE(SUM(cost_cents), 0) as cost 
-      FROM calls 
+      SELECT COUNT(*) as count, 0 as cost 
+      FROM call_logs 
       WHERE user_id = $1 AND created_at >= $2
     `, [userId, dates.thisWeekStart.toISOString()]),
 
     // Last week
     db.query(`
-      SELECT COUNT(*) as count, COALESCE(SUM(cost_cents), 0) as cost 
-      FROM calls 
+      SELECT COUNT(*) as count, 0 as cost 
+      FROM call_logs 
       WHERE user_id = $1 AND created_at >= $2 AND created_at <= $3
     `, [userId, dates.lastWeekStart.toISOString(), dates.lastWeekEnd.toISOString()]),
 
     // This month
     db.query(`
-      SELECT COUNT(*) as count, COALESCE(SUM(cost_cents), 0) as cost 
-      FROM calls 
+      SELECT COUNT(*) as count, 0 as cost 
+      FROM call_logs 
       WHERE user_id = $1 AND created_at >= $2
     `, [userId, dates.thisMonthStart.toISOString()]),
 
     // Last month
     db.query(`
-      SELECT COUNT(*) as count, COALESCE(SUM(cost_cents), 0) as cost 
-      FROM calls 
+      SELECT COUNT(*) as count, 0 as cost 
+      FROM call_logs 
       WHERE user_id = $1 AND created_at >= $2 AND created_at <= $3
     `, [userId, dates.lastMonthStart.toISOString(), dates.lastMonthEnd.toISOString()])
   ])
