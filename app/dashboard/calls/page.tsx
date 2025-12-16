@@ -24,7 +24,6 @@ import {
   PieChart,
   Calendar,
   CreditCard,
-  AlertTriangle,
   CheckCircle,
   X
 } from "lucide-react"
@@ -102,8 +101,6 @@ export default function CallsPage() {
   const [walletBalance, setWalletBalance] = useState<string>("$0.00")
   const [walletLoading, setWalletLoading] = useState(false)
 
-  // State for auto-refresh
-  const [autoRefresh, setAutoRefresh] = useState(false)
 
   // Fetch wallet balance
   const fetchWalletBalance = async () => {
@@ -308,26 +305,6 @@ export default function CallsPage() {
     }
   }, [user?.id, timeframe, page]) // Added page dependency
 
-  // Auto-refresh with sync every 30 seconds
-  useEffect(() => {
-    if (!autoRefresh || !user?.id) return
-
-    const interval = setInterval(async () => {
-      console.log('🔄 [CALLS-PAGE] Periodic auto-refresh with sync...')
-      try {
-        // Sync calls first (without toast to avoid spam)
-        await syncCalls(false)
-      } catch (error) {
-        console.warn('⚠️ [CALLS-PAGE] Periodic sync failed, refreshing cached data:', error)
-        // If sync fails, still refresh the cached data
-        fetchCalls()
-        fetchCallStats()
-        fetchWalletBalance()
-      }
-    }, 30000) // 100 seconds
-
-    return () => clearInterval(interval)
-  }, [autoRefresh, user?.id, timeframe, page]) // Added dependencies
 
   const formatDuration = (seconds: number) => {
     if (!seconds) return 'N/A'
@@ -396,10 +373,6 @@ export default function CallsPage() {
           <Button onClick={() => syncCalls(true)} disabled={syncing} variant="outline">
             <RefreshCcw className={`h-4 w-4 mr-2 ${syncing ? 'animate-spin' : ''}`} />
             Sync Now
-          </Button>
-          <Button onClick={() => setAutoRefresh(prev => !prev)} variant="ghost" className="flex items-center gap-1">
-            {autoRefresh ? <CheckCircle className="h-4 w-4 text-green-500" /> : <AlertTriangle className="h-4 w-4 text-yellow-500" />}
-            Auto-Refresh {autoRefresh ? "On" : "Off"}
           </Button>
         </div>
       </div>

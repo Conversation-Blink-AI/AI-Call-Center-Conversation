@@ -84,6 +84,7 @@ export default function BillingPage() {
   const fetchWalletBalance = async () => {
     try {
       setBalanceLoading(true)
+      setError("") // Clear any previous errors
       // Add cache busting to ensure fresh data
       const response = await fetch(`/api/wallet/balance?t=${Date.now()}`, {
         cache: 'no-cache',
@@ -91,20 +92,43 @@ export default function BillingPage() {
           'Cache-Control': 'no-cache, no-store, must-revalidate',
           'Pragma': 'no-cache',
           'Expires': '0'
-        }
+        },
+        credentials: 'include'
       })
 
       if (response.ok) {
         const data = await response.json()
+        // A balance of 0 is a valid state, not an error
         setBalance(Number(data.balance_dollars) || 0)
         console.log('✅ Balance fetched:', data.balance_dollars)
+        setError("") // Ensure error is cleared on success
       } else {
-        console.error('Failed to fetch wallet balance')
-        setError("Failed to load wallet balance")
+        // Only set error for actual HTTP errors (4xx, 5xx)
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.error || `HTTP ${response.status}: Failed to fetch wallet balance`
+        console.error('Failed to fetch wallet balance:', errorMessage)
+        // Only show error for server errors, not for client errors like 401/403
+        if (response.status >= 500) {
+          setError("Failed to load wallet balance. Please try again later.")
+        } else if (response.status === 401 || response.status === 403) {
+          setError("Authentication error. Please refresh the page.")
+        } else {
+          // For other errors, set balance to 0 but don't show error (might be temporary)
+          setBalance(0)
+          console.warn('Non-critical error fetching wallet balance:', errorMessage)
+        }
       }
     } catch (err) {
+      // Only show error for network errors or unexpected failures
       console.error('Error fetching wallet balance:', err)
-      setError("Failed to load wallet balance")
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+      if (errorMessage.includes('fetch') || errorMessage.includes('network')) {
+        setError("Network error. Please check your connection and try again.")
+      } else {
+        // For other errors, set balance to 0 but don't show persistent error
+        setBalance(0)
+        console.warn('Error fetching wallet balance, defaulting to 0:', err)
+      }
     } finally {
       setBalanceLoading(false)
     }
@@ -247,15 +271,11 @@ export default function BillingPage() {
           )}
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="subscriptions">Subscriptions</TabsTrigger>
-          <TabsTrigger value="payment-methods">Payment Methods</TabsTrigger>
-          <TabsTrigger value="history">Transaction History</TabsTrigger>
-          <TabsTrigger value="call-costs">Call Costs</TabsTrigger>
-        </TabsList>
+            <TabsList className="w-full">
+              <TabsTrigger value="overview">Overview</TabsTrigger>
+            </TabsList>
 
-        <TabsContent value="overview" className="space-y-4">
+            <TabsContent value="overview" className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <Card>
               <CardHeader>
@@ -390,263 +410,7 @@ export default function BillingPage() {
               </Button>
             </CardFooter>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="subscriptions" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Active Subscriptions</CardTitle>
-              <CardDescription>Your current phone number subscriptions</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {subscriptions.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">You don't have any active subscriptions</p>
-                  <Button className="mt-4" onClick={() => router.push("/dashboard/phone-numbers/purchase")}>
-                    Purchase a Phone Number
-                  </Button>
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Phone Number</TableHead>
-                      <TableHead>Plan</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Next Billing Date</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {subscriptions.map((subscription) => (
-                      <TableRow key={subscription.id}>
-                        <TableCell className="font-medium">{subscription.phoneNumber}</TableCell>
-                        <TableCell>{subscription.plan}</TableCell>
-                        <TableCell>{subscription.amount}/month</TableCell>
-                        <TableCell>
-                          <Badge
-                            variant={
-                              subscription.status === "active"
-                                ? "default"
-                                : subscription.status === "cancelling"
-                                  ? "outline"
-                                  : "secondary"
-                            }
-                          >
-                            {subscription.status === "active"
-                              ? "Active"
-                              : subscription.status === "cancelling"
-                                ? "Cancelling"
-                                : "Cancelled"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>{subscription.status === "active" ? subscription.nextBillingDate : "N/A"}</TableCell>
-                        <TableCell>
-                          {subscription.status === "active" ? (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleCancelSubscription(subscription.id)}
-                            >
-                              Cancel
-                            </Button>
-                          ) : subscription.status === "cancelled" ? (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => router.push("/dashboard/phone-numbers/purchase")}
-                            >
-                              Resubscribe
-                            </Button>
-                          ) : (
-                            <Button variant="outline" size="sm" disabled>
-                              <Loader2 className="mr-2 h-3 w-3 animate-spin" />
-                              Processing
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-            <CardFooter className="flex justify-between">
-              <p className="text-sm text-muted-foreground">
-                Subscriptions are billed monthly and will automatically renew
-              </p>
-              <Button onClick={() => router.push("/dashboard/phone-numbers/purchase")}>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Phone Number
-              </Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="payment-methods" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Payment Methods</CardTitle>
-              <CardDescription>Manage your payment methods</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {paymentMethods.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">You don't have any payment methods</p>
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Payment Method</TableHead>
-                      <TableHead>Details</TableHead>
-                      <TableHead>Expires</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paymentMethods.map((method) => (
-                      <TableRow key={method.id}>
-                        <TableCell className="font-medium">
-                          {method.type === "card" ? `${method.brand.toUpperCase()} Card` : "PayPal"}
-                        </TableCell>
-                        <TableCell>
-                          {method.type === "card" ? `•••• •••• •••• ${method.last4}` : method.email}
-                        </TableCell>
-                        <TableCell>{method.type === "card" ? `${method.expMonth}/${method.expYear}` : "N/A"}</TableCell>
-                        <TableCell>
-                          {method.isDefault ? <Badge>Default</Badge> : <Badge variant="outline">Active</Badge>}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex space-x-2">
-                            {!method.isDefault && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleSetDefaultPaymentMethod(method.id)}
-                              >
-                                Set Default
-                              </Button>
-                            )}
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleRemovePaymentMethod(method.id)}
-                              disabled={method.isDefault}
-                            >
-                              Remove
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-            <CardFooter>
-              <Button className="w-full">
-                <Plus className="mr-2 h-4 w-4" />
-                Add Payment Method
-              </Button>
-            </CardFooter>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="history" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle>Transaction History</CardTitle>
-                <CardDescription>Your billing and payment history</CardDescription>
-              </div>
-              <Button variant="outline" size="sm">
-                <Download className="mr-2 h-4 w-4" />
-                Export
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {transactions.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">No transactions found</p>
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Receipt</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {transactions.map((transaction) => (
-                      <TableRow key={transaction.id}>
-                        <TableCell>{transaction.date}</TableCell>
-                        <TableCell>{transaction.description}</TableCell>
-                        <TableCell>{transaction.amount}</TableCell>
-                        <TableCell>
-                          <Badge variant={transaction.status === "completed" ? "default" : "outline"}>
-                            {transaction.status === "completed" ? "Paid" : transaction.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Button variant="link" size="sm">
-                            <Receipt className="mr-1 h-3 w-3" />
-                            View
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="call-costs" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Call Costs</CardTitle>
-              <CardDescription>Details of your call costs</CardDescription>
-            </CardHeader>
-            <CardContent>
-              {loadingCallCosts ? (
-                <div className="flex items-center justify-center h-full">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-              ) : callCosts.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-muted-foreground">No call cost data available</p>
-                </div>
-              ) : (
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Date</TableHead>
-                      <TableHead>Call Duration (Minutes)</TableHead>
-                      <TableHead>Cost ($)</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {callCosts.map((cost) => (
-                      <TableRow key={cost.id}>
-                        <TableCell>{new Date(cost.timestamp).toLocaleDateString()}</TableCell>
-                        <TableCell>{(cost.duration / 60).toFixed(2)}</TableCell>
-                        <TableCell>{(cost.duration / 60 * 0.11).toFixed(2)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+            </TabsContent>
           </Tabs>
         </div>
       </ScrollArea>

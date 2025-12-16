@@ -1,13 +1,29 @@
 "use client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Phone, Workflow, Mic, BarChart3, CreditCard, History, FileText, Zap, Users } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Phone, Workflow, Mic, BarChart3, CreditCard, History, FileText, Zap, Users, ArrowLeft } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 export default function HelpPage() {
+  const router = useRouter()
+
   return (
     <div className="bg-background min-h-screen">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {/* Back Button */}
+        <div className="mb-6">
+          <Button
+            variant="ghost"
+            onClick={() => router.back()}
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </Button>
+        </div>
+
         {/* Header */}
         <div className="mb-12 text-center">
           <h1 className="text-4xl font-bold text-foreground mb-4">Help Center</h1>
