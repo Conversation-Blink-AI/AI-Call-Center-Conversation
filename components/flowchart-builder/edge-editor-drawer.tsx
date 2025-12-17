@@ -1,7 +1,7 @@
 
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Edge } from 'reactflow'
 import {
   Sheet,
@@ -63,6 +63,9 @@ export function EdgeEditorDrawer({
   const [color, setColor] = useState('#3b82f6')
   const [animated, setAnimated] = useState(true)
   const [open, setOpen] = useState(false)
+  const [searchValue, setSearchValue] = useState('')
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const [popoverWidth, setPopoverWidth] = useState<number | undefined>(undefined)
 
   useEffect(() => {
     if (selectedEdge) {
@@ -73,6 +76,94 @@ export function EdgeEditorDrawer({
       setAnimated(selectedEdge.animated || true)
     }
   }, [selectedEdge])
+
+  // Clear search when popover opens
+  useEffect(() => {
+    if (open) {
+      setSearchValue('')
+    }
+  }, [open])
+
+  // Disable animations on popover - use MutationObserver to catch it immediately
+  useEffect(() => {
+    if (!open) return
+
+    const disableAnimations = (element: HTMLElement) => {
+      element.style.setProperty('animation', 'none', 'important')
+      element.style.setProperty('transition', 'none', 'important')
+      element.style.setProperty('transform', 'none', 'important')
+      element.style.setProperty('opacity', '1', 'important')
+      element.style.setProperty('scale', '1', 'important')
+      
+      // Remove animation classes
+      element.classList.remove('animate-in', 'zoom-in-95', 'fade-in-0')
+      element.classList.remove('slide-in-from-top-2', 'slide-in-from-bottom-2', 'slide-in-from-left-2', 'slide-in-from-right-2')
+      
+      // Also disable on all children
+      element.querySelectorAll('*').forEach((child) => {
+        const childEl = child as HTMLElement
+        childEl.style.setProperty('animation', 'none', 'important')
+        childEl.style.setProperty('transition', 'none', 'important')
+      })
+    }
+
+    // Try multiple times with different delays to catch the element
+    const timeouts: NodeJS.Timeout[] = []
+    const tryDisable = () => {
+      // Try various selectors to find the popover
+      const selectors = [
+        '.no-popover-animation',
+        '[data-state="open"]',
+        '[data-radix-popper-content-wrapper] > div',
+        '[role="dialog"]',
+      ]
+      
+      for (const selector of selectors) {
+        const element = document.querySelector(selector) as HTMLElement
+        if (element && element.closest('.no-popover-animation')) {
+          disableAnimations(element)
+          break
+        }
+      }
+      
+      // Also try finding by class
+      const popoverByClass = document.querySelector('.no-popover-animation') as HTMLElement
+      if (popoverByClass) {
+        disableAnimations(popoverByClass)
+      }
+    }
+
+    // Try immediately and with delays
+    timeouts.push(setTimeout(tryDisable, 0))
+    timeouts.push(setTimeout(tryDisable, 10))
+    timeouts.push(setTimeout(tryDisable, 50))
+    timeouts.push(setTimeout(tryDisable, 100))
+
+    // Also use MutationObserver to catch when element is added
+    const observer = new MutationObserver(() => {
+      tryDisable()
+    })
+    observer.observe(document.body, { childList: true, subtree: true })
+
+    return () => {
+      timeouts.forEach(clearTimeout)
+      observer.disconnect()
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (triggerRef.current) {
+      const updateWidth = () => {
+        if (triggerRef.current) {
+          setPopoverWidth(triggerRef.current.offsetWidth)
+        }
+      }
+      updateWidth()
+      // Update on resize
+      window.addEventListener('resize', updateWidth)
+      return () => window.removeEventListener('resize', updateWidth)
+    }
+  }, [open, isOpen])
 
   const handleSave = () => {
     if (!selectedEdge) return
@@ -119,6 +210,7 @@ export function EdgeEditorDrawer({
             <Popover open={open} onOpenChange={setOpen}>
               <PopoverTrigger asChild>
                 <Button
+                  ref={triggerRef}
                   variant="outline"
                   role="combobox"
                   aria-expanded={open}
@@ -128,34 +220,48 @@ export function EdgeEditorDrawer({
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-full p-0">
-                <Command>
+              <PopoverContent 
+                align="start" 
+                sideOffset={4}
+                className="no-popover-animation p-0 w-[calc(100vw-4rem)] max-w-[352px]"
+                style={{ 
+                  width: popoverWidth ? `${popoverWidth}px` : undefined
+                } as React.CSSProperties}
+              >
+                <Command shouldFilter={false}>
                   <CommandInput 
                     placeholder="Search or type label..." 
-                    value={label}
-                    onValueChange={setLabel}
+                    value={searchValue}
+                    onValueChange={setSearchValue}
                   />
                   <CommandList>
-                    <CommandEmpty>Press Enter to use "{label}"</CommandEmpty>
+                    <CommandEmpty>No label found.</CommandEmpty>
                     <CommandGroup>
-                      {edgeLabels.map((option) => (
-                        <CommandItem
-                          key={option.value}
-                          value={option.value}
-                          onSelect={(currentValue) => {
-                            setLabel(currentValue)
-                            setOpen(false)
-                          }}
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              label === option.value ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          {option.label}
-                        </CommandItem>
-                      ))}
+                      {edgeLabels
+                        .filter((option) => 
+                          searchValue === '' || 
+                          option.label.toLowerCase().includes(searchValue.toLowerCase()) ||
+                          option.value.toLowerCase().includes(searchValue.toLowerCase())
+                        )
+                        .map((option) => (
+                          <CommandItem
+                            key={option.value}
+                            value={option.value}
+                            onSelect={(currentValue) => {
+                              setLabel(currentValue)
+                              setSearchValue('')
+                              setOpen(false)
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                label === option.value ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            {option.label}
+                          </CommandItem>
+                        ))}
                     </CommandGroup>
                   </CommandList>
                 </Command>
@@ -211,20 +317,17 @@ export function EdgeEditorDrawer({
           </div>
 
           {/* Edge Info */}
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <h4 className="font-medium mb-2">Edge Information</h4>
-            <div className="space-y-1 text-sm text-gray-600">
-              <div>ID: {selectedEdge.id}</div>
+          <div className="p-2 bg-gray-50 rounded-lg">
+            <h4 className="font-medium mb-1 text-xs text-gray-500">Edge Information</h4>
+            <div className="space-y-0.5 text-xs text-gray-600">
+              <div className="break-all">ID: {selectedEdge.id}</div>
               <div>Source: {selectedEdge.source}</div>
-              <div>Target: {selectedEdge.target}</div>
+              <div className="break-all">Target: {selectedEdge.target}</div>
             </div>
           </div>
 
           {/* Action Buttons */}
           <div className="flex gap-2 pt-4">
-            <Button onClick={handleSave} className="flex-1">
-              Save Changes
-            </Button>
             <Button
               variant="destructive"
               onClick={handleDelete}
@@ -232,6 +335,9 @@ export function EdgeEditorDrawer({
             >
               <Trash2 size={16} />
               Delete
+            </Button>
+            <Button onClick={handleSave} className="flex-1">
+              Save Changes
             </Button>
           </div>
         </div>

@@ -324,11 +324,15 @@ console.log('Call result:', result);`
 
   if (!isMounted || loadingData) {
     return (
-      <div className="p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-gray-300 rounded w-1/4"></div>
-          <div className="h-4 bg-gray-300 rounded w-1/2"></div>
-          <div className="h-64 bg-gray-300 rounded"></div>
+      <div className="p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Send Call</h1>
+            <p className="text-muted-foreground">Configure and send calls using the complete API</p>
+          </div>
+        </div>
+        <div className="flex items-center justify-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
       </div>
     )
