@@ -10,9 +10,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      # Create deploy.tar (required by caprover/deploy-from-github when image/branch not provided)
       - name: Create deploy.tar
         run: |
           tar --exclude=.git -czf deploy.tar .
