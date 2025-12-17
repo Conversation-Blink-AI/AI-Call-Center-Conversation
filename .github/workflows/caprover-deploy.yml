@@ -2,20 +2,25 @@ name: Deploy to CapRover
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
+  workflow_dispatch: {}
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Verify workspace
+        run: |
+          pwd
+          ls -la
 
       - name: Create deploy.tar
         run: |
           tar --exclude=.git -czf deploy.tar .
+          ls -la deploy.tar
 
       - name: Deploy to CapRover
         uses: caprover/deploy-from-github@v1.1.2
