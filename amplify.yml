@@ -7,7 +7,6 @@ frontend:
     build:
       commands:
         # Write environment variables to .env.production for Next.js
-        # AWS Amplify doesn't automatically expose env vars to Next.js runtime
         - |
           echo "Writing environment variables to .env.production..."
           echo "FOREX_URL=$FOREX_URL" >> .env.production
@@ -29,9 +28,6 @@ frontend:
           fi
           if [ -z "$BLAND_AI_API_KEY" ]; then
             echo "WARNING: BLAND_AI_API_KEY is not set in AWS Amplify environment variables"
-          fi
-          if [ -z "$DATABASE_URL" ]; then
-            echo "WARNING: DATABASE_URL is not set in AWS Amplify environment variables"
           fi
         - npm run build
   artifacts:
