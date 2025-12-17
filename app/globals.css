@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -30,36 +29,26 @@
 
   .dark {
     /* Dark purple theme matching homepage */
-    --background: 235 39% 12%;      /* Dark navy/charcoal #1a1a2e */
-    --foreground: 210 40% 95%;      /* Clean white text */
-    
-    --card: 235 25% 15%;            /* Slightly lighter card background */
+    --background: 235 39% 12%;
+    --foreground: 210 40% 95%;
+    --card: 235 25% 15%;
     --card-foreground: 210 40% 95%;
-    
     --popover: 235 25% 15%;
     --popover-foreground: 210 40% 95%;
-    
-    --primary: 262 83% 58%;         /* Purple primary color */
+    --primary: 262 83% 58%;
     --primary-foreground: 210 40% 98%;
-    
-    --secondary: 235 25% 18%;       /* Secondary purple-tinted gray */
+    --secondary: 235 25% 18%;
     --secondary-foreground: 210 40% 95%;
-    
-    --muted: 235 20% 20%;           /* Muted purple-gray */
+    --muted: 235 20% 20%;
     --muted-foreground: 215 20.2% 65.1%;
-    
-    --accent: 262 50% 25%;          /* Purple accent background */
-    --accent-foreground: 262 83% 85%; /* Light purple text */
-    
-    --destructive: 0 62.8% 50.6%;   /* Orange/red for errors */
+    --accent: 262 50% 25%;
+    --accent-foreground: 262 83% 85%;
+    --destructive: 0 62.8% 50.6%;
     --destructive-foreground: 210 40% 98%;
-    
-    --border: 235 20% 25%;          /* Dark purple borders */
-    --input: 235 20% 20%;           /* Input backgrounds */
-    --ring: 262 83% 58%;            /* Purple focus ring */
-    
-    /* Sidebar specific colors */
-    --sidebar-background: 235 30% 11%; /* Darker sidebar */
+    --border: 235 20% 25%;
+    --input: 235 20% 20%;
+    --ring: 262 83% 58%;
+    --sidebar-background: 235 30% 11%;
     --sidebar-foreground: 210 40% 90%;
     --sidebar-primary: 262 83% 58%;
     --sidebar-primary-foreground: 210 40% 98%;
@@ -79,16 +68,15 @@
   }
 }
 
-/* Purple gradient utilities */
 @layer utilities {
   .bg-gradient-purple {
-    background: linear-gradient(135deg, hsl(262, 83%, 58%) 0%, hsl(282, 83%, 68%) 100%);
+    background: linear-gradient(135deg, hsl(262, 83% ,58%) 0%, hsl(282, 83%, 68%) 100%);
   }
-  
+
   .bg-gradient-purple-dark {
     background: linear-gradient(135deg, hsl(262, 50%, 25%) 0%, hsl(282, 50%, 35%) 100%);
   }
-  
+
   .text-gradient-purple {
     background: linear-gradient(135deg, hsl(262, 83%, 58%) 0%, hsl(282, 83%, 68%) 100%);
     -webkit-background-clip: text;
@@ -97,32 +85,6 @@
   }
 }
 
-/* Custom scrollbar styling - dark theme */
-.scrollbar-thin::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-.scrollbar-thin::-webkit-scrollbar-track {
-  background: hsl(235, 20%, 20%);
-}
-
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background: hsl(262, 83%, 58%);
-  border-radius: 3px;
-}
-
-.scrollbar-thin::-webkit-scrollbar-thumb:hover {
-  background: hsl(262, 83%, 68%);
-}
-
-/* Node palette scroll container */
-.node-palette-scroll {
-  scrollbar-width: thin;
-  scrollbar-color: hsl(262, 83%, 58%) hsl(235, 20%, 20%);
-}
-
-/* Smooth transitions for all elements */
 * {
   transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform, filter,
     backdrop-filter;
@@ -130,7 +92,6 @@
   transition-duration: 150ms;
 }
 
-/* ReactFlow theme-aware styles */
 .react-flow__node {
   transition: transform 0.2s ease;
   background: hsl(var(--card));
@@ -147,8 +108,8 @@
   background: white !important;
   border: 0.5px dotted #3b82f6 !important;
   transition: background 0.2s ease, background-image 0.2s ease, border-color 0.2s ease, border-width 0.2s ease;
-  width: 8px !important;
-  height: 8px !important;
+  width: 12px !important;
+  height: 12px !important;
   border-radius: 50% !important;
   z-index: 9999 !important;
   position: absolute !important;
@@ -158,8 +119,8 @@
 .react-flow__handle:hover {
   background: linear-gradient(to right, #3b82f6, #a855f7) !important;
   border: 3px dotted #3b82f6 !important;
-  width: 8px !important;
-  height: 8px !important;
+  width: 12px !important;
+  height: 12px !important;
 }
 
 .react-flow__edge-path {
@@ -181,7 +142,6 @@
   fill: hsl(var(--card-foreground));
 }
 
-/* ReactFlow controls theme-aware */
 .react-flow__controls {
   background: hsl(var(--card));
   border: 1px solid hsl(var(--border));
@@ -210,7 +170,6 @@
   border-bottom: none;
 }
 
-/* ReactFlow minimap theme-aware */
 .react-flow__minimap {
   background: hsl(var(--card));
   border: 1px solid hsl(var(--border));
@@ -229,7 +188,6 @@
   stroke-width: 2;
 }
 
-/* Smooth scrollbar styles - dark theme */
 .scrollbar-smooth {
   scrollbar-width: thin;
   scrollbar-color: hsl(262, 83%, 58%) hsl(235, 20%, 20%);
@@ -254,21 +212,11 @@
   background: hsl(262, 83%, 68%);
 }
 
-/* Theme-aware React Flow background */
 .react-flow {
   background-color: hsl(var(--background)) !important;
 }
 
-.react-flow__pane {
-  background-color: hsl(var(--background)) !important;
-}
-
+.react-flow__pane,
 .react-flow__viewport {
-  background-color: hsl(var(--background)) !important;
+  background-color: transparent !important;
 }
-
-/* Ensure background pattern is visible - don't override the pattern circles, let Background component handle it */
-.react-flow__background {
-  opacity: 1 !important;
-}
-

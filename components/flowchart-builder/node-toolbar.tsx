@@ -27,7 +27,7 @@ export function NodeToolbar({ nodeId, onEdit, onDelete, onDuplicate, position }:
         size="sm"
         variant="ghost"
         onClick={onEdit}
-        className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600"
+        className="h-8 w-8 p-0 text-gray-800 hover:bg-blue-50 hover:text-blue-600"
         title="Edit Node"
       >
         <Pencil className="w-4 h-4" />
@@ -38,7 +38,7 @@ export function NodeToolbar({ nodeId, onEdit, onDelete, onDuplicate, position }:
         size="sm"
         variant="ghost"
         onClick={onDelete}
-        className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
+        className="h-8 w-8 p-0 text-gray-800 hover:bg-red-50 hover:text-red-600"
         title="Delete Node"
       >
         <Trash2 className="w-4 h-4" />
@@ -49,7 +49,7 @@ export function NodeToolbar({ nodeId, onEdit, onDelete, onDuplicate, position }:
         size="sm"
         variant="ghost"
         onClick={onDuplicate}
-        className="h-8 w-8 p-0 hover:bg-green-50 hover:text-green-600"
+        className="h-8 w-8 p-0 text-gray-800 hover:bg-green-50 hover:text-green-600"
         title="Duplicate Node"
       >
         <Copy className="w-4 h-4" />

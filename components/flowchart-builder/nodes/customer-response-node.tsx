@@ -11,16 +11,20 @@ interface CustomerResponseNodeData {
 
 export function CustomerResponseNode({ data, selected }: { data: any; selected?: boolean }) {
   return (
-    <div className={`px-2 py-1.5 shadow-md rounded-md bg-yellow-100 w-[140px] h-[55px] transition-all duration-200 relative overflow-visible ${
+    <div className={`px-3 py-2 shadow-md rounded-md bg-yellow-100 w-[190px] h-[80px] transition-all duration-200 relative overflow-visible ${
       selected ? 'shadow-lg scale-105' : ''
     }`}>
 
       <div className="overflow-hidden h-full">
         <div className="flex items-center space-x-1.5">
-          <MessageSquare className="w-3 h-3 text-yellow-600 flex-shrink-0" />
+          <MessageSquare className="w-3.5 h-3.5 text-yellow-600 flex-shrink-0" />
           <div>
-            <div className="text-[8px] font-medium text-yellow-800">{data.name || 'Customer Response'}</div>
-            <div className="text-[7px] opacity-80 text-yellow-700 mt-0.5 leading-tight overflow-hidden" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }} title={data.text || 'Handle customer input'}>
+            <div className="text-[14px] font-medium text-yellow-800">{data.name || 'Customer Response'}</div>
+            <div
+              className="text-[12px] opacity-80 text-yellow-700 mt-0.5 leading-tight overflow-hidden"
+              style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}
+              title={data.text || 'Handle customer input'}
+            >
               {data.text || 'Handle customer input'}
             </div>
           </div>
@@ -33,8 +37,8 @@ export function CustomerResponseNode({ data, selected }: { data: any; selected?:
         style={{
           background: 'white',
           border: '0.5px solid #3b82f6',
-          width: '8px',
-          height: '8px',
+          width: '12px',
+          height: '12px',
           transformOrigin: '50% 50%',
         }}
       />
@@ -45,9 +49,10 @@ export function CustomerResponseNode({ data, selected }: { data: any; selected?:
         style={{
           background: 'white',
           border: '0.5px solid #3b82f6',
-          width: '8px',
-          height: '8px',
+          width: '12px',
+          height: '12px',
           transformOrigin: '50% 50%',
+          marginTop: '6px',
         }}
       />
     </div>
