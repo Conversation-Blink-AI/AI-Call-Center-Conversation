@@ -12,10 +12,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Create deploy.tar (required by caprover/deploy-from-github when image/branch not provided)
+      - name: Create deploy.tar
+        run: |
+          tar --exclude=.git -czf deploy.tar .
+
       - name: Deploy to CapRover
         uses: caprover/deploy-from-github@v1.1.2
         with:
           server: ${{ secrets.CAPROVER_SERVER }}
           app: ${{ secrets.CAPROVER_APP }}
           token: ${{ secrets.CAPROVER_TOKEN }}
-          source: .
