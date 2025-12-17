@@ -218,7 +218,7 @@ export function FlowchartCanvas({
         type: 'custom',
         animated: true,
         data: { label: 'next' },
-        style: { stroke: '#3b82f6', strokeWidth: 2 },
+        style: { stroke: '#3b82f6', strokeWidth: 1 },
       }
       setEdges((eds) => addEdge(newEdge, eds))
     },
