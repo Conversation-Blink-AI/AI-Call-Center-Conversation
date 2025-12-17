@@ -702,7 +702,7 @@ export default function VoicesPage() {
               ) : (
                 <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 pb-6">
                   {voices.map((voice) => (
-                    <Card key={voice.id} className="shadow-sm hover:shadow-md transition-shadow">
+                    <Card key={voice.id} className="shadow-sm hover:shadow-md transition-shadow bg-gradient-to-br from-gray-50 to-gray-100/50 dark:bg-card">
                       <CardHeader className="pb-4">
                         {/* Heading on single line */}
                         <CardTitle className="text-lg font-semibold capitalize flex items-center text-foreground whitespace-nowrap overflow-hidden">

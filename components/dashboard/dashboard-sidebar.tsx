@@ -83,7 +83,7 @@ export function DashboardSidebar() {
   }
 
   return (
-    <aside className="peer group fixed left-0 top-0 z-40 h-screen w-16 hover:w-60 bg-background border-r border-border transition-all duration-300 ease-in-out overflow-hidden">
+    <aside className="peer group fixed left-0 top-0 z-40 h-screen w-16 hover:w-60 bg-background border-r border-border transition-all duration-200 ease-in-out overflow-hidden">
       {/* Header */}
       <div className="flex h-16 items-center border-b border-border px-4">
         <Link href="/dashboard" className="flex items-center min-w-0 cursor-pointer">
@@ -122,6 +122,7 @@ export function DashboardSidebar() {
               <Link
                 key={link.name}
                 href={link.href}
+                prefetch={true}
                 className={cn(
                   "flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 group/item",
                   isActive
