@@ -166,6 +166,52 @@
   color: hsl(var(--primary));
 }
 
+/* Disable animations on popover dropdowns */
+.no-popover-animation,
+.no-popover-animation[data-state="open"],
+.no-popover-animation[data-state="closed"],
+.no-popover-animation[data-side="bottom"],
+.no-popover-animation[data-side="top"],
+.no-popover-animation[data-side="left"],
+.no-popover-animation[data-side="right"],
+[data-radix-popper-content-wrapper] .no-popover-animation,
+[data-radix-popper-content-wrapper] .no-popover-animation[data-state="open"],
+[data-radix-popper-content-wrapper] .no-popover-animation[data-state="closed"] {
+  animation: none !important;
+  transition: none !important;
+  transform: none !important;
+  opacity: 1 !important;
+  scale: 1 !important;
+  will-change: auto !important;
+}
+
+.no-popover-animation *,
+[data-radix-popper-content-wrapper] .no-popover-animation * {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Override any Tailwind animate classes with higher specificity */
+.no-popover-animation.animate-in,
+.no-popover-animation[data-state="open"].animate-in,
+.no-popover-animation[data-state="open"][data-side="bottom"].animate-in,
+.no-popover-animation[data-state="open"][data-side="top"].animate-in,
+.no-popover-animation[data-state="open"][data-side="left"].animate-in,
+.no-popover-animation[data-state="open"][data-side="right"].animate-in,
+.no-popover-animation.zoom-in-95,
+.no-popover-animation[data-state="open"].zoom-in-95,
+.no-popover-animation.fade-in-0,
+.no-popover-animation[data-state="open"].fade-in-0,
+.no-popover-animation[data-side="bottom"].slide-in-from-top-2,
+.no-popover-animation[data-side="top"].slide-in-from-bottom-2,
+.no-popover-animation[data-side="left"].slide-in-from-right-2,
+.no-popover-animation[data-side="right"].slide-in-from-left-2 {
+  animation: none !important;
+  transform: none !important;
+  opacity: 1 !important;
+  scale: 1 !important;
+}
+
 .react-flow__controls-button:last-child {
   border-bottom: none;
 }
