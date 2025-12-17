@@ -146,18 +146,20 @@
 .react-flow__handle {
   background: white !important;
   border: 0.5px solid #3b82f6 !important;
-  transition: background-color 0.2s ease, border-color 0.2s ease;
-  width: 8px !important;
-  height: 8px !important;
+  transition: background 0.2s ease, background-image 0.2s ease, border-color 0.2s ease;
+  width: 6px !important;
+  height: 6px !important;
   border-radius: 50% !important;
-  z-index: 20 !important;
+  z-index: 9999 !important;
+  position: absolute !important;
+  box-sizing: border-box !important;
 }
 
 .react-flow__handle:hover {
-  background: #dc2626 !important;
-  border-color: #dc2626 !important;
-  width: 8px !important;
-  height: 8px !important;
+  background: linear-gradient(to right, #3b82f6, #a855f7) !important;
+  border-color: transparent !important;
+  width: 6px !important;
+  height: 6px !important;
 }
 
 .react-flow__edge-path {

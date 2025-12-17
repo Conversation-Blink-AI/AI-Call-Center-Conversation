@@ -25,20 +25,21 @@ interface WebhookNodeProps {
 export function WebhookNode({ data, selected }: WebhookNodeProps) {
   return (
     <div className={`
-      group relative bg-white rounded-lg shadow-lg w-[140px] h-[55px] overflow-hidden
-      ${selected ? 'border-orange-500 ring-2 ring-orange-200' : 'border-orange-300'}
-      hover:shadow-xl transition-all duration-200
+      group relative bg-white rounded-lg shadow-lg w-[140px] h-[55px] overflow-visible
+      ${selected ? 'border-orange-600 ring-2 ring-orange-200' : 'border-orange-500'}
+      hover:border-orange-600 hover:shadow-xl transition-all duration-200
     `} style={{ border: '0.5px solid' }}>
       {/* Top Handle */}
       <Handle
         type="target"
         position={Position.Top}
-        className="transition-all z-20 rounded-full"
+        className="transition-all z-[9999] rounded-full"
         style={{
           background: 'white',
           border: '0.5px solid #3b82f6',
-          width: '8px',
-          height: '8px',
+          width: '6px',
+          height: '6px',
+          transformOrigin: '50% 50%',
         }}
       />
 
@@ -77,12 +78,13 @@ export function WebhookNode({ data, selected }: WebhookNodeProps) {
       <Handle
         type="source"
         position={Position.Bottom}
-        className="transition-all z-20 rounded-full"
+        className="transition-all z-[9999] rounded-full"
         style={{
           background: 'white',
           border: '0.5px solid #3b82f6',
-          width: '8px',
-          height: '8px',
+          width: '6px',
+          height: '6px',
+          transformOrigin: '50% 50%',
         }}
       />
     </div>
