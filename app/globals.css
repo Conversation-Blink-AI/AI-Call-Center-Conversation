@@ -134,7 +134,7 @@
 .react-flow__node {
   transition: transform 0.2s ease;
   background: hsl(var(--card));
-  border: 1px solid hsl(var(--border));
+  border: none !important;
   color: hsl(var(--card-foreground));
 }
 
@@ -145,10 +145,10 @@
 
 .react-flow__handle {
   background: white !important;
-  border: 0.5px solid #3b82f6 !important;
-  transition: background 0.2s ease, background-image 0.2s ease, border-color 0.2s ease;
-  width: 6px !important;
-  height: 6px !important;
+  border: 0.5px dotted #3b82f6 !important;
+  transition: background 0.2s ease, background-image 0.2s ease, border-color 0.2s ease, border-width 0.2s ease;
+  width: 8px !important;
+  height: 8px !important;
   border-radius: 50% !important;
   z-index: 9999 !important;
   position: absolute !important;
@@ -157,9 +157,9 @@
 
 .react-flow__handle:hover {
   background: linear-gradient(to right, #3b82f6, #a855f7) !important;
-  border-color: transparent !important;
-  width: 6px !important;
-  height: 6px !important;
+  border: 3px dotted #3b82f6 !important;
+  width: 8px !important;
+  height: 8px !important;
 }
 
 .react-flow__edge-path {

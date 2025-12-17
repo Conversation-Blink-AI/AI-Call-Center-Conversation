@@ -12,8 +12,8 @@ interface CustomerResponseNodeData {
 export function CustomerResponseNode({ data, selected }: { data: any; selected?: boolean }) {
   return (
     <div className={`px-2 py-1.5 shadow-md rounded-md bg-yellow-100 w-[140px] h-[55px] transition-all duration-200 relative overflow-visible ${
-      selected ? 'border-yellow-600 shadow-lg scale-105' : 'border-yellow-500 hover:border-yellow-600'
-    }`} style={{ border: '0.5px solid' }}>
+      selected ? 'shadow-lg scale-105' : ''
+    }`}>
 
       <div className="overflow-hidden h-full">
         <div className="flex items-center space-x-1.5">
@@ -33,8 +33,8 @@ export function CustomerResponseNode({ data, selected }: { data: any; selected?:
         style={{
           background: 'white',
           border: '0.5px solid #3b82f6',
-          width: '6px',
-          height: '6px',
+          width: '8px',
+          height: '8px',
           transformOrigin: '50% 50%',
         }}
       />
@@ -45,8 +45,8 @@ export function CustomerResponseNode({ data, selected }: { data: any; selected?:
         style={{
           background: 'white',
           border: '0.5px solid #3b82f6',
-          width: '6px',
-          height: '6px',
+          width: '8px',
+          height: '8px',
           transformOrigin: '50% 50%',
         }}
       />

@@ -26,9 +26,8 @@ export function WebhookNode({ data, selected }: WebhookNodeProps) {
   return (
     <div className={`
       group relative bg-white rounded-lg shadow-lg w-[140px] h-[55px] overflow-visible
-      ${selected ? 'border-orange-600 ring-2 ring-orange-200' : 'border-orange-500'}
-      hover:border-orange-600 hover:shadow-xl transition-all duration-200
-    `} style={{ border: '0.5px solid' }}>
+      hover:shadow-xl transition-all duration-200
+    `}>
       {/* Top Handle */}
       <Handle
         type="target"
@@ -37,8 +36,8 @@ export function WebhookNode({ data, selected }: WebhookNodeProps) {
         style={{
           background: 'white',
           border: '0.5px solid #3b82f6',
-          width: '6px',
-          height: '6px',
+          width: '8px',
+          height: '8px',
           transformOrigin: '50% 50%',
         }}
       />
@@ -82,8 +81,8 @@ export function WebhookNode({ data, selected }: WebhookNodeProps) {
         style={{
           background: 'white',
           border: '0.5px solid #3b82f6',
-          width: '6px',
-          height: '6px',
+          width: '8px',
+          height: '8px',
           transformOrigin: '50% 50%',
         }}
       />
