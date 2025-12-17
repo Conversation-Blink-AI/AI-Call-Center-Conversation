@@ -3,7 +3,7 @@
 import React from 'react'
 import { Handle, Position, NodeProps } from 'reactflow'
 import { PhoneForwarded, Pencil, Trash2 } from 'lucide-react'
-import { toast } from 'sonner'; // Assuming sonner is used for toasts
+import { toast } from 'sonner'
 
 interface TransferNodeData {
   text: string
@@ -12,26 +12,37 @@ interface TransferNodeData {
 
 export function TransferNode({ data, selected }: { data: any; selected?: boolean }) {
   return (
-    <div className={`px-4 py-3 shadow-md rounded-md bg-purple-100 border-2 w-[250px] h-[120px] transition-all duration-200 relative overflow-hidden ${
-      selected ? 'border-purple-500 shadow-lg scale-105' : 'border-purple-300 hover:border-purple-400'
+    <div className={`px-3 py-2 shadow-md rounded-md bg-gradient-to-br from-purple-100 via-purple-50 to-purple-100 w-[255px] h-[100px] transition-all duration-200 relative overflow-visible ${
+      selected ? 'shadow-lg scale-105' : ''
     }`}>
 
-      <div className="flex items-center space-x-2">
-        <PhoneForwarded className="w-4 h-4 text-purple-600" />
-        <div className="font-bold text-purple-800">
-          {data.name || 'Transfer Call'}
+      <div className="overflow-hidden h-full flex items-center">
+        <div className="flex items-center space-x-1.5">
+          <PhoneForwarded className="w-5 h-5 text-purple-600 flex-shrink-0" />
+          <div>
+            <div className="text-[14px] font-medium text-purple-800">{data.name || 'Transfer Call'}</div>
+            <div
+              className="text-[12px] opacity-80 text-purple-700 mt-0.5 leading-tight overflow-hidden"
+              style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}
+              title={data.transferNumber || '+1234567890'}
+            >
+              {data.transferNumber || '+1234567890'}
+            </div>
+          </div>
         </div>
-      </div>
-      <div className="text-sm text-purple-700 mt-2 leading-tight overflow-hidden" style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical' }} title={data.transferNumber || '+1234567890'}>
-        {data.transferNumber || '+1234567890'}
       </div>
       <Handle
         type="target"
         position={Position.Top}
-        className="w-4 h-4 bg-blue-500 border-2 border-white hover:w-5 hover:h-5 transition-all"
+        className="transition-all z-[9999] rounded-full"
+        style={{
+          background: 'white',
+          border: '0.5px solid #3b82f6',
+          width: '12px',
+          height: '12px',
+          transformOrigin: '50% 50%',
+        }}
       />
-      {/* No source handle - Transfer node is terminal */}
-      
     </div>
   )
 }

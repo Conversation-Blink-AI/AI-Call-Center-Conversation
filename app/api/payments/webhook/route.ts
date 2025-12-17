@@ -112,29 +112,41 @@ async function createBlandPathway(phoneNumber: string): Promise<string> {
     )
   }
 
-  if (data.status !== 'success') {
-    console.error('❌ [WEBHOOK] Bland.ai responded with non-success status:', data)
-    throw new Error(`Bland.ai pathway creation status: ${data.status || 'unknown'}`)
+  // Bland.ai API returns { data: { pathway_id: '...' }, errors: null } on success
+  // Check for errors first
+  if (data.errors !== null && data.errors !== undefined) {
+    console.error('❌ [WEBHOOK] Bland.ai pathway creation returned errors:', data)
+    throw new Error(`Bland.ai pathway creation errors: ${JSON.stringify(data.errors)}`)
   }
 
-  if (!data.pathway_id) {
+  // Extract pathway_id from nested data structure
+  const pathwayId = data.data?.pathway_id || data.pathway_id
+
+  if (!pathwayId) {
     console.error('❌ [WEBHOOK] Bland.ai pathway creation response missing pathway_id:', data)
     throw new Error('Bland.ai pathway creation response missing pathway_id')
   }
 
   console.log('✅ [WEBHOOK] Bland.ai pathway created successfully:', {
-    pathway_id: data.pathway_id,
+    pathway_id: pathwayId,
   })
 
-  return data.pathway_id
+  return pathwayId
 }
 
 // Helper to update Bland.ai inbound config (webhook URL etc.) for a specific number
-async function updateBlandInboundConfig(phoneNumber: string): Promise<void> {
+async function updateBlandInboundConfig(phoneNumber: string, pathwayId?: string): Promise<void> {
   const apiKey = process.env.BLAND_AI_API_KEY
+  const encryptedKey = process.env.BLAND_TWILIO_ENCRYPTED_KEY
+
   if (!apiKey) {
     console.error('❌ [WEBHOOK] BLAND_AI_API_KEY is not configured')
     throw new Error('BLAND_AI_API_KEY is not configured')
+  }
+
+  if (!encryptedKey) {
+    console.error('❌ [WEBHOOK] BLAND_TWILIO_ENCRYPTED_KEY is not configured')
+    throw new Error('BLAND_TWILIO_ENCRYPTED_KEY is not configured')
   }
 
   // Bland inbound endpoints expect the number without leading + or %2B
@@ -145,18 +157,27 @@ async function updateBlandInboundConfig(phoneNumber: string): Promise<void> {
     phoneNumber,
     formatted,
     blandUrl,
+    pathwayId,
   })
+
+  const requestBody: any = {
+    // Set the inbound webhook to your Bland webhook endpoint
+    webhook_url: 'https://dev.conversation.blinklab.in/api/webhooks/bland',
+  }
+
+  // Link pathway to number if pathway_id is provided
+  if (pathwayId) {
+    requestBody.pathway_id = pathwayId
+  }
 
   const response = await fetch(blandUrl, {
     method: 'POST',
     headers: {
       authorization: apiKey,
       'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      // Set the inbound webhook to your Bland webhook endpoint
-      webhook_url: 'https://dev.conversation.blinklab.in/api/webhooks/bland',
-    }),
+      encrypted_key: encryptedKey,
+    } as any,
+    body: JSON.stringify(requestBody),
   })
 
   const text = await response.text()
@@ -238,7 +259,43 @@ async function handlePhoneNumberPurchase(
       friendlyName: purchasedNumber.friendlyName,
     })
 
-    // Store the purchased number in PostgreSQL database
+    // Extract area code and location from phone number (needed for database save)
+    const extractedAreaCode = phoneNumber.replace(/\D/g, '').slice(1, 4) // Remove country code and get area code
+    const location = getLocationFromAreaCode(extractedAreaCode)
+
+    // Phase 4: Register number with Bland.ai (optional - continue on error)
+    console.log('📨 [WEBHOOK] Registering number with Bland.ai...')
+    try {
+      await registerNumbersWithBland([phoneNumber])
+      console.log('✅ [WEBHOOK] Phone number registered with Bland.ai')
+    } catch (blandRegError) {
+      console.warn('⚠️ [WEBHOOK] Bland.ai registration failed (continuing anyway):', blandRegError)
+      // Don't throw - optional step, we'll still save to DB
+    }
+
+    // Phase 5: Create Bland.ai pathway (REQUIRED - fail if this fails)
+    console.log('🛤️ [WEBHOOK] Creating Bland.ai pathway for new number...')
+    let blandPathwayId: string
+    try {
+      blandPathwayId = await createBlandPathway(phoneNumber)
+      console.log('✅ [WEBHOOK] Bland.ai pathway created:', blandPathwayId)
+    } catch (blandPathwayError) {
+      console.error('❌ [WEBHOOK] CRITICAL: Bland.ai pathway creation failed for new number:', blandPathwayError)
+      // Re-throw because this is critical - number is purchased but no pathway
+      throw new Error(`Failed to create Bland.ai pathway: ${blandPathwayError instanceof Error ? blandPathwayError.message : String(blandPathwayError)}`)
+    }
+
+    // Phase 6: Configure Bland.ai inbound webhook (optional - continue on error)
+    console.log('🌐 [WEBHOOK] Configuring Bland inbound webhook...')
+    try {
+      await updateBlandInboundConfig(phoneNumber, blandPathwayId)
+      console.log('✅ [WEBHOOK] Bland inbound webhook configured for phone number')
+    } catch (blandConfigError) {
+      console.warn('⚠️ [WEBHOOK] Bland inbound config failed (continuing anyway):', blandConfigError)
+      // Don't throw - optional step, we'll still save to DB
+    }
+
+    // Phase 7: Save everything to database in one transaction
     const client = new Client({
       connectionString: process.env.DATABASE_URL,
       ssl: getSSLConfig(),
@@ -247,111 +304,112 @@ async function handlePhoneNumberPurchase(
     try {
       await client.connect()
 
-      // Extract area code and location from phone number
-      const extractedAreaCode = phoneNumber.replace(/\D/g, '').slice(1, 4) // Remove country code and get area code
-      const location = getLocationFromAreaCode(extractedAreaCode)
+      // Start transaction
+      await client.query('BEGIN')
 
-      // Check if number already exists for this user
-      const existingNumber = await client.query(
-        'SELECT id FROM phone_numbers WHERE phone_number = $1 AND user_id = $2',
-        [phoneNumber, userId],
-      )
-
-      if (existingNumber.rows.length > 0) {
-        console.log('⚠️ [WEBHOOK] Phone number already exists for user, updating status')
-        const updateResult = await client.query(
-          `
-          UPDATE phone_numbers 
-          SET status = 'active'
-          WHERE phone_number = $1 AND user_id = $2
-          RETURNING *
-        `,
+      try {
+        // Check if number already exists for this user
+        const existingNumber = await client.query(
+          'SELECT id FROM phone_numbers WHERE phone_number = $1 AND user_id = $2',
           [phoneNumber, userId],
         )
-        
-        const savedPhone = updateResult.rows[0]
-        console.log('✅ [WEBHOOK] Phone number status updated:', savedPhone)
 
-        // Still register with Bland.ai in case it wasn't registered before (idempotent)
-        try {
-          await registerNumbersWithBland([phoneNumber])
-          console.log('✅ [WEBHOOK] Phone number registered with Bland.ai')
-        } catch (blandError) {
-          console.warn('⚠️ [WEBHOOK] Bland.ai registration failed (may already be registered):', blandError)
-          // Don't throw - number exists, Bland registration is best-effort
+        let savedPhoneId: string
+
+        if (existingNumber.rows.length > 0) {
+          console.log('⚠️ [WEBHOOK] Phone number already exists for user, updating status and pathwayid')
+          const updateResult = await client.query(
+            `
+            UPDATE phone_numbers 
+            SET status = 'active', pathwayid = $3
+            WHERE phone_number = $1 AND user_id = $2
+            RETURNING *
+          `,
+            [phoneNumber, userId, blandPathwayId],
+          )
+          
+          savedPhoneId = updateResult.rows[0].id
+          console.log('✅ [WEBHOOK] Phone number status and pathwayid updated:', savedPhoneId)
+        } else {
+          // Insert new phone number
+          const result = await client.query(
+            `INSERT INTO phone_numbers (phone_number, user_id, location, type, status, purchased_at, area_code, country_code, pathwayid)
+             VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8)
+             RETURNING *`,
+            [
+              phoneNumber,
+              userId,
+              location,
+              'Local',
+              'active',
+              extractedAreaCode,
+              countryCode,
+              blandPathwayId,
+            ],
+          )
+
+          const savedPhone = result.rows[0]
+          savedPhoneId = savedPhone.id
+          console.log('✅ [WEBHOOK] Phone number saved to database:', savedPhone)
         }
 
-        try {
-          await updateBlandInboundConfig(phoneNumber)
-          console.log('✅ [WEBHOOK] Bland inbound webhook configured for phone number')
-        } catch (blandError) {
-          console.warn('⚠️ [WEBHOOK] Bland inbound config update failed:', blandError)
-          // Don't throw - number exists, config update is best-effort
-        }
-      } else {
-        // Insert new phone number
-        const result = await client.query(
-          `INSERT INTO phone_numbers (phone_number, user_id, location, type, status, purchased_at, area_code, country_code)
-           VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7)
-           RETURNING *`,
-          [
-            phoneNumber,
-            userId,
-            location,
-            'Local',
-            'active',
-            extractedAreaCode,
-            countryCode,
-          ],
+        // Check if pathway already exists for this phone number (by phone_id)
+        const existingPathway = await client.query(
+          'SELECT id FROM pathways WHERE phone_id = $1',
+          [savedPhoneId],
         )
 
-        const savedPhone = result.rows[0]
-        console.log('✅ [WEBHOOK] Phone number saved to database:', savedPhone)
-
-        // Create Bland.ai pathway for this phone number
-        // This MUST succeed for new numbers - we've already purchased from Twilio
-        console.log('🛤️ [WEBHOOK] Creating Bland.ai pathway for new number...')
-        let blandPathwayId: string
-        try {
-          blandPathwayId = await createBlandPathway(phoneNumber)
-          console.log('✅ [WEBHOOK] Bland.ai pathway created:', blandPathwayId)
-        } catch (blandPathwayError) {
-          console.error('❌ [WEBHOOK] CRITICAL: Bland.ai pathway creation failed for new number:', blandPathwayError)
-          // Re-throw because this is critical - number is purchased but no pathway
-          throw new Error(`Failed to create Bland.ai pathway: ${blandPathwayError instanceof Error ? blandPathwayError.message : String(blandPathwayError)}`)
+        if (existingPathway.rows.length === 0) {
+          // Create local pathway entry in pathways table
+          console.log('💾 [WEBHOOK] Creating local pathway entry in pathways table...')
+          const pathwayName = `Pathway for ${phoneNumber}`
+          const pathwayDescription = `Default pathway for ${phoneNumber}`
+          
+          const pathwayResult = await client.query(
+            `INSERT INTO pathways (name, description, creator_id, phone_number, phone_id, bland_id, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+             RETURNING *`,
+            [
+              pathwayName,
+              pathwayDescription,
+              userId,
+              phoneNumber,
+              savedPhoneId,
+              blandPathwayId,
+            ],
+          )
+          
+          const newPathway = pathwayResult.rows[0]
+          console.log('✅ [WEBHOOK] Local pathway created in pathways table:', newPathway.id)
+        } else {
+          // Update existing pathway with bland_id if not set
+          console.log('💾 [WEBHOOK] Updating existing pathway with bland_id...')
+          await client.query(
+            `UPDATE pathways 
+             SET bland_id = $1, updated_at = NOW()
+             WHERE phone_id = $2 AND (bland_id IS NULL OR bland_id != $1)`,
+            [blandPathwayId, savedPhoneId],
+          )
+          console.log('✅ [WEBHOOK] Pathway updated with bland_id')
         }
 
-        // Update phone_numbers.pathwayid with the Bland.ai pathway_id
-        console.log('💾 [WEBHOOK] Updating phone_numbers.pathwayid with Bland.ai pathway_id...')
+        // Update phone_numbers.pathwayid if not already set
         await client.query(
           `UPDATE phone_numbers 
            SET pathwayid = $1
-           WHERE id = $2`,
-          [blandPathwayId, savedPhone.id],
+           WHERE id = $2 AND (pathwayid IS NULL OR pathwayid != $1)`,
+          [blandPathwayId, savedPhoneId],
         )
         console.log('✅ [WEBHOOK] phone_numbers.pathwayid updated:', blandPathwayId)
 
-        // Register the number with Bland.ai and configure inbound webhook
-        // This MUST succeed for new numbers - we've already purchased from Twilio
-        console.log('📨 [WEBHOOK] Registering new number with Bland.ai...')
-        try {
-          await registerNumbersWithBland([phoneNumber])
-          console.log('✅ [WEBHOOK] Phone number registered with Bland.ai')
-        } catch (blandRegError) {
-          console.error('❌ [WEBHOOK] CRITICAL: Bland.ai registration failed for new number:', blandRegError)
-          // Re-throw because this is critical - number is purchased but not registered
-          throw new Error(`Failed to register number with Bland.ai: ${blandRegError instanceof Error ? blandRegError.message : String(blandRegError)}`)
-        }
-
-        console.log('🌐 [WEBHOOK] Configuring Bland inbound webhook...')
-        try {
-          await updateBlandInboundConfig(phoneNumber)
-          console.log('✅ [WEBHOOK] Bland inbound webhook configured for phone number')
-        } catch (blandConfigError) {
-          console.error('❌ [WEBHOOK] CRITICAL: Bland inbound config failed for new number:', blandConfigError)
-          // Re-throw because this is critical - number won't receive calls properly
-          throw new Error(`Failed to configure Bland inbound webhook: ${blandConfigError instanceof Error ? blandConfigError.message : String(blandConfigError)}`)
-        }
+        // Commit transaction
+        await client.query('COMMIT')
+        console.log('✅ [WEBHOOK] Database transaction committed successfully')
+      } catch (dbError) {
+        // Rollback transaction on error
+        await client.query('ROLLBACK')
+        console.error('❌ [WEBHOOK] Database transaction rolled back due to error:', dbError)
+        throw dbError
       }
     } finally {
       await client.end()

@@ -24,54 +24,70 @@ interface WebhookNodeProps {
 
 export function WebhookNode({ data, selected }: WebhookNodeProps) {
   return (
-    <div className={`
-      group relative bg-white border-2 rounded-lg shadow-lg w-[250px] h-[120px] overflow-hidden
-      ${selected ? 'border-orange-500 ring-2 ring-orange-200' : 'border-orange-300'}
+    <div
+      className={`
+      group relative bg-gradient-to-br from-orange-50 via-white to-orange-50 rounded-lg shadow-lg w-[255px] h-[100px] overflow-visible
       hover:shadow-xl transition-all duration-200
-    `}>
+    `}
+    >
       {/* Top Handle */}
       <Handle
         type="target"
         position={Position.Top}
-        className="w-4 h-4 bg-blue-500 border-2 border-white hover:w-5 hover:h-5 transition-all"
+        className="transition-all z-[9999] rounded-full"
+        style={{
+          background: 'white',
+          border: '0.5px solid #3b82f6',
+          width: '12px',
+          height: '12px',
+          transformOrigin: '50% 50%',
+        }}
       />
 
       {/* Header */}
-      <div className="bg-orange-100 text-orange-800 px-3 py-2 border-b border-orange-200">
-        <div className="flex items-center space-x-2">
-          <Globe className="w-4 h-4" />
-          <span className="font-medium text-sm truncate">Webhook</span>
+      <div className="bg-gradient-to-r from-orange-100 to-orange-50 text-orange-800 px-1.5 py-0.5 border-b border-orange-200 rounded-t-lg">
+        <div className="flex items-center space-x-1">
+          <Globe className="w-5 h-5 flex-shrink-0" />
+          <span className="text-[14px] font-medium">Webhook</span>
         </div>
       </div>
 
       {/* Content */}
-      <div className="p-3 flex-1">
+      <div className="p-1.5 flex-1">
         <div className="h-full flex flex-col">
-          <div className="font-medium text-gray-900 text-sm truncate" title={data.name || 'Webhook Request'}>
+          <div className="text-[14px] font-medium text-gray-900" title={data.name || 'Webhook Request'}>
             {data.name || 'Webhook Request'}
           </div>
 
           {data.method && data.url && (
-            <div className="text-xs text-gray-600 mt-1">
-              <span className="font-mono bg-orange-50 px-1 py-0.5 rounded text-xs">
-                {data.method}
-              </span>
+            <div className="text-[12px] opacity-80 text-gray-600 mt-0.5">
+              <span className="font-mono bg-orange-50 px-0.5 py-0.5 rounded text-[7px]">{data.method}</span>
             </div>
           )}
 
-          <div className="text-sm text-gray-700 mt-1 overflow-hidden leading-tight" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }} title={data.text}>
+          <div
+            className="text-[12px] opacity-80 text-gray-700 mt-0.5 overflow-hidden leading-tight"
+            style={{ display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}
+            title={data.text}
+          >
             {data.text || (data.url ? `URL: ${data.url}` : 'Configure webhook')}
           </div>
         </div>
       </div>
 
-
-
       {/* Bottom Handle */}
       <Handle
         type="source"
         position={Position.Bottom}
-        className="w-4 h-4 bg-blue-500 border-2 border-white hover:w-5 hover:h-5 transition-all"
+        className="transition-all z-[9999] rounded-full"
+        style={{
+          background: 'white',
+          border: '0.5px solid #3b82f6',
+          width: '12px',
+          height: '12px',
+          transformOrigin: '50% 50%',
+          marginTop: '6px',
+        }}
       />
     </div>
   )
