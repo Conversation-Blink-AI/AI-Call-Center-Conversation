@@ -12,13 +12,13 @@ interface QuestionNodeData {
 export function QuestionNode({ data, selected }: { data: any; selected?: boolean }) {
   return (
     <div
-      className={`px-3 py-2 shadow-md rounded-md bg-blue-100 w-[190px] h-[80px] transition-all duration-200 relative overflow-visible ${
+      className={`px-3 py-2 shadow-md rounded-md bg-gradient-to-br from-blue-100 via-blue-50 to-blue-100 w-[255px] h-[100px] transition-all duration-200 relative overflow-visible ${
         selected ? 'shadow-lg scale-105' : ''
       }`}
     >
-      <div className="overflow-hidden h-full">
+      <div className="overflow-hidden h-full flex items-center">
         <div className="flex items-center space-x-1.5">
-          <HelpCircle className="w-3.5 h-3.5 text-blue-600 flex-shrink-0" />
+          <HelpCircle className="w-5 h-5 text-blue-600 flex-shrink-0" />
           <div>
             <div className="text-[14px] font-medium text-blue-800">{data.name || 'Question'}</div>
             <div

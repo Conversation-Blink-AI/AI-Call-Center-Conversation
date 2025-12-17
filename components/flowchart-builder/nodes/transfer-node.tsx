@@ -12,13 +12,13 @@ interface TransferNodeData {
 
 export function TransferNode({ data, selected }: { data: any; selected?: boolean }) {
   return (
-    <div className={`px-3 py-2 shadow-md rounded-md bg-purple-100 w-[190px] h-[80px] transition-all duration-200 relative overflow-visible ${
+    <div className={`px-3 py-2 shadow-md rounded-md bg-gradient-to-br from-purple-100 via-purple-50 to-purple-100 w-[255px] h-[100px] transition-all duration-200 relative overflow-visible ${
       selected ? 'shadow-lg scale-105' : ''
     }`}>
 
-      <div className="overflow-hidden h-full">
+      <div className="overflow-hidden h-full flex items-center">
         <div className="flex items-center space-x-1.5">
-          <PhoneForwarded className="w-3.5 h-3.5 text-purple-600 flex-shrink-0" />
+          <PhoneForwarded className="w-5 h-5 text-purple-600 flex-shrink-0" />
           <div>
             <div className="text-[14px] font-medium text-purple-800">{data.name || 'Transfer Call'}</div>
             <div

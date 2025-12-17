@@ -23,7 +23,7 @@ export function FacebookPixelNode({ data, selected }: FacebookPixelNodeProps) {
   return (
     <div
       className={`
-      group relative bg-white rounded-lg shadow-lg w-[190px] h-[85px] overflow-visible
+      group relative bg-gradient-to-br from-blue-50 via-white to-blue-50 rounded-lg shadow-lg w-[255px] h-[100px] overflow-visible
       hover:shadow-xl transition-all duration-200
     `}
     >
@@ -42,9 +42,9 @@ export function FacebookPixelNode({ data, selected }: FacebookPixelNodeProps) {
       />
 
       {/* Header */}
-      <div className="bg-blue-100 text-blue-800 px-1.5 py-0.5 border-b border-blue-200 rounded-t-lg">
+      <div className="bg-gradient-to-r from-blue-100 to-blue-50 text-blue-800 px-1.5 py-0.5 border-b border-blue-200 rounded-t-lg">
         <div className="flex items-center space-x-1">
-          <Facebook className="w-3.5 h-3.5 flex-shrink-0" />
+          <Facebook className="w-5 h-5 flex-shrink-0" />
           <span className="text-[14px] font-medium">Facebook Pixel</span>
         </div>
       </div>

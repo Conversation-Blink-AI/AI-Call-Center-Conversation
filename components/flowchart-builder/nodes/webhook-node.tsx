@@ -26,7 +26,7 @@ export function WebhookNode({ data, selected }: WebhookNodeProps) {
   return (
     <div
       className={`
-      group relative bg-white rounded-lg shadow-lg w-[190px] h-[80px] overflow-visible
+      group relative bg-gradient-to-br from-orange-50 via-white to-orange-50 rounded-lg shadow-lg w-[255px] h-[100px] overflow-visible
       hover:shadow-xl transition-all duration-200
     `}
     >
@@ -45,9 +45,9 @@ export function WebhookNode({ data, selected }: WebhookNodeProps) {
       />
 
       {/* Header */}
-      <div className="bg-orange-100 text-orange-800 px-1.5 py-0.5 border-b border-orange-200 rounded-t-lg">
+      <div className="bg-gradient-to-r from-orange-100 to-orange-50 text-orange-800 px-1.5 py-0.5 border-b border-orange-200 rounded-t-lg">
         <div className="flex items-center space-x-1">
-          <Globe className="w-3.5 h-3.5 flex-shrink-0" />
+          <Globe className="w-5 h-5 flex-shrink-0" />
           <span className="text-[14px] font-medium">Webhook</span>
         </div>
       </div>
