@@ -317,19 +317,19 @@ async function handlePhoneNumberPurchase(
         let savedPhoneId: string
 
         if (existingNumber.rows.length > 0) {
-          console.log('⚠️ [WEBHOOK] Phone number already exists for user, updating status')
+          console.log('⚠️ [WEBHOOK] Phone number already exists for user, updating status and pathwayid')
           const updateResult = await client.query(
             `
             UPDATE phone_numbers 
-            SET status = 'active'
+            SET status = 'active', pathwayid = $3
             WHERE phone_number = $1 AND user_id = $2
             RETURNING *
           `,
-            [phoneNumber, userId],
+            [phoneNumber, userId, blandPathwayId],
           )
           
           savedPhoneId = updateResult.rows[0].id
-          console.log('✅ [WEBHOOK] Phone number status updated:', savedPhoneId)
+          console.log('✅ [WEBHOOK] Phone number status and pathwayid updated:', savedPhoneId)
         } else {
           // Insert new phone number
           const result = await client.query(
@@ -353,9 +353,9 @@ async function handlePhoneNumberPurchase(
           console.log('✅ [WEBHOOK] Phone number saved to database:', savedPhone)
         }
 
-        // Check if pathway already exists for this phone number
+        // Check if pathway already exists for this phone number (by phone_id)
         const existingPathway = await client.query(
-          'SELECT id FROM pathways WHERE phone_number_id = $1',
+          'SELECT id FROM pathways WHERE phone_id = $1',
           [savedPhoneId],
         )
 
@@ -366,13 +366,14 @@ async function handlePhoneNumberPurchase(
           const pathwayDescription = `Default pathway for ${phoneNumber}`
           
           const pathwayResult = await client.query(
-            `INSERT INTO pathways (name, description, creator_id, phone_number_id, bland_id, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
+            `INSERT INTO pathways (name, description, creator_id, phone_number, phone_id, bland_id, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
              RETURNING *`,
             [
               pathwayName,
               pathwayDescription,
               userId,
+              phoneNumber,
               savedPhoneId,
               blandPathwayId,
             ],
@@ -386,7 +387,7 @@ async function handlePhoneNumberPurchase(
           await client.query(
             `UPDATE pathways 
              SET bland_id = $1, updated_at = NOW()
-             WHERE phone_number_id = $2 AND (bland_id IS NULL OR bland_id != $1)`,
+             WHERE phone_id = $2 AND (bland_id IS NULL OR bland_id != $1)`,
             [blandPathwayId, savedPhoneId],
           )
           console.log('✅ [WEBHOOK] Pathway updated with bland_id')
