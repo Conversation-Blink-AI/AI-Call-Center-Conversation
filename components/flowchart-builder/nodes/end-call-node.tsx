@@ -3,7 +3,7 @@
 import React from 'react'
 import { Handle, Position, NodeProps } from 'reactflow'
 import { PhoneOff, Pencil, Trash2 } from 'lucide-react'
-import toast from 'react-hot-toast';
+import toast from 'react-hot-toast'
 
 interface EndCallNodeData {
   prompt: string
@@ -11,16 +11,20 @@ interface EndCallNodeData {
 
 export function EndCallNode({ data, selected }: { data: any; selected?: boolean }) {
   return (
-    <div className={`px-2 py-1.5 shadow-md rounded-md bg-red-100 w-[140px] h-[55px] transition-all duration-200 relative overflow-visible ${
-      selected ? 'border-red-600 shadow-lg scale-105' : 'border-red-500 hover:border-red-600'
-    }`} style={{ border: '0.5px solid' }}>
+    <div className={`px-3 py-2 shadow-md rounded-md bg-gradient-to-br from-red-100 via-red-50 to-red-100 w-[255px] h-[100px] transition-all duration-200 relative overflow-visible ${
+      selected ? 'shadow-lg scale-105' : ''
+    }`}>
 
-      <div className="overflow-hidden h-full">
+      <div className="overflow-hidden h-full flex items-center">
         <div className="flex items-center space-x-1.5">
-          <PhoneOff className="w-3 h-3 text-red-600 flex-shrink-0" />
+          <PhoneOff className="w-5 h-5 text-red-600 flex-shrink-0" />
           <div>
-            <div className="text-[8px] font-medium text-red-800">{data.name || 'End Call'}</div>
-            <div className="text-[7px] opacity-80 text-red-700 mt-0.5 leading-tight overflow-hidden" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }} title={data.prompt || data.text || 'End conversation'}>
+            <div className="text-[14px] font-medium text-red-800">{data.name || 'End Call'}</div>
+            <div
+              className="text-[12px] opacity-80 text-red-700 mt-0.5 leading-tight overflow-hidden"
+              style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}
+              title={data.prompt || data.text || 'End conversation'}
+            >
               {data.prompt || data.text || 'End conversation'}
             </div>
           </div>
@@ -33,8 +37,8 @@ export function EndCallNode({ data, selected }: { data: any; selected?: boolean 
         style={{
           background: 'white',
           border: '0.5px solid #3b82f6',
-          width: '6px',
-          height: '6px',
+          width: '12px',
+          height: '12px',
           transformOrigin: '50% 50%',
         }}
       />

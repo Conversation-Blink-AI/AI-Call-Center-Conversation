@@ -11,37 +11,29 @@ import ReactFlow, {
   Connection,
   Edge,
   Node,
-  ReactFlowProvider,
   ReactFlowInstance,
 } from 'reactflow'
 import 'reactflow/dist/style.css'
 import { useTheme } from 'next-themes'
 
-// Import custom nodes
 import { GreetingNode } from './nodes/greeting-node'
 import { QuestionNode } from './nodes/question-node'
 import { CustomerResponseNode } from './nodes/customer-response-node'
 import { EndCallNode } from './nodes/end-call-node'
 import { TransferNode } from './nodes/transfer-node'
 import { WebhookNode } from './nodes/webhook-node'
-import { FacebookPixelNode } from './nodes/facebook-pixel-node' // Import FacebookPixelNode
+import { FacebookPixelNode } from './nodes/facebook-pixel-node'
 import { NodeEditorDrawer } from './node-editor-drawer'
 import { CustomEdge } from './edges/custom-edge'
 import { EdgeEditorDrawer } from './edge-editor-drawer'
 import { NodeToolbar } from './node-toolbar'
 
-import { Button } from '../ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog'
-import { ScrollArea } from '../ui/scroll-area'
-import { toast } from 'sonner'
-import { convertReactFlowToBland, convertBlandToReactFlow } from '../../services/reactflow-converter'
-import { UpdatePathwayModal } from './update-pathway-modal'
 import { SavePathwayModal } from './save-pathway-modal'
+import { UpdatePathwayModal } from './update-pathway-modal'
+import { convertBlandToReactFlow } from '../../services/reactflow-converter'
+import { toast } from 'sonner'
 
-// Custom edge types
-const edgeTypes = {
-  custom: CustomEdge,
-}
+const edgeTypes = { custom: CustomEdge }
 
 interface FlowchartCanvasProps {
   phoneNumber?: string | null
@@ -54,7 +46,7 @@ export function FlowchartCanvas({
   phoneNumber,
   pathwayInfo,
   initialNodes = [],
-  initialEdges = []
+  initialEdges = [],
 }: FlowchartCanvasProps = {}) {
   const { theme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
@@ -66,130 +58,61 @@ export function FlowchartCanvas({
   const [isEditorOpen, setIsEditorOpen] = useState(false)
   const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null)
   const [isEdgeEditorOpen, setIsEdgeEditorOpen] = useState(false)
-  const [isJsonPreviewOpen, setIsJsonPreviewOpen] = useState(false)
-  const [isConvertedJsonOpen, setIsConvertedJsonOpen] = useState(false)
   const [isLoadingFlowchart, setIsLoadingFlowchart] = useState(false)
   const [toolbarNode, setToolbarNode] = useState<Node | null>(null)
   const [toolbarPosition, setToolbarPosition] = useState({ x: 0, y: 0 })
-  
-  // Handle theme mounting to avoid hydration issues
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-  
-  // Determine if dark mode is active
+
+  useEffect(() => setMounted(true), [])
+
   const isDarkMode = mounted && (resolvedTheme === 'dark' || theme === 'dark')
 
-  const onEditNode = useCallback((node: Node) => {
-    setSelectedNode(node)
-    setIsEditorOpen(true)
-  }, [])
+  const nodeTypes = useMemo(
+    () => ({
+      greetingNode: (props: any) => <GreetingNode {...props} />,
+      questionNode: (props: any) => <QuestionNode {...props} />,
+      customerResponseNode: (props: any) => <CustomerResponseNode {...props} />,
+      webhookNode: (props: any) => <WebhookNode {...props} />,
+      facebookPixelNode: (props: any) => <FacebookPixelNode {...props} />,
+      transferNode: (props: any) => <TransferNode {...props} />,
+      endCallNode: (props: any) => <EndCallNode {...props} />,
+      Default: (props: any) => <CustomerResponseNode {...props} />,
+      'End Call': (props: any) => <EndCallNode {...props} />,
+    }),
+    [],
+  )
 
-  const onDuplicateNode = useCallback((nodeId: string) => {
-    const nodeToDuplicate = nodes.find(node => node.id === nodeId)
-    if (!nodeToDuplicate) return
-
-    const newNode: Node = {
-      ...nodeToDuplicate,
-      id: `${nodeToDuplicate.type}_${Date.now()}`,
-      position: {
-        x: nodeToDuplicate.position.x + 50,
-        y: nodeToDuplicate.position.y + 50,
-      },
-      selected: false,
-      data: {
-        ...nodeToDuplicate.data,
-        name: nodeToDuplicate.data.name ? `${nodeToDuplicate.data.name} (Copy)` : 'Copy',
-      }
-    }
-
-    setNodes((nds) => [...nds, newNode])
-    setToolbarNode(null) // Hide toolbar after duplication
-  }, [nodes, setNodes])
-
-  const onDeleteNode = useCallback((nodeId: string) => {
-    // Remove the node
-    setNodes((nds) => nds.filter((node) => node.id !== nodeId))
-
-    // Remove all connected edges
-    setEdges((eds) => eds.filter((edge) => edge.source !== nodeId && edge.target !== nodeId))
-
-    // Close any open editors if this node was selected
-    setSelectedNode((prevSelected) =>
-      prevSelected?.id === nodeId ? null : prevSelected
-    )
-    if (selectedNode?.id === nodeId) {
-      setIsEditorOpen(false)
-    }
-  }, [setNodes, setEdges, selectedNode])
-
-  const nodeTypes = useMemo(() => ({
-    greetingNode: (props: any) => <GreetingNode {...props} />,
-    questionNode: (props: any) => <QuestionNode {...props} />,
-    customerResponseNode: (props: any) => <CustomerResponseNode {...props} />,
-    webhookNode: (props: any) => <WebhookNode {...props} />,
-    facebookPixelNode: (props: any) => <FacebookPixelNode {...props} />, // Add FacebookPixelNode
-    transferNode: (props: any) => <TransferNode {...props} />,
-    endCallNode: (props: any) => <EndCallNode {...props} />,
-    Default: (props: any) => <CustomerResponseNode {...props} />,
-    'End Call': (props: any) => <EndCallNode {...props} />,
-  }), [])
-
-  // Load saved flowchart data when component mounts OR set initial data
   useEffect(() => {
-    // Prevent multiple simultaneous loads
     if (isLoadingFlowchart) return
 
-    // If initial data is provided, use it immediately
     if (initialNodes.length > 0 || initialEdges.length > 0) {
-      console.log('[FLOWCHART-CANVAS] Setting initial data:', { nodes: initialNodes.length, edges: initialEdges.length })
       setNodes(initialNodes)
       setEdges(initialEdges)
       return
     }
 
-    // Otherwise load saved flowchart data
     const loadSavedFlowchart = async () => {
-      // Try to load by pathway_id first, then by phone number
-      if (!pathwayInfo?.pathway_id && !phoneNumber) {
-        console.log('[FLOWCHART-CANVAS] No pathway ID or phone number available')
-        return
-      }
+      if (!pathwayInfo?.pathway_id && !phoneNumber) return
 
       setIsLoadingFlowchart(true)
       try {
-        // Build the API URL - try pathwayId first, then phoneNumber
         let apiUrl = ''
         if (pathwayInfo?.pathway_id) {
           apiUrl = `/api/pathways/load-flowchart?pathwayId=${pathwayInfo.pathway_id}`
-          console.log('[FLOWCHART-CANVAS] Loading pathway by ID:', pathwayInfo.pathway_id)
         } else if (phoneNumber) {
           apiUrl = `/api/pathways/load-flowchart?phoneNumber=${encodeURIComponent(phoneNumber)}`
-          console.log('[FLOWCHART-CANVAS] Loading pathway by phone number:', phoneNumber)
         }
 
-        const response = await fetch(apiUrl, {
-          credentials: 'include'
-        })
+        const response = await fetch(apiUrl, { credentials: 'include' })
         const result = await response.json()
-
-        console.log('[FLOWCHART-CANVAS] Load response:', result)
 
         if (result.success && result.pathway && result.pathway.flowchart_data) {
           const flowchartData = result.pathway.flowchart_data
-
-          // Convert Bland format back to ReactFlow format
           if (flowchartData && flowchartData.nodes && flowchartData.edges) {
             const reactFlowData = convertBlandToReactFlow(flowchartData)
             setNodes(reactFlowData.nodes)
             setEdges(reactFlowData.edges)
-
             toast.success(`Loaded saved pathway: ${result.pathway.name}`)
-          } else {
-            console.log('[FLOWCHART-CANVAS] Flowchart data missing nodes or edges, starting with empty canvas')
           }
-        } else {
-          console.log('[FLOWCHART-CANVAS] No pathway data found or failed to load:', result.error || 'Unknown error')
         }
       } catch (error) {
         console.error('[FLOWCHART-CANVAS] Error loading saved flowchart:', error)
@@ -200,13 +123,11 @@ export function FlowchartCanvas({
     }
 
     loadSavedFlowchart()
-  }, [pathwayInfo?.pathway_id, phoneNumber]) // Added phoneNumber as dependency
+  }, [pathwayInfo?.pathway_id, phoneNumber])
 
   const onConnect = useCallback(
     (params: Connection) => {
-      // Check if the source node is a Transfer node
-      const sourceNode = nodes.find(node => node.id === params.source)
-      
+      const sourceNode = nodes.find((node) => node.id === params.source)
       if (sourceNode?.type === 'transferNode') {
         toast.error('Cannot connect after Transfer node. Transfer ends the call flow.')
         return
@@ -232,15 +153,8 @@ export function FlowchartCanvas({
 
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
     event.stopPropagation()
-
-    // Set the toolbar node and position
     setToolbarNode(node)
-    setToolbarPosition({
-      x: node.position.x,
-      y: node.position.y
-    })
-
-    // Clear edge selection
+    setToolbarPosition({ x: node.position.x, y: node.position.y })
     setSelectedEdge(null)
     setIsEdgeEditorOpen(false)
   }, [])
@@ -250,7 +164,7 @@ export function FlowchartCanvas({
     setIsEditorOpen(false)
     setSelectedEdge(null)
     setIsEdgeEditorOpen(false)
-    setToolbarNode(null) // Hide toolbar when clicking on canvas
+    setToolbarNode(null)
   }, [])
 
   const onEdgeClick = useCallback((event: React.MouseEvent, edge: Edge) => {
@@ -261,55 +175,38 @@ export function FlowchartCanvas({
     setIsEditorOpen(false)
   }, [])
 
-  const onUpdateNode = useCallback((nodeId: string, updates: any) => {
-    setNodes((nds) =>
-      nds.map((node) =>
-        node.id === nodeId
-          ? { ...node, ...updates }
-          : node
-      )
-    )
+  const onUpdateNode = useCallback(
+    (nodeId: string, updates: any) => {
+      setNodes((nds) => nds.map((node) => (node.id === nodeId ? { ...node, ...updates } : node)))
+      setSelectedNode((prev) => (prev?.id === nodeId ? { ...prev, ...updates } : prev))
+    },
+    [setNodes],
+  )
 
-    // Update selectedNode if it's the one being edited
-    setSelectedNode((prevSelected) =>
-      prevSelected?.id === nodeId
-        ? { ...prevSelected, ...updates }
-        : prevSelected
-    )
-  }, [setNodes])
+  const onUpdateEdge = useCallback(
+    (edgeId: string, updates: any) => {
+      setEdges((eds) => eds.map((edge) => (edge.id === edgeId ? { ...edge, ...updates } : edge)))
+      setSelectedEdge((prev) => (prev?.id === edgeId ? { ...prev, ...updates } : prev))
+    },
+    [setEdges],
+  )
 
-  const onUpdateEdge = useCallback((edgeId: string, updates: any) => {
-    setEdges((eds) =>
-      eds.map((edge) =>
-        edge.id === edgeId
-          ? { ...edge, ...updates }
-          : edge
-      )
-    )
-
-    // Update selectedEdge if it's the one being edited
-    setSelectedEdge((prevSelected) =>
-      prevSelected?.id === edgeId
-        ? { ...prevSelected, ...updates }
-        : prevSelected
-    )
-  }, [setEdges])
-
-  const onDeleteEdge = useCallback((edgeId: string) => {
-    setEdges((eds) => eds.filter((edge) => edge.id !== edgeId))
-    setSelectedEdge(null)
-    setIsEdgeEditorOpen(false)
-  }, [setEdges])
+  const onDeleteEdge = useCallback(
+    (edgeId: string) => {
+      setEdges((eds) => eds.filter((edge) => edge.id !== edgeId))
+      setSelectedEdge(null)
+      setIsEdgeEditorOpen(false)
+    },
+    [setEdges],
+  )
 
   const onDrop = useCallback(
     (event: React.DragEvent) => {
       event.preventDefault()
-
       if (!reactFlowWrapper.current || !reactFlowInstance) return
 
       const reactFlowBounds = reactFlowWrapper.current.getBoundingClientRect()
       const type = event.dataTransfer.getData('application/reactflow')
-
       if (!type) return
 
       const position = reactFlowInstance.project({
@@ -333,21 +230,11 @@ export function FlowchartCanvas({
   const getDefaultNodeData = (nodeType: string) => {
     switch (nodeType) {
       case 'greetingNode':
-        return {
-          name: 'Start',
-          text: 'Hey there, how are you doing today?',
-          isStart: true,
-        }
+        return { name: 'Start', text: 'Hey there, how are you doing today?', isStart: true }
       case 'questionNode':
-        return {
-          name: 'New Question',
-          text: 'What would you like to know?',
-        }
+        return { name: 'New Question', text: 'What would you like to know?' }
       case 'customerResponseNode':
-        return {
-          name: 'Customer Response',
-          text: 'Waiting for customer response...',
-        }
+        return { name: 'Customer Response', text: 'Waiting for customer response...' }
       case 'webhookNode':
         return {
           name: 'Webhook Request',
@@ -372,31 +259,20 @@ export function FlowchartCanvas({
           transferNumber: '+1234567890',
         }
       case 'endCallNode':
-        return {
-          name: 'End Call',
-          prompt: 'Say goodbye to the user',
-        }
-      case 'facebookPixelNode': // Default data for Facebook Pixel Node
+        return { name: 'End Call', prompt: 'Say goodbye to the user' }
+      case 'facebookPixelNode':
         return {
           name: 'Facebook Pixel Event',
           pixelId: '',
           accessToken: '',
           eventName: 'Lead',
-          actionSource: 'phone_call', // Default to phone_call
-          eventData: {}, // For custom_data and other fields
+          actionSource: 'phone_call',
+          eventData: {},
         }
       default:
         return { name: 'Unknown Node' }
     }
   }
-
-  const handleJsonPreview = useCallback(() => {
-    setIsJsonPreviewOpen(true)
-  }, [])
-
-  const handleConvertedJsonPreview = useCallback(() => {
-    setIsConvertedJsonOpen(true)
-  }, [])
 
   return (
     <>
@@ -409,13 +285,10 @@ export function FlowchartCanvas({
             </div>
           </div>
         )}
-        {/* Floating Buttons */}
+
         <div className="absolute top-4 right-4 z-10 flex gap-2">
-          <SavePathwayModal
-              reactFlowData={{ nodes, edges }}
-              pathwayId={pathwayInfo?.pathway_id}
-            />
-        <UpdatePathwayModal reactFlowData={{ nodes, edges }} />
+          <SavePathwayModal reactFlowData={{ nodes, edges }} pathwayId={pathwayInfo?.pathway_id} />
+          <UpdatePathwayModal reactFlowData={{ nodes, edges }} />
         </div>
 
         <ReactFlow
@@ -432,35 +305,55 @@ export function FlowchartCanvas({
           onEdgeClick={onEdgeClick}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
-          fitView
           className="bg-background"
         >
           <Controls />
           <MiniMap />
-          <Background 
-            variant="dots" 
-            gap={12} 
-            size={1} 
-            color={isDarkMode ? '#4a5568' : '#cbd5e0'} 
+          <Background
+            variant="dots"
+            gap={12}
+            size={1.5}
+            color={isDarkMode ? '#4a5568' : '#e2e8f0'}
           />
         </ReactFlow>
 
-        {/* Node Toolbar */}
         {toolbarNode && (
           <NodeToolbar
             nodeId={toolbarNode.id}
             position={toolbarPosition}
             onEdit={() => {
-              onEditNode(toolbarNode)
+              setSelectedNode(toolbarNode)
+              setIsEditorOpen(true)
               setToolbarNode(null)
             }}
             onDelete={() => {
               if (window.confirm('Are you sure you want to delete this node?')) {
-                onDeleteNode(toolbarNode.id)
+                setNodes((nds) => nds.filter((n) => n.id !== toolbarNode.id))
+                setEdges((eds) => eds.filter((e) => e.source !== toolbarNode.id && e.target !== toolbarNode.id))
                 setToolbarNode(null)
               }
             }}
-            onDuplicate={() => onDuplicateNode(toolbarNode.id)}
+            onDuplicate={() => {
+              const nodeToDuplicate = nodes.find((n) => n.id === toolbarNode.id)
+              if (!nodeToDuplicate) return
+              const newNode: Node = {
+                ...nodeToDuplicate,
+                id: `${nodeToDuplicate.type}_${Date.now()}`,
+                position: {
+                  x: nodeToDuplicate.position.x + 50,
+                  y: nodeToDuplicate.position.y + 50,
+                },
+                selected: false,
+                data: {
+                  ...nodeToDuplicate.data,
+                  name: nodeToDuplicate.data.name
+                    ? `${nodeToDuplicate.data.name} (Copy)`
+                    : 'Copy',
+                },
+              }
+              setNodes((nds) => [...nds, newNode])
+              setToolbarNode(null)
+            }}
           />
         )}
       </div>
