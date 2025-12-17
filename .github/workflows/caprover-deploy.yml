@@ -8,22 +8,12 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Verify workspace
+      - name: Create deploy.tar (stable)
         run: |
-          pwd
-          ls -la
-
-      - name: Create deploy.tar
-        run: |
-          tar \
-            --exclude=.git \
-            --exclude=deploy.tar \
-            -czf deploy.tar .
+          git archive --format=tar --output=deploy.tar HEAD
           ls -la deploy.tar
 
       - name: Deploy to CapRover
