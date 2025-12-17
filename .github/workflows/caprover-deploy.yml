@@ -11,7 +11,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Create deploy.tar (stable)
+      - name: Create deploy.tar
         run: |
           git archive --format=tar --output=deploy.tar HEAD
           ls -la deploy.tar
