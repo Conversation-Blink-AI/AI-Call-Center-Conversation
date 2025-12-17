@@ -182,7 +182,7 @@ export async function createCall(callData: {
   phone_number_id?: string
 }) {
   return executeQuery(`
-    INSERT INTO calls (
+    INSERT INTO call_logs (
       call_id, user_id, to_number, from_number, duration_seconds, 
       status, recording_url, transcript, summary, cost_cents, 
       pathway_id, ended_reason, phone_number_id, created_at, updated_at
@@ -220,7 +220,7 @@ export async function createCall(callData: {
 export async function getCallsByUserId(userId: string, limit: number = 50, offset: number = 0) {
   return executeQuery(`
     SELECT c.*, pn.phone_number as phone_number_detail
-    FROM calls c
+    FROM call_logs c
     LEFT JOIN phone_numbers pn ON c.phone_number_id = pn.id
     WHERE c.user_id = $1
     ORDER BY c.created_at DESC
@@ -231,7 +231,7 @@ export async function getCallsByUserId(userId: string, limit: number = 50, offse
 export async function getCallById(callId: string) {
   return executeQuery(`
     SELECT c.*, pn.phone_number as phone_number_detail
-    FROM calls c
+    FROM call_logs c
     LEFT JOIN phone_numbers pn ON c.phone_number_id = pn.id
     WHERE c.call_id = $1
   `, [callId])
@@ -242,7 +242,7 @@ export async function updateCall(callId: string, updateData: any) {
   const values = Object.values(updateData)
 
   return executeQuery(`
-    UPDATE calls 
+    UPDATE call_logs 
     SET ${updates}, updated_at = NOW()
     WHERE call_id = $1
     RETURNING *

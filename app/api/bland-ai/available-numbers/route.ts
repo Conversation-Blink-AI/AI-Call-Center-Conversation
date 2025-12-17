@@ -33,7 +33,7 @@ export async function GET(request: Request) {
           e164: "+14155551234",
           location: "San Francisco, CA",
           type: "Local",
-          monthlyFee: "$1.00",
+          monthlyFee: "15.00",
           status: "available",
           capabilities: ["voice", "sms"]
         },
@@ -44,7 +44,7 @@ export async function GET(request: Request) {
           e164: "+14155555678",
           location: "San Francisco, CA",
           type: "Local",
-          monthlyFee: "$1.00",
+          monthlyFee: "15.00",
           status: "available",
           capabilities: ["voice", "sms"]
         }
@@ -86,7 +86,7 @@ export async function GET(request: Request) {
         e164: number.phoneNumber,
         location: `${number.locality || 'Unknown'}, ${number.region || countryCode}`,
         type: "Local",
-        monthlyFee: "$1.00", // Standard Twilio pricing
+        monthlyFee: "15.00", // Standard Twilio pricing
         status: "available",
         capabilities: number.capabilities || ["voice", "sms"]
       }))

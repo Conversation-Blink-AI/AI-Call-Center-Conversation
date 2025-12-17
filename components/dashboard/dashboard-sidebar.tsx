@@ -12,13 +12,13 @@ import {
   Phone,
   Users,
   CreditCard,
-  Settings,
   FileText,
   History,
   ChevronUp,
   User,
   LogOut,
   Mic,
+  HelpCircle,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 
@@ -31,6 +31,7 @@ const navigation = [
   { name: "Call History", href: "/dashboard/call-history", icon: History },
   { name: "Phone Numbers", href: "/dashboard/phone-numbers", icon: Phone },
   { name: "Billing", href: "/dashboard/billing", icon: CreditCard },
+  { name: "Help", href: "/help", icon: HelpCircle },
 ]
 
 export function DashboardSidebar() {
@@ -146,35 +147,57 @@ export function DashboardSidebar() {
       </div>
 
       {/* Profile Section - Fixed at bottom */}
-      <div className="absolute bottom-0 left-0 right-0 border-t border-border p-4 bg-background" ref={dropdownRef}>
-        <div className="relative">
-          <Button
-            variant="ghost"
-            className="w-full flex items-center justify-start gap-3 hover:bg-accent focus:bg-accent px-3 py-2.5 h-auto rounded-xl"
-            onClick={() => {
-              console.log("🖱️ Profile dropdown clicked, current state:", isDropdownOpen)
-              setIsDropdownOpen(!isDropdownOpen)
-            }}
-          >
-            <Avatar className="h-8 w-8 flex-shrink-0">
-              <AvatarImage src={user?.avatarUrl || ""} alt={user?.name || "User"} />
-              <AvatarFallback className="bg-blue-600 text-white text-sm font-medium">
-                {user?.name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || "U"}
-              </AvatarFallback>
-            </Avatar>
-            <div className="overflow-hidden whitespace-nowrap min-w-0 flex-1 text-left opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-100">
-              <p className="text-sm font-medium text-foreground truncate">
-                {user?.name || user?.email?.split("@")[0] || "User"}
-              </p>
-              <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
-            </div>
-            <ChevronUp
-              className={cn(
-                "h-4 w-4 text-muted-foreground transition-transform duration-200 flex-shrink-0",
-                isDropdownOpen ? "rotate-180" : "",
-              )}
-            />
-          </Button>
+      <div className="absolute bottom-0 left-0 right-0 border-t border-border bg-background h-16 group-hover:h-auto group-hover:p-4 flex items-center justify-center" ref={dropdownRef}>
+        <div className="relative w-full h-full flex items-center justify-center group-hover:block group-hover:h-auto">
+          {/* Collapsed state - just show avatar centered */}
+          <div className="flex items-center justify-center h-full w-full group-hover:hidden">
+            <Button
+              variant="ghost"
+              className="h-full w-full flex items-center justify-center p-0 hover:bg-accent rounded-xl"
+              onClick={() => {
+                console.log("🖱️ Profile dropdown clicked, current state:", isDropdownOpen)
+                setIsDropdownOpen(!isDropdownOpen)
+              }}
+            >
+              <Avatar className="h-8 w-8 flex-shrink-0">
+                <AvatarImage src={user?.avatarUrl || ""} alt={user?.name || "User"} />
+                <AvatarFallback className="bg-blue-600 text-white text-sm font-medium">
+                  {user?.name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || "U"}
+                </AvatarFallback>
+              </Avatar>
+            </Button>
+          </div>
+
+          {/* Expanded state - show full button with text */}
+          <div className="hidden group-hover:block w-full">
+            <Button
+              variant="ghost"
+              className="w-full flex items-center justify-start gap-3 hover:bg-accent focus:bg-accent px-3 py-2.5 h-auto rounded-xl"
+              onClick={() => {
+                console.log("🖱️ Profile dropdown clicked, current state:", isDropdownOpen)
+                setIsDropdownOpen(!isDropdownOpen)
+              }}
+            >
+              <Avatar className="h-8 w-8 flex-shrink-0">
+                <AvatarImage src={user?.avatarUrl || ""} alt={user?.name || "User"} />
+                <AvatarFallback className="bg-blue-600 text-white text-sm font-medium">
+                  {user?.name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || "U"}
+                </AvatarFallback>
+              </Avatar>
+              <div className="overflow-hidden whitespace-nowrap min-w-0 flex-1 text-left">
+                <p className="text-sm font-medium text-foreground truncate">
+                  {user?.name || user?.email?.split("@")[0] || "User"}
+                </p>
+                <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+              </div>
+              <ChevronUp
+                className={cn(
+                  "h-4 w-4 text-muted-foreground transition-transform duration-200 flex-shrink-0",
+                  isDropdownOpen ? "rotate-180" : "",
+                )}
+              />
+            </Button>
+          </div>
 
           {/* Dropdown Menu - Opens upward with proper z-index */}
           {isDropdownOpen && (
@@ -196,14 +219,6 @@ export function DashboardSidebar() {
                 >
                   <User className="mr-3 h-4 w-4" />
                   Profile Settings
-                </Link>
-                <Link
-                  href="/dashboard/settings"
-                  className="flex items-center px-4 py-2 text-sm text-popover-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-                  onClick={() => setIsDropdownOpen(false)}
-                >
-                  <Settings className="mr-3 h-4 w-4" />
-                  Account Settings
                 </Link>
                 <hr className="my-1 border-border/50" />
                 <button

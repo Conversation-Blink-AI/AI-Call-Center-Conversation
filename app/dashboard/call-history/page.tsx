@@ -277,13 +277,13 @@ export default function CallHistoryPage() {
           {loading ? (
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <span className="ml-2 text-gray-600">Loading call history...</span>
+              <span className="ml-2 text-muted-foreground">Loading call history...</span>
             </div>
           ) : paginatedCalls.length === 0 ? (
             <div className="text-center py-12">
-              <Phone className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No calls found</h3>
-              <p className="text-gray-600">
+              <Phone className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-foreground mb-2">No calls found</h3>
+              <p className="text-muted-foreground">
                 {userPhoneNumber
                   ? "No calls have been made from this number yet."
                   : "Purchase a phone number to start making calls."}
@@ -408,7 +408,7 @@ export default function CallHistoryPage() {
                                         />
                                       </div>
                                     </div>
-                                    <div className="text-xs text-gray-500 font-mono whitespace-nowrap">
+                                    <div className="text-xs text-muted-foreground font-mono whitespace-nowrap">
                                       {formatAudioTime(audioProgress[call.id] || 0)} / {formatAudioTime(audioDuration[call.id] || 0)}
                                     </div>
                                   </div>
@@ -476,7 +476,7 @@ export default function CallHistoryPage() {
                     >
                       Previous
                     </Button>
-                    <span className="text-sm text-gray-600">
+                    <span className="text-sm text-muted-foreground">
                       Page {currentPage} of {totalPages}
                     </span>
                     <Button

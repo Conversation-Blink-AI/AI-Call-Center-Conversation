@@ -144,9 +144,22 @@ export async function POST(request: Request) {
         const localUser = updateResult.rows[0]
         console.log("[AUTH/SIGNUP] Updated existing local user:", localUser.id)
 
+        // Ensure wallet exists for this user
+        try {
+          await client.query(
+            `INSERT INTO wallets (user_id, balance_cents, updated_at)
+             VALUES ($1, $2, NOW())
+             ON CONFLICT (user_id) DO NOTHING`,
+            [localUser.id, 0]
+          )
+          console.log("[AUTH/SIGNUP] Ensured wallet exists for existing user:", localUser.id)
+        } catch (walletError) {
+          console.error("[AUTH/SIGNUP] Failed to ensure wallet for existing user:", walletError)
+        }
+
         return NextResponse.json({
           success: true,
-          message: externalResult.message || "Account updated successfully",
+          message: "Account updated successfully. Please verify your email to access the platform.",
           user: {
             id: localUser.id,
             email: localUser.email,
@@ -154,8 +167,9 @@ export async function POST(request: Request) {
             lastName: localUser.last_name,
             company: localUser.company,
             phoneNumber: localUser.phone_number,
-            isVerified: true
-          }
+            isVerified: localUser.is_verified || false
+          },
+          requiresVerification: !localUser.is_verified
         })
       }
 
@@ -173,7 +187,7 @@ export async function POST(request: Request) {
           'user',
           externalResult.data?._id || externalResult.data?.id || null,
           externalResult.data?.token || null,
-          true, // Set as verified since external API succeeded
+          false, // Set as unverified - user must verify account before accessing platform
           'AI Call',
           password
         ]
@@ -182,10 +196,24 @@ export async function POST(request: Request) {
       const localUser = insertResult.rows[0]
       console.log("[AUTH/SIGNUP] Local user record created:", localUser.id)
 
+      // Create initial wallet record for the new user with 0 balance
+      try {
+        await client.query(
+          `INSERT INTO wallets (user_id, balance_cents, updated_at)
+           VALUES ($1, $2, NOW())
+           ON CONFLICT (user_id) DO NOTHING`,
+          [localUser.id, 0]
+        )
+        console.log("[AUTH/SIGNUP] Wallet created for new user:", localUser.id)
+      } catch (walletError) {
+        // Don't fail signup if wallet creation has an issue; it can be recovered later
+        console.error("[AUTH/SIGNUP] Failed to create wallet for new user:", walletError)
+      }
+
       // Return success with external API message
       return NextResponse.json({
         success: true,
-        message: externalResult.message || "Account created successfully",
+        message: "Account created successfully. Please verify your email to access the platform.",
         user: {
           id: localUser.id,
           email: localUser.email,
@@ -193,8 +221,9 @@ export async function POST(request: Request) {
           lastName: localUser.last_name,
           company: localUser.company,
           phoneNumber: localUser.phone_number,
-          isVerified: true
-        }
+          isVerified: false
+        },
+        requiresVerification: true
       })
 
     } catch (dbError: any) {

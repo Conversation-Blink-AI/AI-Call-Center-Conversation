@@ -119,14 +119,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!response.ok) {
         // Try to parse error message
         let errorMessage = "An error occurred during login"
+        let requiresVerification = false
+        let email = ""
         try {
           const errorData = await response.json()
           errorMessage = errorData.message || errorMessage
+          requiresVerification = errorData.requiresVerification || false
+          email = errorData.email || ""
         } catch {
           // If JSON parsing fails, use status text
           errorMessage = response.statusText || `Server error (${response.status})`
         }
         console.error("❌ [AUTH-CONTEXT] Login error:", errorMessage)
+        
+        // If verification is required, redirect to verification page
+        if (requiresVerification && email) {
+          router.push(`/verification-pending?email=${encodeURIComponent(email)}`)
+        }
+        
         return { success: false, message: errorMessage }
       }
 
@@ -183,7 +193,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       console.log("✅ [AUTH-CONTEXT] Signup successful")
 
-      // Set user as authenticated and redirect to dashboard
+      // Don't set user as authenticated - they need to verify first
+      // Redirect to verification pending page instead of dashboard
+      if (result.requiresVerification || !result.user?.isVerified) {
+        router.push(`/verification-pending?email=${encodeURIComponent(result.user?.email || data.email)}`)
+        return { success: true, message: result.message || "Account created successfully. Please verify your email to access the platform." }
+      }
+
+      // Only set authenticated if already verified (shouldn't happen for new signups)
       setUser(result.user)
       setIsAuthenticated(true)
       router.push("/dashboard")

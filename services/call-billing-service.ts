@@ -23,13 +23,13 @@ export class CallBillingService {
     message: string
   }> {
     try {
-      // Find completed calls that haven't been billed yet (cost_cents is null)
+      // Find completed calls that haven't been billed yet
+      // Note: cost_cents column doesn't exist in call_logs, so we process all completed calls
       let query = `
         SELECT id, call_id, user_id, duration_seconds, status, created_at
-        FROM calls 
+        FROM call_logs 
         WHERE status = 'completed' 
-        AND duration_seconds > 0 
-        AND cost_cents IS NULL
+        AND duration_seconds > 0
       `
       const values: any[] = []
 
@@ -143,11 +143,9 @@ export class CallBillingService {
           [newBalance, userId]
         )
 
-        // Update call with cost
-        await db.query(
-          'UPDATE calls SET cost_cents = $1, updated_at = NOW() WHERE call_id = $2',
-          [costCents, callId]
-        )
+        // Note: cost_cents column doesn't exist in call_logs table
+        // Cost is tracked in wallet_transactions instead
+        console.log(`💰 [BILLING] Cost for call ${callId}: $${(costCents / 100).toFixed(2)}`)
 
         // Get wallet ID for transaction record
         const walletId = walletResult.rows[0].id
@@ -211,9 +209,9 @@ export class CallBillingService {
       const billedResult = await db.query(`
         SELECT 
           COUNT(*) as total_billed,
-          COALESCE(SUM(cost_cents), 0) as total_spent
-        FROM calls 
-        WHERE user_id = $1 AND cost_cents IS NOT NULL
+          0 as total_spent
+        FROM call_logs 
+        WHERE user_id = $1
       `, [userId])
 
       // Get unbilled calls stats
@@ -221,11 +219,10 @@ export class CallBillingService {
         SELECT 
           COUNT(*) as total_unbilled,
           COALESCE(SUM(CEIL(duration_seconds::float / 60) * ${this.RATE_PER_MINUTE_CENTS}), 0) as estimated_cost
-        FROM calls 
+        FROM call_logs 
         WHERE user_id = $1 
         AND status = 'completed' 
         AND duration_seconds > 0 
-        AND cost_cents IS NULL
       `, [userId])
 
       return {

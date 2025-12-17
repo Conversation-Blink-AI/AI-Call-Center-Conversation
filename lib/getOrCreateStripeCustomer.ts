@@ -16,10 +16,23 @@ export async function getOrCreateStripeCustomer(userId: string): Promise<string>
 
     const user = userResult.rows[0]
 
-    // 2) If we already have a Stripe customer ID, return it
+    // 2) If we already have a Stripe customer ID, verify it exists in Stripe
     if (user.stripe_customer_id) {
-      console.log(`✅ Using existing Stripe customer: ${user.stripe_customer_id}`)
-      return user.stripe_customer_id
+      try {
+        // Verify the customer exists in Stripe
+        await stripe.customers.retrieve(user.stripe_customer_id)
+        console.log(`✅ Using existing Stripe customer: ${user.stripe_customer_id}`)
+        return user.stripe_customer_id
+      } catch (error: any) {
+        // Customer doesn't exist in Stripe (deleted or wrong account)
+        console.warn(`⚠️ Stripe customer ${user.stripe_customer_id} not found in Stripe, will create new one`)
+        // Clear the invalid customer ID from database
+        await db.query(
+          'UPDATE users SET stripe_customer_id = NULL, updated_at = $1 WHERE id = $2',
+          [new Date().toISOString(), userId]
+        )
+        // Continue to create a new customer below
+      }
     }
 
     // 3) Try to find existing customer by metadata (fallback for lost DB records)

@@ -216,7 +216,7 @@ export default function PublicApiDocumentationPage() {
 
           <h2>🔧 Quick Start</h2>
           <p>Get started with a simple request:</p>
-          <pre>{`curl -X GET "https://your-domain.com/Public_api/getPurchaseNumber?email=user@example.com"`}</pre>
+          <pre>{`curl -X GET "https://conversation.hustleapp.co/Public_api/getPurchaseNumber?email=user@example.com"`}</pre>
 
           <h2>📋 Parameters</h2>
           <table>
@@ -258,7 +258,7 @@ if (data.success) {
           <pre>{`import requests
 
 email = "user@example.com"
-response = requests.get(f"https://your-domain.com/Public_api/getPurchaseNumber?email={email}")
+response = requests.get(f"https://conversation.hustleapp.co/Public_api/getPurchaseNumber?email={email}")
 data = response.json()
 
 if data['success']:
@@ -273,7 +273,7 @@ else:
 
 async function getPurchaseNumbers(email) {
   try {
-    const response = await fetch(\`https://your-domain.com/Public_api/getPurchaseNumber?email=\${email}\`);
+    const response = await fetch(\`https://conversation.hustleapp.co/Public_api/getPurchaseNumber?email=\${email}\`);
     const data = await response.json();
     
     if (data.success) {

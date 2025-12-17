@@ -32,7 +32,7 @@ export async function fetchCallSummary(userId: string) {
     })
     await client.connect()
     const { rows: calls, error: callsError } = await client.query(
-      `SELECT * FROM calls WHERE phone_number IN (${phoneNumberStrings.map((_, i) => `$${i + 1}`).join(", ")}) ORDER BY created_at DESC`,
+      `SELECT * FROM call_logs WHERE phone_number IN (${phoneNumberStrings.map((_, i) => `$${i + 1}`).join(", ")}) ORDER BY created_at DESC`,
       phoneNumberStrings
     )
     await client.end()

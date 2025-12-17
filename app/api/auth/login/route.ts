@@ -209,6 +209,17 @@ export async function POST(request: Request) {
       }
     }
 
+    // Check if user is verified before allowing login
+    if (!localUser.is_verified) {
+      console.log("[AUTH/LOGIN] User is not verified:", email)
+      return NextResponse.json({
+        success: false,
+        message: "Please verify your email address before logging in. Check your inbox for the verification email.",
+        requiresVerification: true,
+        email: email
+      }, { status: 403 })
+    }
+
     // Create local JWT token for compatibility
     const localToken = jwt.sign(
       {
