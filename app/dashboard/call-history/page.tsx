@@ -2,11 +2,13 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { RefreshCw, Phone, Download, Play, Pause, FileText, ExternalLink, Calendar, Clock, Volume2 } from "lucide-react"
+import { RefreshCw, Phone, Download, Play, Pause, FileText, Calendar, Clock, Volume2, Gauge } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { useUserCallData } from "@/hooks/use-user-call-data"
 import { useState, useRef, useEffect } from "react"
 
@@ -18,7 +20,12 @@ export default function CallHistoryPage() {
   const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null)
   const [audioProgress, setAudioProgress] = useState<{ [key: string]: number }>({})
   const [audioDuration, setAudioDuration] = useState<{ [key: string]: number }>({})
+  const [audioLoaded, setAudioLoaded] = useState<{ [key: string]: boolean }>({})
+  const [playbackSpeed, setPlaybackSpeed] = useState<{ [key: string]: number }>({})
   const audioRefs = useRef<{ [key: string]: HTMLAudioElement }>({})
+
+  // Summary modal state
+  const [selectedSummary, setSelectedSummary] = useState<{ id: string; summary: string } | null>(null)
 
   // Audio player functions
   const handlePlayPause = (callId: string, recordingUrl: string) => {
@@ -27,6 +34,8 @@ export default function CallHistoryPage() {
     if (!audio) {
       // Create new audio element if it doesn't exist
       const newAudio = new Audio(recordingUrl)
+      newAudio.preload = 'auto' // Preload the audio for better caching
+      newAudio.playbackRate = playbackSpeed[callId] || 1.0 // Set default playback speed
       audioRefs.current[callId] = newAudio
 
       // Set up event listeners
@@ -34,6 +43,14 @@ export default function CallHistoryPage() {
         setAudioDuration(prev => ({
           ...prev,
           [callId]: newAudio.duration
+        }))
+      })
+
+      newAudio.addEventListener('canplaythrough', () => {
+        // Audio is fully downloaded and ready to play
+        setAudioLoaded(prev => ({
+          ...prev,
+          [callId]: true
         }))
       })
 
@@ -56,6 +73,19 @@ export default function CallHistoryPage() {
       newAudio.play()
       setCurrentlyPlaying(callId)
     } else {
+      // Check if audio is already loaded
+      if (audio.readyState >= 3) { // HAVE_FUTURE_DATA or HAVE_ENOUGH_DATA
+        setAudioLoaded(prev => ({
+          ...prev,
+          [callId]: true
+        }))
+      }
+
+      // Apply playback speed if set
+      if (playbackSpeed[callId]) {
+        audio.playbackRate = playbackSpeed[callId]
+      }
+
       // Toggle play/pause for existing audio
       if (currentlyPlaying === callId) {
         audio.pause()
@@ -84,6 +114,18 @@ export default function CallHistoryPage() {
       }))
     }
   }
+
+  const handlePlaybackSpeedChange = (callId: string, speed: number) => {
+    const audio = audioRefs.current[callId]
+    if (audio) {
+      audio.playbackRate = speed
+      setPlaybackSpeed(prev => ({
+        ...prev,
+        [callId]: speed
+      }))
+    }
+  }
+
 
   const formatAudioTime = (seconds: number) => {
     if (!seconds || isNaN(seconds)) return "0:00"
@@ -207,8 +249,13 @@ export default function CallHistoryPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-foreground">Call History</h1>
-          <p className="text-muted-foreground">View real-time call logs from Bland.ai</p>
-          {userPhoneNumber && <p className="text-sm text-muted-foreground mt-1">Showing calls for: {userPhoneNumber}</p>}
+          <p className="text-muted-foreground">View real-time call logs</p>
+          {userPhoneNumber && (
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-sm text-muted-foreground">Showing calls for:</span>
+              <Badge variant="secondary" className="text-sm">{userPhoneNumber}</Badge>
+            </div>
+          )}
         </div>
         <div className="flex items-center space-x-3">
           <Button variant="outline" onClick={refetch} disabled={loading}>
@@ -291,87 +338,87 @@ export default function CallHistoryPage() {
             </div>
           ) : (
             <>
-              <div className="overflow-auto max-h-[75vh] border rounded-lg">
-                <div className="min-w-[1400px]">
+              <div className="border rounded-lg overflow-visible">
+                <div className="w-full">
                   <Table>
-                    <TableHeader className="sticky top-0 bg-card z-10">
+                    <TableHeader className="bg-card">
                       <TableRow>
-                        <TableHead className="font-semibold w-[130px] text-foreground">
+                        <TableHead className="font-semibold text-foreground whitespace-nowrap">
                           <div className="flex items-center gap-1">
                             <Phone className="h-3 w-3" />
                             From
                           </div>
                         </TableHead>
-                        <TableHead className="font-semibold w-[130px] text-foreground">
+                        <TableHead className="font-semibold text-foreground whitespace-nowrap">
                           <div className="flex items-center gap-1">
                             <Phone className="h-3 w-3" />
                             To
                           </div>
                         </TableHead>
-                        <TableHead className="font-semibold w-[110px] text-foreground">
+                        <TableHead className="font-semibold text-foreground whitespace-nowrap">
                           <div className="flex items-center gap-1">
                             <Calendar className="h-3 w-3" />
                             Date
                           </div>
                         </TableHead>
-                        <TableHead className="font-semibold w-[100px] text-foreground">
+                        <TableHead className="font-semibold text-foreground whitespace-nowrap">
                           <div className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
                             Time
                           </div>
                         </TableHead>
-                        <TableHead className="font-semibold w-[80px] text-foreground">Duration</TableHead>
-                        <TableHead className="font-semibold w-[110px] text-foreground">Status</TableHead>
-                        <TableHead className="font-semibold w-[120px] text-foreground">Ended Reason</TableHead>
-                        <TableHead className="font-semibold w-[200px] text-foreground">Pathway ID</TableHead>
-                        <TableHead className="font-semibold w-[250px] text-foreground">Summary</TableHead>
-                        <TableHead className="font-semibold w-[280px] text-foreground">Actions</TableHead>
+                        <TableHead className="font-semibold text-foreground whitespace-nowrap">Duration</TableHead>
+                        <TableHead className="font-semibold text-foreground whitespace-nowrap">Status</TableHead>
+                        <TableHead className="font-semibold text-foreground whitespace-nowrap">Ended Reason</TableHead>
+                        <TableHead className="font-semibold text-foreground">Pathway ID</TableHead>
+                        <TableHead className="font-semibold text-foreground">Conversation Summary</TableHead>
+                        <TableHead className="font-semibold text-foreground whitespace-nowrap w-[200px]">Call Recordings</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {paginatedCalls.map((call, index) => (
                         <TableRow key={call.id || index}>
-                          <TableCell className="font-mono text-xs">
+                          <TableCell className="font-mono text-xs whitespace-nowrap">
                             {call.from_number || "—"}
                           </TableCell>
-                          <TableCell className="font-mono text-xs">
+                          <TableCell className="font-mono text-xs whitespace-nowrap">
                             {call.to_number || "—"}
                           </TableCell>
-                          <TableCell className="text-xs">
+                          <TableCell className="text-xs whitespace-nowrap">
                             {formatDate(call.start_time)}
                           </TableCell>
-                          <TableCell className="text-xs">
+                          <TableCell className="text-xs whitespace-nowrap">
                             {formatTime(call.start_time)}
                           </TableCell>
-                          <TableCell className="font-mono text-xs">
+                          <TableCell className="font-mono text-xs whitespace-nowrap">
                             {formatDuration(call.duration)}
                           </TableCell>
-                          <TableCell>
+                          <TableCell className="whitespace-nowrap">
                             <Badge variant="outline" className={`text-xs ${getStatusColor(call.status)}`}>
                               {call.status || "unknown"}
                             </Badge>
                           </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">
+                          <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                             {call.ended_reason || call.outcome || "—"}
                           </TableCell>
-                          <TableCell className="text-xs text-muted-foreground font-mono">
-                            {call.pathway_id ? (
-                              <div className="truncate max-w-[180px]" title={call.pathway_id}>
-                                {call.pathway_id}
-                              </div>
-                            ) : "—"}
+                          <TableCell className="text-xs text-muted-foreground font-mono break-all max-w-[200px]">
+                            {call.pathway_id || "—"}
                           </TableCell>
-                          <TableCell className="text-xs text-muted-foreground">
+                          <TableCell className="text-xs text-muted-foreground max-w-[300px]">
                             {call.summary ? (
-                              <div className="truncate max-w-[200px]" title={call.summary}>
+                              <div 
+                                className="line-clamp-2 cursor-pointer hover:text-foreground transition-colors"
+                                onClick={() => setSelectedSummary({ id: call.id, summary: call.summary })}
+                                title="Click to view full summary"
+                              >
                                 {call.summary}
                               </div>
                             ) : "—"}
                           </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
+                          <TableCell className="whitespace-nowrap w-[200px]">
+                            <div className="flex items-center gap-1 max-w-[200px]">
                               {call.recording_url && (
-                                <div className="flex items-center gap-2 min-w-[180px]">
+                                <div className="flex items-center gap-1 flex-shrink-0">
                                   <Button
                                     variant="ghost"
                                     size="sm"
@@ -387,19 +434,25 @@ export default function CallHistoryPage() {
                                   </Button>
 
                                   {/* Audio Progress Bar */}
-                                  <div className="flex items-center gap-1 flex-1 min-w-0">
-                                    <div className="flex-1 min-w-0">
-                                      <div className="relative h-1 bg-gray-200 rounded-full cursor-pointer"
-                                           onClick={(e) => {
-                                             const rect = e.currentTarget.getBoundingClientRect()
-                                             const clickX = e.clientX - rect.left
-                                             const width = rect.width
-                                             const duration = audioDuration[call.id] || 0
-                                             const seekTime = (clickX / width) * duration
-                                             handleSeek(call.id, seekTime)
-                                           }}>
+                                  <div className="flex items-center gap-1 flex-shrink-0">
+                                    <div className="w-[50px] flex-shrink-0">
+                                      <div 
+                                        className="relative h-2 bg-gray-200 rounded-full cursor-pointer"
+                                        data-call-id={call.id}
+                                        onClick={(e) => {
+                                          const rect = e.currentTarget.getBoundingClientRect()
+                                          const clickX = e.clientX - rect.left
+                                          const width = rect.width
+                                          const duration = audioDuration[call.id] || 0
+                                          if (duration > 0) {
+                                            const percentage = Math.max(0, Math.min(clickX / width, 1))
+                                            const seekTime = percentage * duration
+                                            handleSeek(call.id, seekTime)
+                                          }
+                                        }}
+                                      >
                                         <div 
-                                          className="absolute top-0 left-0 h-full bg-blue-500 rounded-full transition-all"
+                                          className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full transition-all"
                                           style={{
                                             width: audioDuration[call.id] 
                                               ? `${((audioProgress[call.id] || 0) / audioDuration[call.id]) * 100}%`
@@ -408,9 +461,43 @@ export default function CallHistoryPage() {
                                         />
                                       </div>
                                     </div>
-                                    <div className="text-xs text-muted-foreground font-mono whitespace-nowrap">
-                                      {formatAudioTime(audioProgress[call.id] || 0)} / {formatAudioTime(audioDuration[call.id] || 0)}
-                                    </div>
+                                    {(currentlyPlaying === call.id || audioDuration[call.id] > 0) && (
+                                      <div className="text-[10px] text-muted-foreground font-mono whitespace-nowrap flex-shrink-0 leading-tight">
+                                        {formatAudioTime(audioProgress[call.id] || 0)}/{formatAudioTime(audioDuration[call.id] || 0)}
+                                      </div>
+                                    )}
+                                    {/* Playback Speed Control */}
+                                    {audioLoaded[call.id] && (
+                                      <Popover>
+                                        <PopoverTrigger asChild>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-5 w-5 p-0 min-w-0"
+                                            title={`Speed: ${playbackSpeed[call.id] || 1.0}x`}
+                                          >
+                                            <Gauge className="h-3 w-3" />
+                                          </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-auto p-1" side="top" align="center">
+                                          <div className="flex flex-col gap-0.5">
+                                            {[0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0].map((speed) => (
+                                              <Button
+                                                key={speed}
+                                                variant={playbackSpeed[call.id] === speed ? "default" : "ghost"}
+                                                size="sm"
+                                                className="h-6 px-2 text-xs justify-start"
+                                                onClick={() => {
+                                                  handlePlaybackSpeedChange(call.id, speed)
+                                                }}
+                                              >
+                                                {speed}x
+                                              </Button>
+                                            ))}
+                                          </div>
+                                        </PopoverContent>
+                                      </Popover>
+                                    )}
                                   </div>
                                 </div>
                               )}
@@ -436,20 +523,6 @@ export default function CallHistoryPage() {
                                   title="View Transcript"
                                 >
                                   <FileText className="h-3 w-3" />
-                                </Button>
-                              )}
-
-                              {call.id && (
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-7 w-7 p-0"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(call.id)
-                                  }}
-                                  title="Copy Call ID"
-                                >
-                                  <ExternalLink className="h-3 w-3" />
                                 </Button>
                               )}
                             </div>
@@ -494,6 +567,20 @@ export default function CallHistoryPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Summary Modal */}
+      <Dialog open={!!selectedSummary} onOpenChange={(open) => !open && setSelectedSummary(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Conversation Summary</DialogTitle>
+          </DialogHeader>
+          <div className="mt-4">
+            <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+              {selectedSummary?.summary}
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
