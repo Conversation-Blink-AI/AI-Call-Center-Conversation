@@ -158,16 +158,6 @@ export function EdgeEditorDrawer({
             <Label htmlFor="animated">Animated</Label>
           </div>
 
-          {/* Edge Info */}
-          <div className="p-2 bg-gray-50 rounded-lg">
-            <h4 className="font-medium mb-1 text-xs text-gray-500">Edge Information</h4>
-            <div className="space-y-0.5 text-xs text-gray-600">
-              <div className="break-all">ID: {selectedEdge.id}</div>
-              <div>Source: {selectedEdge.source}</div>
-              <div className="break-all">Target: {selectedEdge.target}</div>
-            </div>
-          </div>
-
           {/* Action Buttons */}
           <div className="flex gap-2 pt-4">
             <Button
