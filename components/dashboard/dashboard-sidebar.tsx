@@ -19,12 +19,13 @@ import {
   LogOut,
   Mic,
   HelpCircle,
+  Workflow,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: Home },
-  { name: "My Pathway", href: "/dashboard/pathway", icon: FileText },
+  { name: "My Pathway", href: "/dashboard/pathway", icon: Workflow },
   { name: "Analytics", href: "/dashboard/calls", icon: BarChart3 },
   { name: "Send Call", href: "/dashboard/sendcall", icon: Phone },
   { name: "Voices", href: "/dashboard/voices", icon: Mic },

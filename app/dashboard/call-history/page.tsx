@@ -12,6 +12,15 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useUserCallData } from "@/hooks/use-user-call-data"
 import { useState, useRef, useEffect } from "react"
 
+// Three dots loading animation
+const ThreeDotsLoader = () => (
+  <span className="inline-flex items-center ml-1">
+    <span className="inline-block w-1 h-1 bg-current rounded-full mx-0.5 dot-loader"></span>
+    <span className="inline-block w-1 h-1 bg-current rounded-full mx-0.5 dot-loader" style={{ animationDelay: '0.2s' }}></span>
+    <span className="inline-block w-1 h-1 bg-current rounded-full mx-0.5 dot-loader" style={{ animationDelay: '0.4s' }}></span>
+  </span>
+)
+
 export default function CallHistoryPage() {
   const { calls, totalCalls, userPhoneNumber, loading, error, lastUpdated, refetch } = useUserCallData()
   const [pageSize, setPageSize] = useState("50")
@@ -299,12 +308,14 @@ export default function CallHistoryPage() {
               </div>
               <div>
                 <CardTitle className="text-lg">
-                  Calls for {userPhoneNumber || "Loading..."}
+                  Calls for {userPhoneNumber || <ThreeDotsLoader />}
                 </CardTitle>
-                <CardDescription>
-                  {totalCalls} total calls • Page {currentPage} of {totalPages}
-                  {lastUpdated && ` • Updated ${new Date(lastUpdated).toLocaleTimeString()}`}
-                </CardDescription>
+                {!loading && (
+                  <CardDescription>
+                    {totalCalls} total calls • Page {currentPage} of {totalPages}
+                    {lastUpdated && ` • Updated ${new Date(lastUpdated).toLocaleTimeString()}`}
+                  </CardDescription>
+                )}
               </div>
             </div>
             <Select value={pageSize} onValueChange={setPageSize}>
@@ -323,8 +334,7 @@ export default function CallHistoryPage() {
         <CardContent>
           {loading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              <span className="ml-2 text-muted-foreground">Loading call history...</span>
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div>
           ) : paginatedCalls.length === 0 ? (
             <div className="text-center py-12">

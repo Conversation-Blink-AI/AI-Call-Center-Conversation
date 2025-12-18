@@ -27,6 +27,20 @@ export default function DashboardPage() {
   // Wallet balance state
   const [walletBalance, setWalletBalance] = useState<string>("$0.00")
   const [walletLoading, setWalletLoading] = useState(false)
+  
+  // Track if wave animation has been played
+  const [shouldAnimateWave, setShouldAnimateWave] = useState(false)
+  
+  // Check if animation has been played in this session
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const hasAnimated = sessionStorage.getItem('wave-animation-played')
+      if (!hasAnimated) {
+        setShouldAnimateWave(true)
+        sessionStorage.setItem('wave-animation-played', 'true')
+      }
+    }
+  }, [])
 
   // Fetch wallet balance
   const fetchWalletBalance = async () => {
@@ -160,7 +174,7 @@ export default function DashboardPage() {
         <div className="mb-8 flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2">
-              Welcome back, {user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : user.first_name || user.last_name || user.email?.split("@")[0] || "User"}! 👋
+              Welcome back, {user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : user.first_name || user.last_name || user.email?.split("@")[0] || "User"}! <span className={`inline-block ${shouldAnimateWave ? 'wave-animation' : ''}`}>👋</span>
             </h1>
             <p className="text-muted-foreground text-lg">Here's what's happening with your call flows today.</p>
             {userPhoneNumber && <p className="text-sm text-muted-foreground mt-1">Phone Number: {userPhoneNumber}</p>}

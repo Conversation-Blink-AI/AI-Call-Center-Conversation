@@ -1,7 +1,7 @@
 
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Button } from '../ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog'
 import { Input } from '../ui/input'
@@ -44,6 +44,14 @@ export function UpdatePathwayModal({ reactFlowData, pathwayId }: UpdatePathwayMo
   const [description, setDescription] = useState('')
 
   const convertedData = convertReactFlowToBland(reactFlowData)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+
+  // Scroll to top when preview is shown
+  useEffect(() => {
+    if (showPreview && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0
+    }
+  }, [showPreview])
 
   // Fetch pathways when modal opens and user is available
   useEffect(() => {
@@ -179,12 +187,13 @@ export function UpdatePathwayModal({ reactFlowData, pathwayId }: UpdatePathwayMo
           🚀 Update
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[90vh]">
-        <DialogHeader>
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Update Pathway</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto pr-4">
+          <div className="space-y-6">
           {isSuccess ? (
             // Success State
             <div className="text-center py-8 space-y-4">
@@ -205,28 +214,29 @@ export function UpdatePathwayModal({ reactFlowData, pathwayId }: UpdatePathwayMo
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="pathwayId">Select Pathway *</Label>
-                <Select
-                  value={manualPathwayId || ""}
-                  onValueChange={(value) => {
-                    setManualPathwayId(value)
-                    // Auto-fill name and description from selected pathway (only if fields are empty)
-                    const selectedPathway = pathways.find(
-                      (p) => (p.bland_id || p.id) === value
-                    )
-                    if (selectedPathway) {
-                      if (!name || name.trim() === '') {
-                        setName(selectedPathway.name)
+                <div className="px-1">
+                  <Select
+                    value={manualPathwayId || ""}
+                    onValueChange={(value) => {
+                      setManualPathwayId(value)
+                      // Auto-fill name and description from selected pathway (only if fields are empty)
+                      const selectedPathway = pathways.find(
+                        (p) => (p.bland_id || p.id) === value
+                      )
+                      if (selectedPathway) {
+                        if (!name || name.trim() === '') {
+                          setName(selectedPathway.name)
+                        }
+                        if ((!description || description.trim() === '') && selectedPathway.description) {
+                          setDescription(selectedPathway.description)
+                        }
                       }
-                      if ((!description || description.trim() === '') && selectedPathway.description) {
-                        setDescription(selectedPathway.description)
-                      }
-                    }
-                  }}
-                  disabled={loadingPathways}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={loadingPathways ? "Loading pathways..." : "Choose a pathway"} />
-                  </SelectTrigger>
+                    }}
+                    disabled={loadingPathways}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={loadingPathways ? "Loading pathways..." : "Choose a pathway"} />
+                    </SelectTrigger>
                   <SelectContent
                     className="max-h-[200px] overflow-y-auto z-50"
                     position="popper"
@@ -243,10 +253,10 @@ export function UpdatePathwayModal({ reactFlowData, pathwayId }: UpdatePathwayMo
                           key={pathway.id}
                           value={pathway.bland_id || pathway.id}
                         >
-                          <div className="flex flex-col pointer-events-none">
+                          <div className="flex flex-col pointer-events-none gap-1">
                             <span className="font-medium">{pathway.name}</span>
                             {pathway.phone_number && (
-                              <span className="text-xs text-muted-foreground">
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 w-fit">
                                 Phone: {pathway.phone_number}
                               </span>
                             )}
@@ -255,7 +265,8 @@ export function UpdatePathwayModal({ reactFlowData, pathwayId }: UpdatePathwayMo
                       ))
                     )}
                   </SelectContent>
-                </Select>
+                  </Select>
+                </div>
                 {manualPathwayId && (
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
                     <span>Selected Pathway ID:</span>
@@ -269,59 +280,64 @@ export function UpdatePathwayModal({ reactFlowData, pathwayId }: UpdatePathwayMo
                   <Label htmlFor="pathwayIdManual" className="text-xs text-muted-foreground">
                     Or enter Pathway ID manually:
                   </Label>
-                  <Input
-                    id="pathwayIdManual"
-                    placeholder="Enter pathway ID"
-                    value={manualPathwayId}
-                    onChange={(e) => setManualPathwayId(e.target.value)}
-                    className="mt-1"
-                  />
+                  <div className="mt-1 px-1">
+                    <Input
+                      id="pathwayIdManual"
+                      placeholder="Enter pathway ID"
+                      value={manualPathwayId}
+                      onChange={(e) => setManualPathwayId(e.target.value)}
+                    />
+                  </div>
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="name">Pathway Name *</Label>
-                <Input
-                  id="name"
-                  placeholder="My Pathway"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                />
+                <div className="px-1">
+                  <Input
+                    id="name"
+                    placeholder="My Pathway"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                  />
+                </div>
                 <p className="text-xs text-gray-500">The name of your conversational pathway</p>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  placeholder="A description of the pathway..."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={3}
-                />
+                <div className="px-1">
+                  <Textarea
+                    id="description"
+                    placeholder="A description of the pathway..."
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={3}
+                  />
+                </div>
                 <p className="text-xs text-gray-500">Optional description of your pathway</p>
               </div>
 
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="font-medium mb-2">Converted Data Summary:</h4>
-                <div className="text-sm text-gray-600 space-y-2">
-                  <div className="bg-blue-50 p-2 rounded border-l-4 border-blue-400">
-                    <p><strong>Pathway ID:</strong> <code className="bg-blue-100 px-1 rounded text-xs">{manualPathwayId || 'Not set'}</code></p>
-                    <p className="text-xs text-blue-600 mt-1">This ID will be used in the API request to Bland.ai</p>
+              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                <h4 className="font-medium mb-2 text-gray-900 dark:text-gray-200">Converted Data Summary:</h4>
+                <div className="text-sm text-gray-700 dark:text-gray-300 space-y-2">
+                  <div className="bg-blue-50 dark:bg-blue-900/30 p-2 rounded border-l-4 border-blue-500 dark:border-blue-500">
+                    <p className="text-gray-900 dark:text-gray-200"><strong>Pathway ID:</strong> <code className="bg-blue-100 dark:bg-blue-800/50 px-1 rounded text-xs text-blue-800 dark:text-blue-200">{manualPathwayId || 'Not set'}</code></p>
+                    <p className="text-xs text-blue-700 dark:text-blue-400 mt-1">This ID will be used in the API request to Bland.ai</p>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p><strong>Original Nodes:</strong> {reactFlowData.nodes.length}</p>
-                      <p><strong>Cleaned Nodes:</strong> {convertedData.nodes.length}</p>
+                      <p className="text-gray-900 dark:text-gray-200"><strong>Original Nodes:</strong> {reactFlowData.nodes.length}</p>
+                      <p className="text-gray-900 dark:text-gray-200"><strong>Cleaned Nodes:</strong> {convertedData.nodes.length}</p>
                     </div>
                     <div>
-                      <p><strong>Original Edges:</strong> {reactFlowData.edges.length}</p>
-                      <p><strong>Cleaned Edges:</strong> {convertedData.edges.length}</p>
+                      <p className="text-gray-900 dark:text-gray-200"><strong>Original Edges:</strong> {reactFlowData.edges.length}</p>
+                      <p className="text-gray-900 dark:text-gray-200"><strong>Cleaned Edges:</strong> {convertedData.edges.length}</p>
                     </div>
                   </div>
                 </div>
-                <p className="text-green-600 text-xs mt-2">✅ UI-specific properties will be removed before sending</p>
+                <p className="text-green-700 dark:text-green-400 text-xs mt-2">✅ UI-specific properties will be removed before sending</p>
               </div>
 
               <div className="flex gap-3 pt-4">
@@ -352,7 +368,7 @@ export function UpdatePathwayModal({ reactFlowData, pathwayId }: UpdatePathwayMo
           ) : (
             // Preview View
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between sticky top-0 bg-background dark:bg-background z-10 pb-2 pt-1 -mt-1 border-b">
                 <h3 className="font-semibold">Final Payload Preview</h3>
                 <Button
                   variant="outline"
@@ -373,7 +389,7 @@ export function UpdatePathwayModal({ reactFlowData, pathwayId }: UpdatePathwayMo
 
                 <div>
                   <h4 className="font-medium mb-2">JSON Payload:</h4>
-                  <ScrollArea className="h-96 w-full rounded-md border p-4">
+                  <ScrollArea className="h-48 w-full rounded-md border p-4">
                     <pre className="text-xs">
                       {JSON.stringify(finalPayload, null, 2)}
                     </pre>
@@ -400,6 +416,7 @@ export function UpdatePathwayModal({ reactFlowData, pathwayId }: UpdatePathwayMo
               </div>
             </div>
           )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>
