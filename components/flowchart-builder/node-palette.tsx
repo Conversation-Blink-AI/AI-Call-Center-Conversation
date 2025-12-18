@@ -62,8 +62,8 @@ export function NodePalette() {
   }
 
   return (
-    <div className="w-64 bg-white border-r border-gray-200 p-4 h-full overflow-y-auto">
-      <h3 className="text-lg font-semibold text-gray-900 mb-4">Node Palette</h3>
+    <div className="w-64 bg-card border-r border-border p-4 h-full overflow-y-auto">
+      <h3 className="text-lg font-semibold text-foreground mb-4">Node Palette</h3>
       <div className="space-y-3">
         {nodeTypes.map((node) => {
           const IconComponent = node.icon

@@ -43,20 +43,7 @@ export default function HelpPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div>
-              <h3 className="font-semibold text-foreground mb-2">1. Create Your First Call Flow</h3>
-              <p className="text-muted-foreground mb-3">
-                A call flow (also called a pathway) is a visual representation of how your AI will handle phone calls. 
-                You can create flows using our drag-and-drop editor or generate them with AI.
-              </p>
-              <ul className="list-disc list-inside space-y-1 text-muted-foreground ml-4">
-                <li>Go to <strong>My Pathway</strong> or <strong>Call Flows</strong> in the sidebar</li>
-                <li>Click <strong>Create New Flow</strong> or use the AI generator</li>
-                <li>Design your conversation flow with nodes for greetings, questions, and actions</li>
-                <li>Save your flow when you're ready</li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold text-foreground mb-2">2. Purchase a Phone Number</h3>
+              <h3 className="font-semibold text-foreground mb-2">1. Purchase a Phone Number</h3>
               <p className="text-muted-foreground mb-3">
                 To make and receive calls, you need a phone number. You can purchase one directly from the platform.
               </p>
@@ -68,7 +55,7 @@ export default function HelpPage() {
               </ul>
             </div>
             <div>
-              <h3 className="font-semibold text-foreground mb-2">3. Assign a Flow to Your Number</h3>
+              <h3 className="font-semibold text-foreground mb-2">2. Assign a Flow to Your Number</h3>
               <p className="text-muted-foreground mb-3">
                 Once you have both a call flow and a phone number, connect them together.
               </p>

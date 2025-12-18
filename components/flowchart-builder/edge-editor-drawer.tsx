@@ -13,12 +13,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { Check, ChevronsUpDown } from 'lucide-react'
-import { cn } from '@/lib/utils'
 import { Trash2 } from 'lucide-react'
 
 interface EdgeEditorDrawerProps {
@@ -28,18 +23,6 @@ interface EdgeEditorDrawerProps {
   onUpdateEdge: (edgeId: string, updates: any) => void
   onDeleteEdge: (edgeId: string) => void
 }
-
-const edgeLabels = [
-  { value: 'next', label: 'Next' },
-  { value: 'yes', label: 'Yes' },
-  { value: 'no', label: 'No' },
-  { value: 'success', label: 'Success' },
-  { value: 'error', label: 'Error' },
-  { value: 'timeout', label: 'Timeout' },
-  { value: 'transfer', label: 'Transfer' },
-  { value: 'end', label: 'End' },
-  { value: 'custom', label: 'Custom' },
-]
 
 const edgeColors = [
   { value: '#3b82f6', label: 'Blue', color: '#3b82f6' },
@@ -58,16 +41,13 @@ export function EdgeEditorDrawer({
   onDeleteEdge,
 }: EdgeEditorDrawerProps) {
   const [label, setLabel] = useState('')
-  const [customLabel, setCustomLabel] = useState('')
   const [description, setDescription] = useState('')
   const [color, setColor] = useState('#3b82f6')
   const [animated, setAnimated] = useState(true)
-  const [open, setOpen] = useState(false)
 
   useEffect(() => {
     if (selectedEdge) {
       setLabel(selectedEdge.data?.label || 'next')
-      setCustomLabel(selectedEdge.data?.customLabel || '')
       setDescription(selectedEdge.data?.description || '')
       setColor(selectedEdge.data?.color || '#3b82f6')
       setAnimated(selectedEdge.animated || true)
@@ -113,54 +93,22 @@ export function EdgeEditorDrawer({
         </SheetHeader>
 
         <div className="space-y-6 mt-6">
-          {/* Edge Label */}
+          {/* Pathway Label */}
           <div className="space-y-2">
-            <Label htmlFor="edge-label">Edge Label</Label>
-            <Popover open={open} onOpenChange={setOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={open}
-                  className="w-full justify-between"
-                >
-                  {label || "Select or type label..."}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-full p-0">
-                <Command>
-                  <CommandInput 
-                    placeholder="Search or type label..." 
-                    value={label}
-                    onValueChange={setLabel}
-                  />
-                  <CommandList>
-                    <CommandEmpty>Press Enter to use "{label}"</CommandEmpty>
-                    <CommandGroup>
-                      {edgeLabels.map((option) => (
-                        <CommandItem
-                          key={option.value}
-                          value={option.value}
-                          onSelect={(currentValue) => {
-                            setLabel(currentValue)
-                            setOpen(false)
-                          }}
-                        >
-                          <Check
-                            className={cn(
-                              "mr-2 h-4 w-4",
-                              label === option.value ? "opacity-100" : "opacity-0"
-                            )}
-                          />
-                          {option.label}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+            <Label htmlFor="pathway-label">Pathway Label</Label>
+            <p className="text-sm text-muted-foreground">
+              Enter a label that describes when this pathway should be chosen. Keep it short and succinct e.g. user said yes
+            </p>
+            <Input
+              id="pathway-label"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              placeholder="Enter pathway label..."
+              maxLength={100}
+            />
+            <p className="text-xs text-muted-foreground text-right">
+              {label.length}/100
+            </p>
           </div>
 
           {/* Edge Description */}
@@ -210,21 +158,8 @@ export function EdgeEditorDrawer({
             <Label htmlFor="animated">Animated</Label>
           </div>
 
-          {/* Edge Info */}
-          <div className="p-4 bg-gray-50 rounded-lg">
-            <h4 className="font-medium mb-2">Edge Information</h4>
-            <div className="space-y-1 text-sm text-gray-600">
-              <div>ID: {selectedEdge.id}</div>
-              <div>Source: {selectedEdge.source}</div>
-              <div>Target: {selectedEdge.target}</div>
-            </div>
-          </div>
-
           {/* Action Buttons */}
           <div className="flex gap-2 pt-4">
-            <Button onClick={handleSave} className="flex-1">
-              Save Changes
-            </Button>
             <Button
               variant="destructive"
               onClick={handleDelete}
@@ -232,6 +167,9 @@ export function EdgeEditorDrawer({
             >
               <Trash2 size={16} />
               Delete
+            </Button>
+            <Button onClick={handleSave} className="flex-1">
+              Save Changes
             </Button>
           </div>
         </div>

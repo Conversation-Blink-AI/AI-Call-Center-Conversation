@@ -78,6 +78,18 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     if (!blandResponse.ok) {
       const errorText = await blandResponse.text()
       console.log("❌ [API ERROR]", errorText)
+      
+      // For 429 errors, return a simpler message
+      if (blandResponse.status === 429) {
+        return NextResponse.json(
+          {
+            error: "Re-try. Something went wrong",
+            details: errorText,
+          },
+          { status: blandResponse.status },
+        )
+      }
+      
       return NextResponse.json(
         {
           error: `Bland.ai API error: ${blandResponse.status} ${blandResponse.statusText}`,

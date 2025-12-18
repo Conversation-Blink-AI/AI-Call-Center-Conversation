@@ -85,6 +85,42 @@
   }
 }
 
+/* Border glow effect for card hover */
+.border-glow {
+  box-shadow: 0 0 15px rgba(99, 102, 241, 0.4), 0 0 25px rgba(99, 102, 241, 0.25), 0 0 35px rgba(99, 102, 241, 0.15), inset 0 0 15px rgba(99, 102, 241, 0.1);
+}
+
+.dark .border-glow {
+  box-shadow: 0 0 15px rgba(168, 85, 247, 0.5), 0 0 25px rgba(168, 85, 247, 0.35), 0 0 35px rgba(168, 85, 247, 0.25), inset 0 0 15px rgba(168, 85, 247, 0.15);
+}
+
+/* Glow pulse animation - loops 3 times */
+@keyframes glow-pulse-light {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(99, 102, 241, 0.4), 0 0 25px rgba(99, 102, 241, 0.25), 0 0 35px rgba(99, 102, 241, 0.15), inset 0 0 15px rgba(99, 102, 241, 0.1);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(99, 102, 241, 0.6), 0 0 40px rgba(99, 102, 241, 0.4), 0 0 55px rgba(99, 102, 241, 0.3), inset 0 0 20px rgba(99, 102, 241, 0.2);
+  }
+}
+
+@keyframes glow-pulse-dark {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(168, 85, 247, 0.5), 0 0 25px rgba(168, 85, 247, 0.35), 0 0 35px rgba(168, 85, 247, 0.25), inset 0 0 15px rgba(168, 85, 247, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 25px rgba(168, 85, 247, 0.7), 0 0 40px rgba(168, 85, 247, 0.5), 0 0 55px rgba(168, 85, 247, 0.4), inset 0 0 20px rgba(168, 85, 247, 0.25);
+  }
+}
+
+.glow-animate {
+  animation: glow-pulse-light 1.5s ease-in-out 3;
+}
+
+.dark .glow-animate {
+  animation: glow-pulse-dark 1.5s ease-in-out 3;
+}
+
 * {
   transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform, filter,
     backdrop-filter;
@@ -166,6 +202,52 @@
   color: hsl(var(--primary));
 }
 
+/* Disable animations on popover dropdowns */
+.no-popover-animation,
+.no-popover-animation[data-state="open"],
+.no-popover-animation[data-state="closed"],
+.no-popover-animation[data-side="bottom"],
+.no-popover-animation[data-side="top"],
+.no-popover-animation[data-side="left"],
+.no-popover-animation[data-side="right"],
+[data-radix-popper-content-wrapper] .no-popover-animation,
+[data-radix-popper-content-wrapper] .no-popover-animation[data-state="open"],
+[data-radix-popper-content-wrapper] .no-popover-animation[data-state="closed"] {
+  animation: none !important;
+  transition: none !important;
+  transform: none !important;
+  opacity: 1 !important;
+  scale: 1 !important;
+  will-change: auto !important;
+}
+
+.no-popover-animation *,
+[data-radix-popper-content-wrapper] .no-popover-animation * {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* Override any Tailwind animate classes with higher specificity */
+.no-popover-animation.animate-in,
+.no-popover-animation[data-state="open"].animate-in,
+.no-popover-animation[data-state="open"][data-side="bottom"].animate-in,
+.no-popover-animation[data-state="open"][data-side="top"].animate-in,
+.no-popover-animation[data-state="open"][data-side="left"].animate-in,
+.no-popover-animation[data-state="open"][data-side="right"].animate-in,
+.no-popover-animation.zoom-in-95,
+.no-popover-animation[data-state="open"].zoom-in-95,
+.no-popover-animation.fade-in-0,
+.no-popover-animation[data-state="open"].fade-in-0,
+.no-popover-animation[data-side="bottom"].slide-in-from-top-2,
+.no-popover-animation[data-side="top"].slide-in-from-bottom-2,
+.no-popover-animation[data-side="left"].slide-in-from-right-2,
+.no-popover-animation[data-side="right"].slide-in-from-left-2 {
+  animation: none !important;
+  transform: none !important;
+  opacity: 1 !important;
+  scale: 1 !important;
+}
+
 .react-flow__controls-button:last-child {
   border-bottom: none;
 }
@@ -219,4 +301,27 @@
 .react-flow__pane,
 .react-flow__viewport {
   background-color: transparent !important;
+}
+
+/* Add top margin to first row of voice cards */
+.voice-cards-grid > *:nth-child(-n+3) {
+  margin-top: 5px;
+}
+
+@media (max-width: 1024px) {
+  .voice-cards-grid > *:nth-child(-n+2) {
+    margin-top: 5px;
+  }
+  .voice-cards-grid > *:nth-child(3) {
+    margin-top: 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .voice-cards-grid > *:nth-child(1) {
+    margin-top: 5px;
+  }
+  .voice-cards-grid > *:nth-child(n+2) {
+    margin-top: 0;
+  }
 }

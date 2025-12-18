@@ -12,6 +12,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { Toaster } from "@/components/ui/toaster"
 import { useRouter } from "next/navigation"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { useAuth } from "@/contexts/auth-context"
 
 import TopUpStripeButton from "@/components/TopUpStripeButton"
 
@@ -30,44 +31,12 @@ const mockSubscriptions = [
   },
 ]
 
-// Mock data for payment methods
-const mockPaymentMethods = [
-  {
-    id: "pm_1234567890",
-    type: "card",
-    brand: "visa",
-    last4: "4242",
-    expMonth: 12,
-    expYear: 2025,
-    isDefault: true,
-  },
-  {
-    id: "pm_0987654321",
-    type: "paypal",
-    email: "user@example.com",
-    isDefault: false,
-  },
-]
+// Mock data for payment methods - REMOVED: Now using real Stripe API data
 
-// Mock data for transactions
-const mockTransactions = [
-  {
-    id: "txn_1234567890",
-    date: "2025-04-10",
-    description: "Phone Number Subscription - Initial Payment",
-    amount: "$5.00",
-    status: "completed",
-  },
-  {
-    id: "txn_0987654321",
-    date: "2025-03-15",
-    description: "Account Credit Purchase",
-    amount: "$20.00",
-    status: "completed",
-  },
-]
+// Mock data for transactions - REMOVED: Now using real Stripe API invoices
 
 export default function BillingPage() {
+  const { user } = useAuth()
   const [activeTab, setActiveTab] = useState("overview")
   const [subscriptions, setSubscriptions] = useState<any[]>([])
   const [paymentMethods, setPaymentMethods] = useState<any[]>([])
@@ -78,6 +47,13 @@ export default function BillingPage() {
   const [balanceLoading, setBalanceLoading] = useState(false)
   const [callCosts, setCallCosts] = useState<any[]>([])
   const [loadingCallCosts, setLoadingCallCosts] = useState(false)
+  const [phoneNumbers, setPhoneNumbers] = useState<any[]>([])
+  const [subscriptionCount, setSubscriptionCount] = useState<number>(0)
+  const [totalMonthlyFee, setTotalMonthlyFee] = useState<number>(0)
+  const [loadingPhoneNumbers, setLoadingPhoneNumbers] = useState(false)
+  const [loadingPaymentMethods, setLoadingPaymentMethods] = useState(false)
+  const [loadingTransactions, setLoadingTransactions] = useState(false)
+  const [showAllTransactions, setShowAllTransactions] = useState(false)
   const { toast } = useToast()
   const router = useRouter()
 
@@ -151,6 +127,183 @@ export default function BillingPage() {
     }
   }
 
+  const fetchPhoneNumbers = async () => {
+    if (!user?.id) {
+      console.log('🔍 [BILLING] No user ID available for fetching phone numbers')
+      return
+    }
+
+    try {
+      setLoadingPhoneNumbers(true)
+      const response = await fetch('/api/user/phone-numbers', {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.phoneNumbers) {
+          const numbers = data.phoneNumbers
+          setPhoneNumbers(numbers)
+          
+          // Calculate subscription count (total number of phone numbers purchased)
+          const count = numbers.length
+          setSubscriptionCount(count)
+          
+          // Calculate total monthly fee (sum of all monthly_fee values)
+          const totalFee = numbers.reduce((sum: number, phone: any) => {
+            const fee = parseFloat(phone.monthly_fee) || 0
+            return sum + fee
+          }, 0)
+          setTotalMonthlyFee(totalFee)
+          
+          console.log('✅ [BILLING] Phone numbers fetched:', {
+            count,
+            totalMonthlyFee: totalFee
+          })
+        } else {
+          console.warn('⚠️ [BILLING] No phone numbers found or API returned error')
+          setPhoneNumbers([])
+          setSubscriptionCount(0)
+          setTotalMonthlyFee(0)
+        }
+      } else {
+        console.error('❌ [BILLING] Failed to fetch phone numbers:', response.status)
+        setPhoneNumbers([])
+        setSubscriptionCount(0)
+        setTotalMonthlyFee(0)
+      }
+    } catch (error) {
+      console.error('❌ [BILLING] Error fetching phone numbers:', error)
+      setPhoneNumbers([])
+      setSubscriptionCount(0)
+      setTotalMonthlyFee(0)
+    } finally {
+      setLoadingPhoneNumbers(false)
+    }
+  }
+
+  const fetchPaymentMethods = async () => {
+    if (!user?.id) {
+      console.log('🔍 [BILLING] No user ID available for fetching payment methods')
+      return
+    }
+
+    try {
+      setLoadingPaymentMethods(true)
+      const response = await fetch('/api/payments/stripe/payment-methods', {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.paymentMethods) {
+          setPaymentMethods(data.paymentMethods)
+          console.log('✅ [BILLING] Payment methods fetched:', data.paymentMethods.length)
+        } else {
+          console.warn('⚠️ [BILLING] No payment methods found or API returned error')
+          setPaymentMethods([])
+        }
+      } else {
+        console.error('❌ [BILLING] Failed to fetch payment methods:', response.status)
+        setPaymentMethods([])
+      }
+    } catch (error) {
+      console.error('❌ [BILLING] Error fetching payment methods:', error)
+      setPaymentMethods([])
+    } finally {
+      setLoadingPaymentMethods(false)
+    }
+  }
+
+  const fetchTransactions = async () => {
+    if (!user?.id) {
+      console.log('🔍 [BILLING] No user ID available for fetching transactions')
+      return
+    }
+
+    try {
+      setLoadingTransactions(true)
+      const response = await fetch('/api/payments/stripe/invoices?limit=10&status=paid', {
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.invoices) {
+          // Transform invoices to transaction format
+          const formattedTransactions = data.invoices.map((invoice: any) => ({
+            id: invoice.id,
+            date: invoice.date,
+            description: invoice.description,
+            amount: invoice.amountFormatted,
+            status: invoice.status === 'paid' ? 'completed' : invoice.status,
+            invoicePdf: invoice.invoicePdf,
+            invoiceNumber: invoice.number,
+          }))
+          setTransactions(formattedTransactions)
+          console.log('✅ [BILLING] Transactions fetched:', formattedTransactions.length)
+        } else {
+          console.warn('⚠️ [BILLING] No transactions found or API returned error')
+          setTransactions([])
+        }
+      } else {
+        console.error('❌ [BILLING] Failed to fetch transactions:', response.status)
+        setTransactions([])
+      }
+    } catch (error) {
+      console.error('❌ [BILLING] Error fetching transactions:', error)
+      setTransactions([])
+    } finally {
+      setLoadingTransactions(false)
+    }
+  }
+
+  const handleDownloadInvoice = async (invoiceId: string, invoiceNumber?: string) => {
+    try {
+      const response = await fetch(`/api/payments/stripe/invoices/${invoiceId}/download`, {
+        credentials: 'include',
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to download invoice')
+      }
+
+      // Get the PDF blob
+      const blob = await response.blob()
+      
+      // Create a download link
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `invoice-${invoiceNumber || invoiceId}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+
+      toast({
+        title: "Invoice Downloaded",
+        description: "Your invoice has been downloaded successfully.",
+      })
+    } catch (error) {
+      console.error('❌ [BILLING] Error downloading invoice:', error)
+      toast({
+        title: "Download Failed",
+        description: "Failed to download invoice. Please try again.",
+        variant: "destructive",
+      })
+    }
+  }
+
   useEffect(() => {
     // Fetch billing data and wallet balance
     const fetchBillingData = async () => {
@@ -163,12 +316,19 @@ export default function BillingPage() {
         // Fetch call costs
         await fetchCallCosts()
 
+        // Fetch phone numbers for subscription data
+        await fetchPhoneNumbers()
+
+        // Fetch payment methods from Stripe
+        await fetchPaymentMethods()
+
+        // Fetch transactions (invoices) from Stripe
+        await fetchTransactions()
+
         // Simulate API call for other data
         await new Promise((resolve) => setTimeout(resolve, 1000))
 
         setSubscriptions(mockSubscriptions)
-        setPaymentMethods(mockPaymentMethods)
-        setTransactions(mockTransactions)
       } catch (err) {
         console.error("Error fetching billing data:", err)
         setError("Failed to load billing data")
@@ -177,8 +337,12 @@ export default function BillingPage() {
       }
     }
 
-    fetchBillingData()
-  }, [])
+    if (user?.id) {
+      fetchBillingData()
+    } else {
+      setIsLoading(false)
+    }
+  }, [user?.id])
 
   const handleCancelSubscription = async (subscriptionId: string) => {
     try {
@@ -320,16 +484,24 @@ export default function BillingPage() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Active Subscriptions</CardTitle>
-                <Badge variant="outline">{subscriptions.filter((s) => s.status === "active").length}</Badge>
+                <Badge variant="outline">
+                  {loadingPhoneNumbers ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    subscriptionCount
+                  )}
+                </Badge>
               </CardHeader>
               <CardContent>
                 <div className="text-2xl font-bold">
-                  $
-                  {subscriptions
-                    .filter((s) => s.status === "active")
-                    .reduce((total, sub) => total + Number.parseFloat(sub.amount.replace("$", "")), 0)
-                    .toFixed(2)}
-                  /mo
+                  {loadingPhoneNumbers ? (
+                    <div className="flex items-center space-x-2">
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                      <span>Loading...</span>
+                    </div>
+                  ) : (
+                    `$${totalMonthlyFee.toFixed(2)}/mo`
+                  )}
                 </div>
                 <p className="text-xs text-muted-foreground">Total monthly charges</p>
               </CardContent>
@@ -343,27 +515,43 @@ export default function BillingPage() {
             <Card>
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">Payment Methods</CardTitle>
-                <Badge variant="outline">{paymentMethods.length}</Badge>
+                <Badge variant="outline">
+                  {loadingPaymentMethods ? (
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                  ) : (
+                    paymentMethods.length
+                  )}
+                </Badge>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  {paymentMethods.map((pm) => (
-                    <div key={pm.id} className="flex items-center space-x-2">
-                      {pm.type === "card" ? (
+                {loadingPaymentMethods ? (
+                  <div className="flex items-center justify-center py-4">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : paymentMethods.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No payment methods found</p>
+                ) : (
+                  <div className="space-y-2">
+                    {paymentMethods.map((pm) => (
+                      <div key={pm.id} className="flex items-center justify-between space-x-2">
                         <div className="flex items-center space-x-2">
                           <CreditCard className="h-4 w-4" />
-                          <span className="text-sm">•••• {pm.last4}</span>
-                          {pm.isDefault && <CheckCircle2 className="h-3 w-3 text-green-500" />}
+                          <span className="text-sm">
+                            {pm.brand ? pm.brand.charAt(0).toUpperCase() + pm.brand.slice(1) : 'Card'} •••• {pm.last4}
+                          </span>
+                          {pm.expMonth && pm.expYear && (
+                            <span className="text-xs text-muted-foreground">
+                              ({pm.expMonth.toString().padStart(2, '0')}/{pm.expYear})
+                            </span>
+                          )}
                         </div>
-                      ) : (
-                        <div className="flex items-center space-x-2">
-                          <span className="text-sm">PayPal</span>
-                          {pm.isDefault && <CheckCircle2 className="h-3 w-3 text-green-500" />}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                        {pm.isDefault && (
+                          <CheckCircle2 className="h-3 w-3 text-green-500 flex-shrink-0" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
               <CardFooter>
                 <Button variant="outline" className="w-full" onClick={() => setActiveTab("payment-methods")}>
@@ -379,36 +567,67 @@ export default function BillingPage() {
               <CardDescription>Your most recent billing activity</CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Date</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Amount</TableHead>
-                    <TableHead>Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {transactions.slice(0, 3).map((transaction) => (
-                    <TableRow key={transaction.id}>
-                      <TableCell>{transaction.date}</TableCell>
-                      <TableCell>{transaction.description}</TableCell>
-                      <TableCell>{transaction.amount}</TableCell>
-                      <TableCell>
-                        <Badge variant={transaction.status === "completed" ? "default" : "outline"}>
-                          {transaction.status === "completed" ? "Paid" : transaction.status}
-                        </Badge>
-                      </TableCell>
+              {loadingTransactions ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                </div>
+              ) : transactions.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 text-center">
+                  <Receipt className="h-12 w-12 text-muted-foreground mb-4" />
+                  <p className="text-sm text-muted-foreground">No transactions found</p>
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {(showAllTransactions ? transactions : transactions.slice(0, 2)).map((transaction) => (
+                      <TableRow key={transaction.id}>
+                        <TableCell>{transaction.date}</TableCell>
+                        <TableCell>{transaction.description}</TableCell>
+                        <TableCell>{transaction.amount}</TableCell>
+                        <TableCell>
+                          <Badge variant={transaction.status === "completed" ? "default" : "outline"}>
+                            {transaction.status === "completed" ? "Paid" : transaction.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {transaction.invoicePdf && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDownloadInvoice(transaction.id, transaction.invoiceNumber)}
+                              className="h-8 w-8 p-0"
+                              title="Download Invoice"
+                            >
+                              <Download className="h-4 w-4" />
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
-            <CardFooter>
-              <Button variant="outline" className="w-full" onClick={() => setActiveTab("history")}>
-                View All Transactions
-              </Button>
-            </CardFooter>
+            {transactions.length > 0 && (
+              <CardFooter>
+                <Button
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => setShowAllTransactions((prev) => !prev)}
+                >
+                  {showAllTransactions ? "Hide" : "View All Transactions"}
+                </Button>
+              </CardFooter>
+            )}
           </Card>
             </TabsContent>
           </Tabs>
