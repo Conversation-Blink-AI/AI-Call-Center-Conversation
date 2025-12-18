@@ -19,6 +19,8 @@ interface NodeEditorDrawerProps {
 }
 
 export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }: NodeEditorDrawerProps) {
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null)
+
   if (!selectedNode) return null
 
   const handleFieldChange = (field: string, value: any) => {
@@ -35,6 +37,16 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
     const currentVars = selectedNode.data.extractVars || []
     const newVar = ['variable_name', 'string', 'Description of variable']
     handleFieldChange('extractVars', [...currentVars, newVar])
+    
+    // Scroll to bottom after adding variable
+    setTimeout(() => {
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTo({
+          top: scrollContainerRef.current.scrollHeight,
+          behavior: 'smooth'
+        })
+      }
+    }, 100)
   }
 
   const handleExtractVarUpdate = (index: number, field: number, value: string) => {
@@ -157,8 +169,8 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
               />
             </div>
 
-            <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-              <h4 className="text-sm font-semibold text-blue-900 mb-3">Facebook Pixel Configuration</h4>
+            <div className="bg-muted p-3 rounded-lg border border-border">
+              <h4 className="text-sm font-semibold text-foreground mb-3">Facebook Pixel Configuration</h4>
               
               <div className="space-y-3">
                 <div>
@@ -169,7 +181,7 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
                     onChange={(e) => handleFieldChange('pixelId', e.target.value)}
                     placeholder="123456789012345"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Your Facebook Pixel ID</p>
+                  <p className="text-xs text-muted-foreground mt-1">Your Facebook Pixel ID</p>
                 </div>
 
                 <div>
@@ -181,7 +193,7 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
                     onChange={(e) => handleFieldChange('accessToken', e.target.value)}
                     placeholder="EAAG..."
                   />
-                  <p className="text-xs text-gray-500 mt-1">Facebook Pixel Access Token</p>
+                  <p className="text-xs text-muted-foreground mt-1">Facebook Pixel Access Token</p>
                 </div>
 
                 <div>
@@ -192,12 +204,12 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
                     onChange={(e) => handleFieldChange('eventName', e.target.value)}
                     placeholder="Lead"
                   />
-                  <p className="text-xs text-gray-500 mt-1">Standard events: Lead, Purchase, Contact, etc.</p>
+                  <p className="text-xs text-muted-foreground mt-1">Standard events: Lead, Purchase, Contact, etc.</p>
                 </div>
 
-                <div className="bg-white p-2 rounded border border-blue-100">
-                  <p className="text-xs text-blue-700 font-medium">✓ Pre-configured Settings:</p>
-                  <ul className="text-xs text-gray-600 mt-1 space-y-1">
+                <div className="bg-card p-2 rounded border border-border">
+                  <p className="text-xs text-primary font-medium">✓ Pre-configured Settings:</p>
+                  <ul className="text-xs text-muted-foreground mt-1 space-y-1">
                     <li>• Method: POST</li>
                     <li>• Content-Type: application/json</li>
                     <li>• Auto SHA-256 hashing for PII</li>
@@ -547,7 +559,7 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
     return (
       <div className="space-y-4">
         {/* Authorization Section */}
-        <div className="p-4 border rounded-lg bg-gray-50">
+        <div className="p-4 border rounded-lg bg-muted">
           <div className="flex items-center justify-between mb-3">
             <Label className="text-sm font-medium">Authorization</Label>
             <Switch checked={showAuthorization} onCheckedChange={setShowAuthorization} />
@@ -594,7 +606,7 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
         </div>
 
         {/* Headers Section */}
-        <div className="p-4 border rounded-lg bg-gray-50">
+        <div className="p-4 border rounded-lg bg-muted">
           <div className="flex items-center justify-between mb-3">
             <Label className="text-sm font-medium">Headers</Label>
             <Switch checked={showHeaders} onCheckedChange={setShowHeaders} />
@@ -649,7 +661,7 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
         </div>
 
         {/* Body Section */}
-        <div className="p-4 border rounded-lg bg-gray-50">
+        <div className="p-4 border rounded-lg bg-muted">
           <div className="flex items-center justify-between mb-3">
             <Label className="text-sm font-medium">Body</Label>
             <Switch checked={showBody} onCheckedChange={setShowBody} />
@@ -733,7 +745,7 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
 
           {/* Test Result Display */}
           {testResult && (
-            <div className="mt-3 p-3 border rounded-lg bg-gray-50">
+            <div className="mt-3 p-3 border rounded-lg bg-muted">
               <div className="flex items-center justify-between mb-2">
                 <Label className="text-sm font-medium">
                   {testResult.success ? '✅ Test Result' : '❌ Test Failed'}
@@ -746,8 +758,8 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
               {testResult.success ? (
                 <div className="space-y-2">
                   <div>
-                    <Label className="text-xs text-gray-600">Response Data:</Label>
-                    <div className="mt-1 p-2 bg-white border rounded text-xs font-mono max-h-32 overflow-y-auto">
+                    <Label className="text-xs text-muted-foreground">Response Data:</Label>
+                    <div className="mt-1 p-2 bg-card border rounded text-xs font-mono text-foreground max-h-32 overflow-y-auto">
                       {typeof testResult.data === 'string' 
                         ? testResult.data 
                         : JSON.stringify(testResult.data, null, 2)
@@ -756,8 +768,8 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
                   </div>
                   {Object.keys(testResult.headers).length > 0 && (
                     <div>
-                      <Label className="text-xs text-gray-600">Response Headers:</Label>
-                      <div className="mt-1 p-2 bg-white border rounded text-xs font-mono max-h-20 overflow-y-auto">
+                      <Label className="text-xs text-muted-foreground">Response Headers:</Label>
+                      <div className="mt-1 p-2 bg-card border rounded text-xs font-mono text-foreground max-h-20 overflow-y-auto">
                         {Object.entries(testResult.headers).slice(0, 5).map(([key, value]) => (
                           <div key={key}>{key}: {String(value)}</div>
                         ))}
@@ -767,8 +779,8 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
                 </div>
               ) : (
                 <div>
-                  <Label className="text-xs text-gray-600">Error:</Label>
-                  <div className="mt-1 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                  <Label className="text-xs text-muted-foreground">Error:</Label>
+                  <div className="mt-1 p-2 bg-destructive/10 border border-destructive/50 rounded text-xs text-destructive">
                     {testResult.error}
                   </div>
                 </div>
@@ -871,10 +883,11 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
           <SheetTitle>Edit Node Properties</SheetTitle>
         </SheetHeader>
 
-        <div className="flex-1 overflow-y-auto mt-6 space-y-4 pr-2">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto mt-6 space-y-4 pr-2 pl-2 py-2 node-editor-content">
           <div className="flex items-center space-x-2">
-            <Badge variant="outline">{selectedNode.type}</Badge>
-            <span className="text-sm text-gray-500">ID: {selectedNode.id}</span>
+            <Badge variant="outline" title={`ID: ${selectedNode.id}`} className="cursor-help">
+              {selectedNode.type}
+            </Badge>
           </div>
 
           {renderNodeFields()}

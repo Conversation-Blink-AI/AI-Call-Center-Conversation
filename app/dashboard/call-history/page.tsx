@@ -437,19 +437,8 @@ export default function CallHistoryPage() {
                                   <div className="flex items-center gap-1 flex-shrink-0">
                                     <div className="w-[50px] flex-shrink-0">
                                       <div 
-                                        className="relative h-2 bg-gray-200 rounded-full cursor-pointer"
+                                        className="relative h-2 bg-gray-200 rounded-full"
                                         data-call-id={call.id}
-                                        onClick={(e) => {
-                                          const rect = e.currentTarget.getBoundingClientRect()
-                                          const clickX = e.clientX - rect.left
-                                          const width = rect.width
-                                          const duration = audioDuration[call.id] || 0
-                                          if (duration > 0) {
-                                            const percentage = Math.max(0, Math.min(clickX / width, 1))
-                                            const seekTime = percentage * duration
-                                            handleSeek(call.id, seekTime)
-                                          }
-                                        }}
                                       >
                                         <div 
                                           className="absolute top-0 left-0 h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 rounded-full transition-all"

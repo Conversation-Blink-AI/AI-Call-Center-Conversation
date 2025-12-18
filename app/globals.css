@@ -121,13 +121,6 @@
   animation: glow-pulse-dark 1.5s ease-in-out 3;
 }
 
-* {
-  transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform, filter,
-    backdrop-filter;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
-}
-
 .react-flow__node {
   transition: transform 0.2s ease;
   background: hsl(var(--card));
@@ -225,6 +218,12 @@
 [data-radix-popper-content-wrapper] .no-popover-animation * {
   animation: none !important;
   transition: none !important;
+}
+
+/* Add left margin to inputs/textareas in node editor to prevent glow clipping */
+.node-editor-content input,
+.node-editor-content textarea {
+  margin-left: 4px;
 }
 
 /* Override any Tailwind animate classes with higher specificity */

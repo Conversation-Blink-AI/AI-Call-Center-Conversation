@@ -32,6 +32,16 @@ import { SavePathwayModal } from './save-pathway-modal'
 import { UpdatePathwayModal } from './update-pathway-modal'
 import { convertBlandToReactFlow } from '../../services/reactflow-converter'
 import { toast } from 'sonner'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 const edgeTypes = { custom: CustomEdge }
 
@@ -61,6 +71,8 @@ export function FlowchartCanvas({
   const [isLoadingFlowchart, setIsLoadingFlowchart] = useState(false)
   const [toolbarNode, setToolbarNode] = useState<Node | null>(null)
   const [toolbarPosition, setToolbarPosition] = useState({ x: 0, y: 0 })
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [nodeToDelete, setNodeToDelete] = useState<string | null>(null)
 
   useEffect(() => setMounted(true), [])
 
@@ -327,11 +339,8 @@ export function FlowchartCanvas({
               setToolbarNode(null)
             }}
             onDelete={() => {
-              if (window.confirm('Are you sure you want to delete this node?')) {
-                setNodes((nds) => nds.filter((n) => n.id !== toolbarNode.id))
-                setEdges((eds) => eds.filter((e) => e.source !== toolbarNode.id && e.target !== toolbarNode.id))
-                setToolbarNode(null)
-              }
+              setNodeToDelete(toolbarNode.id)
+              setDeleteDialogOpen(true)
             }}
             onDuplicate={() => {
               const nodeToDuplicate = nodes.find((n) => n.id === toolbarNode.id)
@@ -372,6 +381,43 @@ export function FlowchartCanvas({
         onUpdateEdge={onUpdateEdge}
         onDeleteEdge={onDeleteEdge}
       />
+
+      <AlertDialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteDialogOpen(open)
+          if (!open) {
+            setToolbarNode(null)
+            setNodeToDelete(null)
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Node</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this node? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (nodeToDelete) {
+                  setNodes((nds) => nds.filter((n) => n.id !== nodeToDelete))
+                  setEdges((eds) => eds.filter((e) => e.source !== nodeToDelete && e.target !== nodeToDelete))
+                  setToolbarNode(null)
+                  setNodeToDelete(null)
+                }
+                setDeleteDialogOpen(false)
+              }}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }
