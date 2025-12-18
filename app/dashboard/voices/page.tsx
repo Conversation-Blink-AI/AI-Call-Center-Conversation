@@ -558,12 +558,12 @@ export default function VoicesPage() {
 
   const getTagColor = (tag: string) => {
     const lowerTag = tag.toLowerCase()
-    if (lowerTag.includes("male") || lowerTag.includes("female")) return "bg-pink-100 dark:bg-pink-900/30 text-pink-700 dark:text-pink-300 border-pink-200 dark:border-pink-800"
+    if (lowerTag.includes("male") || lowerTag.includes("female")) return "bg-pink-50 dark:bg-gray-900 text-pink-600 dark:text-pink-300 border-pink-200 dark:border-pink-700/50"
     if (lowerTag.includes("english") || lowerTag.includes("spanish") || lowerTag.includes("language"))
-      return "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800"
+      return "bg-blue-50 dark:bg-gray-900 text-blue-600 dark:text-blue-300 border-blue-200 dark:border-blue-700/50"
     if (lowerTag.includes("young") || lowerTag.includes("old") || lowerTag.includes("age"))
-      return "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 border-green-200 dark:border-green-800"
-    return "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-700"
+      return "bg-green-50 dark:bg-gray-900 text-green-600 dark:text-green-300 border-green-200 dark:border-green-700/50"
+    return "bg-gray-100 dark:bg-gray-900 text-gray-600 dark:text-gray-300 border-gray-300 dark:border-gray-700/50"
   }
 
   const shouldDisplayDescription = (description: any): boolean => {
@@ -641,7 +641,7 @@ export default function VoicesPage() {
         </div>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
-            <Card key={i} className="shadow-sm">
+            <Card key={i} className="bg-white dark:bg-gradient-to-br dark:from-[hsl(235_25%_15%)] dark:to-[hsl(235_25%_18%)] border border-gray-200 dark:border-border shadow-sm">
               <CardContent className="flex items-center justify-center py-12">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
               </CardContent>
@@ -686,37 +686,39 @@ export default function VoicesPage() {
 
             <div className="flex-1 overflow-y-auto scrollbar-smooth pr-2">
               {voices.length === 0 ? (
-                <Card className="shadow-sm">
+                <Card className="bg-white dark:bg-gradient-to-br dark:from-[hsl(235_25%_15%)] dark:to-[hsl(235_25%_18%)] border border-gray-200 dark:border-border shadow-sm">
                   <CardContent className="py-12">
                     <div className="text-center">
                       <div className="text-6xl mx-auto mb-4">🗣️</div>
-                      <h3 className="text-lg font-medium text-foreground mb-2">
+                      <h3 className="text-lg font-semibold text-gray-900 dark:text-foreground mb-2">
                         No voices available
                       </h3>
-                      <p className="text-muted-foreground">
+                      <p className="text-gray-600 dark:text-muted-foreground">
                         There are no voices available at the moment.
                       </p>
                     </div>
                   </CardContent>
                 </Card>
               ) : (
-                <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 pb-6">
+                <div className="voice-cards-grid grid gap-6 md:grid-cols-2 lg:grid-cols-3 pb-6">
                   {voices.map((voice) => (
-                    <Card key={voice.id} className="shadow-sm hover:shadow-md transition-shadow bg-gradient-to-br from-gray-50 to-gray-100/50 dark:bg-card">
-                      <CardHeader className="pb-4">
+                    <Card key={voice.id} className="group relative overflow-hidden bg-gradient-to-br from-blue-50/30 via-white to-purple-50/20 dark:bg-gradient-to-br dark:from-[hsl(235_25%_15%)] dark:to-[hsl(235_25%_18%)] border border-gray-200 dark:border-border shadow-sm transition-all duration-300 hover:-translate-y-1 hover:bg-gradient-to-br hover:from-blue-50/40 hover:via-white hover:to-purple-50/30 hover:dark:bg-[hsl(235_25%_15%)]/70 hover:backdrop-blur-lg hover:shadow-2xl hover:shadow-gray-200/60 dark:hover:shadow-purple-900/30 hover:border-gray-300 dark:hover:border-purple-400/60 hover:border-glow hover:glow-animate">
+                      {/* Glassmorphic overlay effect */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-white/40 to-transparent dark:from-purple-500/10 dark:to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none z-[1]"></div>
+                      <CardHeader className="pb-4 relative z-10">
                         {/* Heading on single line */}
-                        <CardTitle className="text-lg font-semibold capitalize flex items-center text-foreground whitespace-nowrap overflow-hidden">
-                          <span className="mr-2 text-blue-600 dark:text-blue-400">🗣️</span>
+                        <CardTitle className="text-lg font-semibold capitalize flex items-center text-gray-900 dark:text-foreground whitespace-nowrap overflow-hidden">
+                          <span className="mr-2 text-xl">🗣️</span>
                           <span className="truncate">{voice.name}</span>
                         </CardTitle>
                         {/* Actions on next line */}
-                        <div className="flex items-center space-x-2 mt-2">
+                        <div className="flex items-center space-x-2 mt-3">
                           {voice.average_rating && voice.average_rating > 0 && (
-                            <Badge variant="outline" className="bg-yellow-50 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 border-yellow-200 dark:border-yellow-800">
+                            <Badge variant="outline" className="bg-gradient-to-r from-amber-50 to-yellow-50 dark:bg-gradient-to-r dark:from-amber-900/50 dark:via-yellow-900/40 dark:to-amber-900/50 text-amber-700 dark:text-amber-200 border-amber-300 dark:border-amber-500/60 dark:shadow-lg dark:shadow-amber-900/30 font-medium">
                               ⭐ {voice.average_rating.toFixed(1)}
                             </Badge>
                           )}
-                          <Badge variant={voice.public ? "default" : "secondary"} className="flex items-center">
+                          <Badge variant={voice.public ? "default" : "secondary"} className={`flex items-center font-medium shadow-sm ${voice.public ? 'bg-gradient-to-r from-purple-400 to-purple-500 dark:from-purple-500 dark:to-purple-600 text-white border-0' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 border-gray-200 dark:border-gray-700'}`}>
                             {voice.public ? (
                               <>
                                 <Globe className="h-3 w-3 mr-1" />
@@ -741,7 +743,7 @@ export default function VoicesPage() {
                               }
                             }}
                             disabled={loadingVoiceId === voice.id}
-                            className="h-8 px-2 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white border-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="h-8 px-2.5 bg-gradient-to-br from-gray-50 to-gray-100 dark:bg-gradient-to-br dark:from-gray-700/80 dark:to-gray-800/90 hover:bg-gradient-to-r hover:from-pink-500 hover:to-purple-600 text-gray-600 dark:text-gray-100 border border-gray-200 dark:border-gray-600/60 dark:shadow-md hover:shadow-md hover:text-white hover:border-transparent dark:hover:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
                             title={playingVoiceId === voice.id ? "Stop preview" : "Play preview"}
                           >
                             {loadingVoiceId === voice.id ? (
@@ -788,21 +790,21 @@ export default function VoicesPage() {
                           
                           // Only render if there's actual content
                           return (
-                            <div className="text-sm text-muted-foreground mt-2">{displayText}</div>
+                            <div className="text-sm text-gray-600 dark:text-muted-foreground mt-3 font-medium">{displayText}</div>
                           )
                         })()}
                         {voice.total_ratings &&
                          typeof voice.total_ratings === 'number' &&
                          voice.total_ratings > 0 ? (
-                          <div className="text-xs text-muted-foreground mt-1">
+                          <div className="text-xs text-gray-500 dark:text-muted-foreground mt-2">
                             Based on {voice.total_ratings} rating{voice.total_ratings !== 1 ? 's' : ''}
                           </div>
                         ) : null}
                       </CardHeader>
-                      <CardContent>
+                      <CardContent className="pt-2 relative z-10">
                         {voice.tags && voice.tags.length > 0 && (
                           <div>
-                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2 block">
+                            <span className="text-xs font-semibold text-gray-500 dark:text-muted-foreground uppercase tracking-wider mb-3 block">
                               Tags
                             </span>
                             <div className="flex flex-wrap gap-2">
@@ -810,7 +812,7 @@ export default function VoicesPage() {
                                 <Badge
                                   key={index}
                                   variant="outline"
-                                  className={`text-xs ${getTagColor(tag)}`}
+                                  className={`text-xs font-medium shadow-sm ${getTagColor(tag)}`}
                                 >
                                   {tag}
                                 </Badge>
