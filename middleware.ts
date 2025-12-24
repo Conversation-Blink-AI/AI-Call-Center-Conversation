@@ -39,6 +39,13 @@ export async function middleware(req: NextRequest) {
     return res
   }
 
+  // Skip middleware check for generate-pathway - let the route handler handle auth
+  // The route handler has better error handling and debugging
+  if (req.nextUrl.pathname === "/api/generate-pathway") {
+    console.log("[MIDDLEWARE] ⏭️ generate-pathway: Skipping middleware, route handler will verify auth")
+    return res
+  }
+
   try {
     // Get token from cookies
     const token = req.cookies.get("auth-token")?.value

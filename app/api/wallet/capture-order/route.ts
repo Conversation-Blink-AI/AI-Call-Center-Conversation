@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { paypalClient } from '../../../../lib/paypalClient'
 import paypal from '@paypal/checkout-server-sdk'
+import { PhoneBlockService } from '@/services/phone-block-service'
 
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic'
@@ -163,6 +164,17 @@ export async function POST(req) {
       }
 
       console.log(`✅ PayPal payment captured and wallet updated: ${userId}, amount: $${amountValue}, new balance: ${newBalance} cents`)
+
+      // Check if balance changed from <=0 to >0, and unblock phone numbers if needed
+      if (currentBalance <= 0 && newBalance > 0) {
+        try {
+          console.log(`🔓 [WALLET] Balance changed from ${currentBalance} to ${newBalance}, unblocking phone numbers for user ${userId}`)
+          await PhoneBlockService.unblockUserNumbers(userId)
+        } catch (unblockError) {
+          // Don't fail payment capture if unblocking fails - it's non-critical
+          console.error(`❌ [WALLET] Failed to unblock numbers after top-up (non-critical):`, unblockError)
+        }
+      }
 
       return NextResponse.json({
         message: 'Payment captured successfully',

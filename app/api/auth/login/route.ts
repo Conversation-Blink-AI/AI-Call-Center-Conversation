@@ -237,8 +237,18 @@ export async function POST(request: Request) {
     cookieStore.set("auth-token", localToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
+      sameSite: "lax", // Changed from "strict" to "lax" to allow cookies in POST requests
+      maxAge: 7 * 24 * 60 * 60, // 7 days
+      path: "/", // Ensure cookie is available for all paths
+      domain: process.env.NODE_ENV === "production" ? undefined : undefined // Use default domain
+    })
+    
+    console.log("[AUTH/LOGIN] ✅ Cookie set successfully:", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60 // 7 days
+      path: "/",
+      maxAge: 7 * 24 * 60 * 60
     })
 
     // Return user data with external token for localStorage storage

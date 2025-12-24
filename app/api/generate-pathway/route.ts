@@ -1,9 +1,60 @@
 import { type NextRequest, NextResponse } from "next/server"
-import { convertApiToReactFlow, enhanceFlowchartLayout, ensureNodeConnections, validateApiData } from "@/utils/api-to-flowchart-converter"
+import {
+  convertApiToReactFlow,
+  enhanceFlowchartLayout,
+  ensureNodeConnections,
+  validateApiData,
+} from "@/utils/api-to-flowchart-converter"
+
+// Reject all methods except POST
+export async function GET() {
+  return NextResponse.json(
+    { error: "Method not allowed" },
+    { status: 405 }
+  )
+}
+
+export async function PUT() {
+  return NextResponse.json(
+    { error: "Method not allowed" },
+    { status: 405 }
+  )
+}
+
+export async function DELETE() {
+  return NextResponse.json(
+    { error: "Method not allowed" },
+    { status: 405 }
+  )
+}
+
+export async function PATCH() {
+  return NextResponse.json(
+    { error: "Method not allowed" },
+    { status: 405 }
+  )
+}
 
 export async function POST(req: NextRequest) {
+  // ============================================
+  // NO AUTH CHECK - pathway generation is now open
+  // This route does NOT require authentication
+  // ============================================
+  console.log("✅✅✅ [GENERATE-PATHWAY] Request received - NO AUTH CHECK - AUTH REMOVED ✅✅✅")
+  
   try {
-    const { prompt } = await req.json()
+    // Parse request body
+    let requestBody
+    try {
+      requestBody = await req.json()
+    } catch (parseError) {
+      return NextResponse.json(
+        { error: "Invalid request body" },
+        { status: 400 }
+      )
+    }
+
+    const { prompt, apiKey: clientApiKey } = requestBody
 
     if (!prompt) {
       return NextResponse.json(
@@ -14,11 +65,19 @@ export async function POST(req: NextRequest) {
 
     console.log("🤖 Generating pathway with prompt:", prompt)
 
+    // Check if API key is available - prefer client-provided key, then environment variable
+    const apiKey = clientApiKey || process.env.OPENROUTER_API_KEY
+    if (!apiKey) {
+      console.warn("⚠️ OPENROUTER_API_KEY not found, falling back to mock data")
+      throw new Error("OPENROUTER_API_KEY not configured. Please set it in your environment variables or in Settings.")
+    }
+
     // Call OpenRouter API directly
+    console.log("🌐 [GENERATE-PATHWAY] Calling OpenRouter API with key:", apiKey ? `${apiKey.substring(0, 10)}...` : 'MISSING')
     const openRouterResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
         'X-Title': 'Call Flow Generator'
@@ -72,16 +131,42 @@ Create a logical flow with proper connections between nodes. Include realistic c
       })
     })
 
+    console.log("📡 [GENERATE-PATHWAY] OpenRouter response status:", openRouterResponse.status, openRouterResponse.statusText)
+    
     if (!openRouterResponse.ok) {
-      const errorText = await openRouterResponse.text()
-      console.error("❌ OpenRouter API error:", errorText)
-      return NextResponse.json(
-        { 
-          error: "Failed to generate pathway",
-          details: errorText 
-        },
-        { status: openRouterResponse.status }
-      )
+      let errorText = ''
+      try {
+        errorText = await openRouterResponse.text()
+        console.log("📡 [GENERATE-PATHWAY] OpenRouter error response text:", errorText.substring(0, 500))
+        const errorJson = JSON.parse(errorText)
+        console.error("❌ [GENERATE-PATHWAY] OpenRouter API error (parsed):", JSON.stringify(errorJson, null, 2))
+        
+        // Check if this is actually an OpenRouter error or something else
+        if (errorJson.error?.message?.includes('cookie auth')) {
+          console.error("⚠️ [GENERATE-PATHWAY] WARNING: OpenRouter returned cookie auth error - this shouldn't happen!")
+          console.error("⚠️ [GENERATE-PATHWAY] This suggests the request might be intercepted or proxied")
+        }
+        
+        return NextResponse.json(
+          { 
+            error: "Failed to generate pathway",
+            message: errorJson.error?.message || errorJson.error || "OpenRouter API request failed",
+            details: errorText,
+            status: openRouterResponse.status
+          },
+          { status: openRouterResponse.status }
+        )
+      } catch (parseError) {
+        console.error("❌ OpenRouter API error (non-JSON):", errorText)
+        return NextResponse.json(
+          { 
+            error: "Failed to generate pathway",
+            message: `OpenRouter API returned status ${openRouterResponse.status}`,
+            details: errorText || "Unknown error"
+          },
+          { status: openRouterResponse.status }
+        )
+      }
     }
 
     const openRouterData = await openRouterResponse.json()
@@ -131,6 +216,18 @@ Create a logical flow with proper connections between nodes. Include realistic c
 
   } catch (error) {
     console.error("❌ Error in generate-pathway:", error)
+
+    // If it's an API key error, return it directly instead of falling back
+    if (error instanceof Error && error.message.includes("OPENROUTER_API_KEY")) {
+      return NextResponse.json(
+        { 
+          error: "Configuration Error",
+          message: error.message,
+          details: "Please set OPENROUTER_API_KEY in your environment variables. You can get an API key from https://openrouter.ai"
+        },
+        { status: 500 }
+      )
+    }
 
     // Fallback to mock data if API fails
     console.log("🔄 Falling back to mock data generation...")

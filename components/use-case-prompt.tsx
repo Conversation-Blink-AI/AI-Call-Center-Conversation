@@ -134,7 +134,12 @@ export default function UseCasePrompt({ phoneNumber }: UseCasePromptProps) {
           })
 
           const encodedData = encodeURIComponent(JSON.stringify(flowchartData))
-          router.push(`/dashboard/call-flows/editor?generated=${encodedData}&timestamp=${Date.now()}`)
+          // Redirect back to pathway page if phoneNumber is provided, otherwise to pathway list
+          if (phoneNumber) {
+            router.push(`/dashboard/pathway/${phoneNumber}?generated=${encodedData}&timestamp=${Date.now()}`)
+          } else {
+            router.push(`/dashboard/pathway?generated=${encodedData}&timestamp=${Date.now()}`)
+          }
         }
       } catch (conversionError) {
         console.error("Error converting API response to flowchart:", conversionError)

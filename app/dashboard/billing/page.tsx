@@ -516,7 +516,7 @@ export default function BillingPage() {
                 <p className="text-xs text-muted-foreground">Total monthly charges</p>
               </CardContent>
               <CardFooter>
-                <Button variant="outline" className="w-full" onClick={() => setActiveTab("subscriptions")}>
+                <Button variant="outline" className="w-full" onClick={() => router.push("/dashboard/billing/subscriptions")}>
                   Manage Subscriptions
                 </Button>
               </CardFooter>

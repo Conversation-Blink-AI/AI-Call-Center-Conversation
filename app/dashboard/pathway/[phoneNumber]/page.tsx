@@ -196,10 +196,10 @@ export default function PathwayEditorPage({ params, searchParams }: PathwayEdito
 
   const handleAIGeneratorClick = () => {
     if (!phoneNumber || phoneNumber === "undefined") {
-      router.push("/dashboard/call-flows/generate")
+      router.push("/dashboard/pathway/generate")
       return
     }
-    router.push(`/dashboard/call-flows/generate?phoneNumber=${phoneNumber}`)
+    router.push(`/dashboard/pathway/generate?phoneNumber=${phoneNumber}`)
   }
 
   const handleEditPathway = () => {
@@ -208,16 +208,9 @@ export default function PathwayEditorPage({ params, searchParams }: PathwayEdito
       return
     }
 
-    const cleanNumber = phoneNumber.replace(/\D/g, "")
-    const pathwayId = pathwayInfo?.pathway_id
-
-    if (pathwayId) {
-      // If pathway exists, load it in the editor
-      router.push(`/dashboard/call-flows/editor?phone=${cleanNumber}&pathwayId=${pathwayId}&source=pathway`)
-    } else {
-      // If no pathway exists, open editor for new pathway creation
-      router.push(`/dashboard/call-flows/editor?phone=${cleanNumber}&source=pathway`)
-    }
+    // Pathway editing is done directly on this page via FlowchartBuilder
+    // No need to redirect to a separate editor
+    toast.info("You can edit the pathway directly on this page")
   }
 
   // ✅ CRITICAL: Only show loading if we're actually loading AND not initialized, or if params aren't resolved yet
