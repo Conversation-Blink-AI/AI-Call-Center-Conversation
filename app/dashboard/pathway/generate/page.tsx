@@ -7,11 +7,10 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Loader2, Wand2, ArrowLeft, Save, Download, ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { Loader2, Wand2, ArrowLeft, ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { toast } from 'sonner'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { FlowchartCanvas } from '@/components/flowchart-builder/flowchart-canvas'
-import { convertReactFlowToBland } from '@/services/reactflow-converter'
 import { useAuth } from '@/contexts/auth-context'
 import type { Node, Edge } from 'reactflow'
 
@@ -29,7 +28,6 @@ export default function GeneratePathwayPage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState('')
   const [generatedFlowchart, setGeneratedFlowchart] = useState<ReactFlowData | null>(null)
-  const [isSaving, setIsSaving] = useState(false)
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(false)
 
   // Authentication check - same pattern as dashboard page
@@ -140,76 +138,6 @@ export default function GeneratePathwayPage() {
     }
   }
 
-  const handleSaveAsPathway = async () => {
-    if (!generatedFlowchart) {
-      toast.error('No flowchart to save')
-      return
-    }
-
-    setIsSaving(true)
-    try {
-      const blandData = convertReactFlowToBland(generatedFlowchart)
-      const pathwayName = prompt.length > 50 
-        ? `${prompt.substring(0, 47)}...` 
-        : prompt
-
-      console.log('💾 Saving pathway:', pathwayName)
-
-      const response = await fetch('/api/pathways/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          name: pathwayName,
-          description: `Generated from prompt: ${prompt}`,
-          flowchart_data: blandData,
-          nodes: blandData.nodes,
-          edges: blandData.edges
-        }),
-      })
-
-      const result = await response.json()
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to save pathway')
-      }
-
-      toast.success('Pathway saved successfully!')
-      
-      // Redirect back to pathway page if phoneNumber is provided
-      if (phoneNumber) {
-        router.push(`/dashboard/pathway/${phoneNumber}?saved=${result.pathway.id}`)
-      } else {
-        router.push(`/dashboard/pathway?saved=${result.pathway.id}`)
-      }
-
-    } catch (err) {
-      console.error('❌ Save error:', err)
-      const errorMessage = err instanceof Error ? err.message : 'Failed to save pathway'
-      toast.error(errorMessage)
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  const handleDownloadJson = () => {
-    if (!generatedFlowchart) return
-
-    const dataStr = JSON.stringify(generatedFlowchart, null, 2)
-    const dataBlob = new Blob([dataStr], { type: 'application/json' })
-    const url = URL.createObjectURL(dataBlob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = 'generated-call-flow.json'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
-    
-    toast.success('JSON file downloaded!')
-  }
 
   const examplePrompts = [
     "Create a Medicare insurance qualification call flow that screens for eligibility and transfers qualified leads to an agent",
@@ -250,31 +178,6 @@ export default function GeneratePathwayPage() {
             >
               {isPanelCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
             </Button>
-
-            {generatedFlowchart && (
-              <>
-                <Button 
-                  variant="outline" 
-                  onClick={handleDownloadJson}
-                  className="flex items-center gap-1"
-                >
-                  <Download className="h-4 w-4" />
-                  Download JSON
-                </Button>
-                <Button 
-                  onClick={handleSaveAsPathway}
-                  disabled={isSaving}
-                  className="flex items-center gap-1"
-                >
-                  {isSaving ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4" />
-                  )}
-                  Save as Pathway
-                </Button>
-              </>
-            )}
           </div>
         </div>
 

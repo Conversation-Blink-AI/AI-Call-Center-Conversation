@@ -28,6 +28,10 @@ export default function DashboardPage() {
   const [walletBalance, setWalletBalance] = useState<string>("$0.00")
   const [walletLoading, setWalletLoading] = useState(false)
   
+  // Phone numbers count state
+  const [purchasedNumbersCount, setPurchasedNumbersCount] = useState<number>(0)
+  const [phoneNumbersLoading, setPhoneNumbersLoading] = useState(false)
+  
   // Track if wave animation has been played
   const [shouldAnimateWave, setShouldAnimateWave] = useState(false)
   
@@ -73,10 +77,40 @@ export default function DashboardPage() {
     }
   }
 
-  // Fetch wallet balance on component mount
+  // Fetch phone numbers count
+  const fetchPhoneNumbersCount = async () => {
+    if (!user?.id) return
+
+    setPhoneNumbersLoading(true)
+    try {
+      const response = await fetch('/api/user/phone-numbers', {
+        credentials: 'include'
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        if (data.success && data.phoneNumbers) {
+          setPurchasedNumbersCount(data.phoneNumbers.length)
+        } else {
+          setPurchasedNumbersCount(0)
+        }
+      } else {
+        console.error('Failed to fetch phone numbers count')
+        setPurchasedNumbersCount(0)
+      }
+    } catch (err) {
+      console.error('Error fetching phone numbers count:', err)
+      setPurchasedNumbersCount(0)
+    } finally {
+      setPhoneNumbersLoading(false)
+    }
+  }
+
+  // Fetch wallet balance and phone numbers count on component mount
   useEffect(() => {
     if (user?.id) {
       fetchWalletBalance()
+      fetchPhoneNumbersCount()
     }
   }, [user?.id])
 
@@ -288,14 +322,20 @@ export default function DashboardPage() {
               </div>
             </CardHeader>
             <CardContent>
-              {callDataLoading ? (
+              {phoneNumbersLoading ? (
                 <div className="flex items-center">
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-400"></div>
                 </div>
               ) : (
-                <div className="text-2xl font-bold text-foreground">{userPhoneNumber ? "1" : "0"}</div>
+                <div className="text-2xl font-bold text-foreground">{purchasedNumbersCount}</div>
               )}
-              <p className="text-xs text-muted-foreground mt-1">{userPhoneNumber ? "1 purchased" : "No numbers yet"}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {purchasedNumbersCount === 0 
+                  ? "No numbers yet" 
+                  : purchasedNumbersCount === 1 
+                    ? "1 purchased" 
+                    : `${purchasedNumbersCount} purchased`}
+              </p>
             </CardContent>
           </Card>
 
