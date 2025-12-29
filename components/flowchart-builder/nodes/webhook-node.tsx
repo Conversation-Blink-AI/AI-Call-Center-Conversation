@@ -27,7 +27,8 @@ export function WebhookNode({ data, selected }: WebhookNodeProps) {
     <div
       className={`
       group relative bg-gradient-to-br from-orange-50 via-white to-orange-50 rounded-lg shadow-lg w-[255px] h-[100px] overflow-visible
-      hover:shadow-xl transition-all duration-200
+      hover:shadow-xl transition-all duration-200 cursor-pointer
+      ${selected ? 'ring-2 ring-blue-500' : ''}
     `}
     >
       {/* Top Handle */}

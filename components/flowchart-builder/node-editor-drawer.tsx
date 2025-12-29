@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Trash2, Send } from 'lucide-react'
+import { Plus, Trash2, Send, Lock, FileText, Code } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 
 interface NodeEditorDrawerProps {
@@ -20,6 +20,13 @@ interface NodeEditorDrawerProps {
 
 export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }: NodeEditorDrawerProps) {
   const scrollContainerRef = React.useRef<HTMLDivElement>(null)
+  
+  // Webhook settings state - must be at component level (React hooks rules)
+  const [showAuthorization, setShowAuthorization] = React.useState(false);
+  const [showHeaders, setShowHeaders] = React.useState(false);
+  const [showBody, setShowBody] = React.useState(false);
+  const [isTestingAPI, setIsTestingAPI] = React.useState(false);
+  const [testResult, setTestResult] = React.useState<any>(null);
 
   if (!selectedNode) return null
 
@@ -62,9 +69,18 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
   }
 
   const renderNodeFields = () => {
-    const nodeType = selectedNode.type
+    try {
+      if (!selectedNode || !selectedNode.data) {
+        return (
+          <div className="text-sm text-gray-500">
+            Node data is missing. Please try selecting the node again.
+          </div>
+        )
+      }
 
-    switch (nodeType) {
+      const nodeType = selectedNode.type
+
+      switch (nodeType) {
       case 'greetingNode':
       case 'Default':
         return (
@@ -223,6 +239,7 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
         )
 
       case 'webhookNode':
+      case 'Webhook':
         return (
           <div className="space-y-4">
             <div>
@@ -351,6 +368,16 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
             No editor available for this node type: {nodeType}
           </div>
         )
+      }
+    } catch (error: any) {
+      console.error('Error rendering node fields:', error);
+      return (
+        <div className="p-4 border border-red-500 rounded-lg bg-red-50">
+          <p className="text-sm font-semibold text-red-700 mb-2">Error loading node editor</p>
+          <p className="text-xs text-red-600 mb-2">{error.message || 'Unknown error'}</p>
+          <p className="text-xs text-gray-600">Node type: {selectedNode?.type || 'unknown'}</p>
+        </div>
+      );
     }
   }
 
@@ -462,11 +489,7 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
   }
 
   const renderWebhookSettings = () => {
-    const [showAuthorization, setShowAuthorization] = React.useState(false);
-    const [showHeaders, setShowHeaders] = React.useState(false);
-    const [showBody, setShowBody] = React.useState(false);
-    const [isTestingAPI, setIsTestingAPI] = React.useState(false);
-    const [testResult, setTestResult] = React.useState<any>(null);
+    // State hooks are now at component level (above) to comply with React hooks rules
 
     const handleTestAPI = async () => {
       if (!selectedNode.data.url) {
@@ -507,13 +530,15 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
           }
         }
 
-        // Prepare request options
+        // Prepare request options with timeout support
+        const timeout = (selectedNode.data.timeout || 10) * 1000
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), timeout)
+        
         const requestOptions: RequestInit = {
           method: selectedNode.data.method || 'GET',
           headers,
-          ...(selectedNode.data.timeout && { 
-            signal: AbortSignal.timeout((selectedNode.data.timeout || 10) * 1000) 
-          })
+          signal: controller.signal
         };
 
         // Add body for POST/PUT/PATCH requests
@@ -525,6 +550,7 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
         console.log('🧪 Request options:', requestOptions);
 
         const response = await fetch(selectedNode.data.url, requestOptions);
+        clearTimeout(timeoutId);
         
         let responseData: any;
         const contentType = response.headers.get('content-type');
@@ -545,6 +571,7 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
         });
 
       } catch (error: any) {
+        clearTimeout(timeoutId);
         console.error('❌ API Test failed:', error);
         setTestResult({
           success: false,
@@ -559,10 +586,33 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
     return (
       <div className="space-y-4">
         {/* Authorization Section */}
-        <div className="p-4 border rounded-lg bg-muted">
+        <div className={`p-4 rounded-lg border-2 transition-all duration-200 ${
+          showAuthorization 
+            ? 'border-primary bg-primary/5 shadow-md' 
+            : 'border-border bg-muted/50 hover:border-primary/50 hover:bg-muted'
+        }`}>
           <div className="flex items-center justify-between mb-3">
-            <Label className="text-sm font-medium">Authorization</Label>
-            <Switch checked={showAuthorization} onCheckedChange={setShowAuthorization} />
+            <div className="flex items-center gap-2">
+              <Lock className={`w-4 h-4 ${showAuthorization ? 'text-primary' : 'text-muted-foreground'}`} />
+              <Label className="text-base font-semibold text-foreground">Authorization</Label>
+              {showAuthorization && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-primary/20 text-primary font-medium">
+                  Active
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs font-medium transition-colors ${
+                showAuthorization ? 'text-primary' : 'text-muted-foreground'
+              }`}>
+                {showAuthorization ? 'ON' : 'OFF'}
+              </span>
+              <Switch 
+                checked={showAuthorization} 
+                onCheckedChange={setShowAuthorization}
+                className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/30"
+              />
+            </div>
           </div>
 
           {showAuthorization && (
@@ -606,10 +656,33 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
         </div>
 
         {/* Headers Section */}
-        <div className="p-4 border rounded-lg bg-muted">
+        <div className={`p-4 rounded-lg border-2 transition-all duration-200 ${
+          showHeaders 
+            ? 'border-primary bg-primary/5 shadow-md' 
+            : 'border-border bg-muted/50 hover:border-primary/50 hover:bg-muted'
+        }`}>
           <div className="flex items-center justify-between mb-3">
-            <Label className="text-sm font-medium">Headers</Label>
-            <Switch checked={showHeaders} onCheckedChange={setShowHeaders} />
+            <div className="flex items-center gap-2">
+              <FileText className={`w-4 h-4 ${showHeaders ? 'text-primary' : 'text-muted-foreground'}`} />
+              <Label className="text-base font-semibold text-foreground">Headers</Label>
+              {showHeaders && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-primary/20 text-primary font-medium">
+                  Active
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs font-medium transition-colors ${
+                showHeaders ? 'text-primary' : 'text-muted-foreground'
+              }`}>
+                {showHeaders ? 'ON' : 'OFF'}
+              </span>
+              <Switch 
+                checked={showHeaders} 
+                onCheckedChange={setShowHeaders}
+                className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/30"
+              />
+            </div>
           </div>
 
           {showHeaders && (
@@ -661,10 +734,33 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
         </div>
 
         {/* Body Section */}
-        <div className="p-4 border rounded-lg bg-muted">
+        <div className={`p-4 rounded-lg border-2 transition-all duration-200 ${
+          showBody 
+            ? 'border-primary bg-primary/5 shadow-md' 
+            : 'border-border bg-muted/50 hover:border-primary/50 hover:bg-muted'
+        }`}>
           <div className="flex items-center justify-between mb-3">
-            <Label className="text-sm font-medium">Body</Label>
-            <Switch checked={showBody} onCheckedChange={setShowBody} />
+            <div className="flex items-center gap-2">
+              <Code className={`w-4 h-4 ${showBody ? 'text-primary' : 'text-muted-foreground'}`} />
+              <Label className="text-base font-semibold text-foreground">Body</Label>
+              {showBody && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-primary/20 text-primary font-medium">
+                  Active
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs font-medium transition-colors ${
+                showBody ? 'text-primary' : 'text-muted-foreground'
+              }`}>
+                {showBody ? 'ON' : 'OFF'}
+              </span>
+              <Switch 
+                checked={showBody} 
+                onCheckedChange={setShowBody}
+                className="data-[state=checked]:bg-primary data-[state=unchecked]:bg-muted-foreground/30"
+              />
+            </div>
           </div>
 
           {showBody && (

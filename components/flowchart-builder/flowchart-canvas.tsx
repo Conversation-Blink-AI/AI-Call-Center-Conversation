@@ -480,7 +480,12 @@ export function FlowchartCanvas({
             nodeId={toolbarNode.id}
             position={toolbarPosition}
             onEdit={() => {
-              setSelectedNode(toolbarNode)
+              // Normalize node type to ensure editor drawer recognizes it
+              const normalizedNode = {
+                ...toolbarNode,
+                type: toolbarNode.type === 'Webhook' ? 'webhookNode' : toolbarNode.type
+              }
+              setSelectedNode(normalizedNode)
               setIsEditorOpen(true)
               setToolbarNode(null)
             }}
