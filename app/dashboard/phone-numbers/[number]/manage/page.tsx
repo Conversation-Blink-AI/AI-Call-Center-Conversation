@@ -209,7 +209,7 @@ export default function ManageNumberPage({ params }: ManageNumberPageProps) {
   }
 
   return (
-    <div className="container mx-auto py-8 max-w-4xl">
+    <div className="container mx-auto py-8 pb-12 max-w-4xl px-4 sm:px-6">
       <div className="mb-6">
         <Button
           variant="ghost"
@@ -226,7 +226,7 @@ export default function ManageNumberPage({ params }: ManageNumberPageProps) {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)}>
-        <div className="space-y-6">
+        <div className="space-y-6 pb-4">
           {/* Basic Settings */}
           <Card>
             <CardHeader>

@@ -241,144 +241,141 @@ export function FlowchartCanvas({
     [reactFlowInstance, setNodes],
   )
 
-  // Handle minimap drag to pan the canvas
-  const handleMinimapMouseDown = useCallback((event: React.MouseEvent) => {
-    if (!reactFlowInstance || !minimapRef.current) return
+  // Handle minimap click to pan the canvas (for single clicks)
+  const handleMinimapClick = useCallback((event: React.MouseEvent, position: { x: number; y: number }) => {
+    if (!reactFlowInstance) return
     
-    event.preventDefault()
-    setIsMinimapDragging(true)
-    
-    const minimapElement = minimapRef.current.querySelector('.react-flow__minimap') as HTMLElement
-    if (!minimapElement) return
-    
-    const minimapSvg = minimapElement.querySelector('svg') as SVGSVGElement
-    if (!minimapSvg) return
-    
-    const svgRect = minimapSvg.getBoundingClientRect()
-    const clickX = event.clientX - svgRect.left
-    const clickY = event.clientY - svgRect.top
-    
-    // Get the viewBox from the SVG to understand the coordinate system
-    const viewBox = minimapSvg.viewBox.baseVal
-    const viewBoxX = viewBox.x
-    const viewBoxY = viewBox.y
-    const viewBoxWidth = viewBox.width
-    const viewBoxHeight = viewBox.height
-    
-    // Calculate the position in flow coordinates based on the minimap's viewBox
-    const flowX = viewBoxX + (clickX / svgRect.width) * viewBoxWidth
-    const flowY = viewBoxY + (clickY / svgRect.height) * viewBoxHeight
+    // Get the ReactFlow pane element to get actual dimensions
+    const paneElement = reactFlowWrapper.current?.querySelector('.react-flow__pane') as HTMLElement
+    const paneWidth = paneElement?.clientWidth || window.innerWidth || 800
+    const paneHeight = paneElement?.clientHeight || window.innerHeight || 600
     
     // Get current viewport
     const viewport = reactFlowInstance.getViewport()
     
-    // Get the canvas dimensions
-    const canvasWidth = window.innerWidth || 800
-    const canvasHeight = window.innerHeight || 600
-    
-    // Center the viewport on this position
-    const newX = -flowX * viewport.zoom + canvasWidth / 2
-    const newY = -flowY * viewport.zoom + canvasHeight / 2
+    // Calculate new viewport position to center on the clicked point
+    // position is already in flow coordinates from ReactFlow
+    const newX = -position.x * viewport.zoom + paneWidth / 2
+    const newY = -position.y * viewport.zoom + paneHeight / 2
     
     reactFlowInstance.setViewport({ x: newX, y: newY, zoom: viewport.zoom })
-  }, [reactFlowInstance])
+  }, [reactFlowInstance, reactFlowWrapper])
 
-  const handleMinimapMouseMove = useCallback((event: React.MouseEvent) => {
-    if (!isMinimapDragging || !reactFlowInstance || !minimapRef.current) return
-    
-    event.preventDefault()
-    
-    const minimapElement = minimapRef.current.querySelector('.react-flow__minimap') as HTMLElement
-    if (!minimapElement) return
-    
-    const minimapSvg = minimapElement.querySelector('svg') as SVGSVGElement
-    if (!minimapSvg) return
-    
-    const svgRect = minimapSvg.getBoundingClientRect()
-    const moveX = event.clientX - svgRect.left
-    const moveY = event.clientY - svgRect.top
-    
-    // Get the viewBox from the SVG
-    const viewBox = minimapSvg.viewBox.baseVal
-    const viewBoxX = viewBox.x
-    const viewBoxY = viewBox.y
-    const viewBoxWidth = viewBox.width
-    const viewBoxHeight = viewBox.height
-    
-    // Calculate the position in flow coordinates
-    const flowX = viewBoxX + (moveX / svgRect.width) * viewBoxWidth
-    const flowY = viewBoxY + (moveY / svgRect.height) * viewBoxHeight
-    
-    // Get current viewport
-    const viewport = reactFlowInstance.getViewport()
-    const canvasWidth = window.innerWidth || 800
-    const canvasHeight = window.innerHeight || 600
-    
-    // Center the viewport on this position
-    const newX = -flowX * viewport.zoom + canvasWidth / 2
-    const newY = -flowY * viewport.zoom + canvasHeight / 2
-    
-    reactFlowInstance.setViewport({ x: newX, y: newY, zoom: viewport.zoom })
-  }, [isMinimapDragging, reactFlowInstance])
-
-  const handleMinimapMouseUp = useCallback(() => {
-    setIsMinimapDragging(false)
-  }, [])
-
-  // Add global mouse up listener for minimap dragging
+  // Attach event listeners directly to minimap DOM element
   useEffect(() => {
-    if (isMinimapDragging) {
-      const handleGlobalMouseUp = () => setIsMinimapDragging(false)
-      const handleGlobalMouseMove = (e: MouseEvent) => {
-        if (!reactFlowInstance || !minimapRef.current) return
-        
-        const minimapElement = minimapRef.current.querySelector('.react-flow__minimap') as HTMLElement
-        if (!minimapElement) return
-        
-        const minimapSvg = minimapElement.querySelector('svg') as SVGSVGElement
-        if (!minimapSvg) return
-        
+    if (!minimapRef.current || !reactFlowInstance) return
+
+    let cleanup: (() => void) | null = null
+    let retryTimeout: NodeJS.Timeout | null = null
+
+    const setupMinimapListeners = () => {
+      const minimapElement = minimapRef.current?.querySelector('.react-flow__minimap') as HTMLElement
+      if (!minimapElement) {
+        // Retry after a short delay if minimap isn't ready
+        retryTimeout = setTimeout(setupMinimapListeners, 100)
+        return
+      }
+
+      const minimapSvg = minimapElement.querySelector('svg') as SVGSVGElement
+      if (!minimapSvg) {
+        retryTimeout = setTimeout(setupMinimapListeners, 100)
+        return
+      }
+
+      const calculateFlowPosition = (clientX: number, clientY: number) => {
         const svgRect = minimapSvg.getBoundingClientRect()
-        const moveX = e.clientX - svgRect.left
-        const moveY = e.clientY - svgRect.top
-        
-        // Check if mouse is still within minimap bounds
-        if (moveX < 0 || moveY < 0 || moveX > svgRect.width || moveY > svgRect.height) {
-          return
-        }
-        
+        const clickX = clientX - svgRect.left
+        const clickY = clientY - svgRect.top
+
         // Get the viewBox from the SVG
         const viewBox = minimapSvg.viewBox.baseVal
         const viewBoxX = viewBox.x
         const viewBoxY = viewBox.y
         const viewBoxWidth = viewBox.width
         const viewBoxHeight = viewBox.height
-        
+
         // Calculate the position in flow coordinates
-        const flowX = viewBoxX + (moveX / svgRect.width) * viewBoxWidth
-        const flowY = viewBoxY + (moveY / svgRect.height) * viewBoxHeight
-        
-        // Get current viewport
+        const flowX = viewBoxX + (clickX / svgRect.width) * viewBoxWidth
+        const flowY = viewBoxY + (clickY / svgRect.height) * viewBoxHeight
+
+        return { flowX, flowY }
+      }
+
+      const panToPosition = (flowX: number, flowY: number) => {
+        const paneElement = reactFlowWrapper.current?.querySelector('.react-flow__pane') as HTMLElement
+        const paneWidth = paneElement?.clientWidth || window.innerWidth || 800
+        const paneHeight = paneElement?.clientHeight || window.innerHeight || 600
         const viewport = reactFlowInstance.getViewport()
-        const canvasWidth = window.innerWidth || 800
-        const canvasHeight = window.innerHeight || 600
         
-        // Center the viewport on this position
-        const newX = -flowX * viewport.zoom + canvasWidth / 2
-        const newY = -flowY * viewport.zoom + canvasHeight / 2
+        const newX = -flowX * viewport.zoom + paneWidth / 2
+        const newY = -flowY * viewport.zoom + paneHeight / 2
         
         reactFlowInstance.setViewport({ x: newX, y: newY, zoom: viewport.zoom })
       }
-      
-      window.addEventListener('mouseup', handleGlobalMouseUp)
-      window.addEventListener('mousemove', handleGlobalMouseMove)
-      
-      return () => {
-        window.removeEventListener('mouseup', handleGlobalMouseUp)
-        window.removeEventListener('mousemove', handleGlobalMouseMove)
+
+      let isDragging = false
+
+      const handleMouseDown = (e: MouseEvent) => {
+        // Allow dragging anywhere on the minimap
+        const target = e.target as HTMLElement
+        const isMinimapArea = target.closest('.react-flow__minimap') || 
+                             target.tagName === 'svg' || 
+                             target.tagName === 'rect' ||
+                             target.closest('.react-flow__minimap-mask')
+        
+        if (isMinimapArea) {
+          e.preventDefault()
+          e.stopPropagation()
+          isDragging = true
+          setIsMinimapDragging(true)
+          
+          const { flowX, flowY } = calculateFlowPosition(e.clientX, e.clientY)
+          panToPosition(flowX, flowY)
+        }
+      }
+
+      const handleMouseMove = (e: MouseEvent) => {
+        if (!isDragging) return
+        
+        e.preventDefault()
+        e.stopPropagation()
+        
+        const { flowX, flowY } = calculateFlowPosition(e.clientX, e.clientY)
+        panToPosition(flowX, flowY)
+      }
+
+      const handleMouseUp = () => {
+        if (isDragging) {
+          isDragging = false
+          setIsMinimapDragging(false)
+        }
+      }
+
+      // Attach listeners to both the minimap element and SVG (capture phase)
+      minimapElement.addEventListener('mousedown', handleMouseDown, true)
+      minimapSvg.addEventListener('mousedown', handleMouseDown, true)
+      window.addEventListener('mousemove', handleMouseMove)
+      window.addEventListener('mouseup', handleMouseUp)
+
+      cleanup = () => {
+        minimapElement.removeEventListener('mousedown', handleMouseDown, true)
+        minimapSvg.removeEventListener('mousedown', handleMouseDown, true)
+        window.removeEventListener('mousemove', handleMouseMove)
+        window.removeEventListener('mouseup', handleMouseUp)
       }
     }
-  }, [isMinimapDragging, reactFlowInstance])
+
+    setupMinimapListeners()
+
+    return () => {
+      if (retryTimeout) {
+        clearTimeout(retryTimeout)
+      }
+      if (cleanup) {
+        cleanup()
+      }
+    }
+  }, [reactFlowInstance, reactFlowWrapper, nodes.length])
 
   const getDefaultNodeData = (nodeType: string) => {
     switch (nodeType) {
@@ -463,13 +460,12 @@ export function FlowchartCanvas({
           <Controls />
           <div
             ref={minimapRef}
-            onMouseDown={handleMinimapMouseDown}
-            onMouseMove={handleMinimapMouseMove}
-            onMouseUp={handleMinimapMouseUp}
-            style={{ cursor: isMinimapDragging ? 'grabbing' : 'grab', display: 'inline-block' }}
+            style={{ cursor: isMinimapDragging ? 'grabbing' : 'grab', display: 'inline-block', userSelect: 'none' }}
             className="react-flow__minimap-wrapper"
           >
-            <MiniMap />
+            <MiniMap 
+              onClick={handleMinimapClick}
+            />
           </div>
           <Background
             variant="dots"
