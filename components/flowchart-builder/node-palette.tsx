@@ -1,7 +1,8 @@
 'use client'
 
-import React from 'react'
-import { MessageCircle, HelpCircle, MessageSquare, PhoneOff, PhoneForwarded, Globe, Facebook } from 'lucide-react'
+import React, { useState } from 'react'
+import { MessageCircle, HelpCircle, MessageSquare, PhoneOff, PhoneForwarded, Globe, Facebook, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 const nodeTypes = [
   {
@@ -55,36 +56,89 @@ const nodeTypes = [
   }
 ]
 
-export function NodePalette() {
+interface NodePaletteProps {
+  isCollapsed?: boolean
+  onToggle?: () => void
+}
+
+export function NodePalette({ isCollapsed = false, onToggle }: NodePaletteProps = {}) {
+  const [internalCollapsed, setInternalCollapsed] = useState(false)
+  
+  // Use prop if provided, otherwise use internal state
+  const collapsed = onToggle ? isCollapsed : internalCollapsed
+  const toggleCollapse = onToggle || (() => setInternalCollapsed(!internalCollapsed))
+
   const onDragStart = (event: React.DragEvent, nodeType: string) => {
     event.dataTransfer.setData('application/reactflow', nodeType)
     event.dataTransfer.effectAllowed = 'move'
   }
 
   return (
-    <div className="w-64 bg-card border-r border-border p-4 h-full overflow-y-auto">
-      <h3 className="text-lg font-semibold text-foreground mb-4">Node Palette</h3>
-      <div className="space-y-3">
-        {nodeTypes.map((node) => {
-          const IconComponent = node.icon
-          return (
-            <div
-              key={node.type}
-              className={`h-[80px] rounded-lg border-2 cursor-grab active:cursor-grabbing hover:shadow-md transition-all duration-200 flex items-center ${node.color}`}
-              draggable
-              onDragStart={(event) => onDragStart(event, node.type)}
-            >
-              <div className="flex items-center space-x-2 px-3 w-full">
-                <IconComponent className="w-5 h-5 flex-shrink-0" />
-                <div className="flex-1">
-                  <div className="font-medium text-sm">{node.label}</div>
-                  <div className="text-xs opacity-80 mt-0.5">{node.description}</div>
+    <div 
+      className={`bg-card border-r border-border h-full overflow-hidden transition-all duration-300 ease-in-out relative ${
+        collapsed ? 'w-12' : 'w-64'
+      }`}
+    >
+      {/* Toggle Button */}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={toggleCollapse}
+        className="absolute top-2 right-2 z-10 h-8 w-8 p-0 hover:bg-accent"
+        title={collapsed ? 'Expand Node Palette' : 'Collapse Node Palette'}
+      >
+        {collapsed ? (
+          <ChevronRight className="h-4 w-4" />
+        ) : (
+          <ChevronLeft className="h-4 w-4" />
+        )}
+      </Button>
+
+      {/* Content */}
+      <div className={`h-full overflow-y-auto transition-opacity duration-300 ${collapsed ? 'opacity-0 pointer-events-none' : 'opacity-100 p-4'}`}>
+        <h3 className="text-lg font-semibold text-foreground mb-4">Node Palette</h3>
+        <div className="space-y-3">
+          {nodeTypes.map((node) => {
+            const IconComponent = node.icon
+            return (
+              <div
+                key={node.type}
+                className={`h-[80px] rounded-lg border-2 cursor-grab active:cursor-grabbing hover:shadow-md transition-all duration-200 flex items-center ${node.color}`}
+                draggable
+                onDragStart={(event) => onDragStart(event, node.type)}
+              >
+                <div className="flex items-center space-x-2 px-3 w-full">
+                  <IconComponent className="w-5 h-5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <div className="font-medium text-sm">{node.label}</div>
+                    <div className="text-xs opacity-80 mt-0.5">{node.description}</div>
+                  </div>
                 </div>
               </div>
-            </div>
-          )
-        })}
+            )
+          })}
+        </div>
       </div>
+
+      {/* Collapsed View - Show only icons */}
+      {collapsed && (
+        <div className="flex flex-col items-center py-4 space-y-2 h-full overflow-y-auto">
+          {nodeTypes.map((node) => {
+            const IconComponent = node.icon
+            return (
+              <div
+                key={node.type}
+                className="w-10 h-10 rounded-lg border-2 cursor-grab active:cursor-grabbing hover:shadow-md transition-all duration-200 flex items-center justify-center bg-card border-border hover:bg-accent"
+                draggable
+                onDragStart={(event) => onDragStart(event, node.type)}
+                title={node.label}
+              >
+                <IconComponent className="w-5 h-5 text-foreground" />
+              </div>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }
