@@ -9,49 +9,49 @@ const nodeTypes = [
     type: 'greetingNode',
     label: 'Greeting',
     icon: MessageCircle,
-    color: 'bg-gradient-to-br from-green-100 via-green-50 to-green-100 text-green-800 border-green-300',
+    color: 'bg-gradient-to-br from-green-100 via-green-50 to-green-100 dark:from-green-800 dark:via-green-700 dark:to-green-800 text-green-800 dark:text-green-100 border-green-300 dark:border-green-700',
     description: 'Start conversation'
   },
   {
     type: 'questionNode',
     label: 'Question',
     icon: HelpCircle,
-    color: 'bg-gradient-to-br from-blue-100 via-blue-50 to-blue-100 text-blue-800 border-blue-300',
+    color: 'bg-gradient-to-br from-blue-100 via-blue-50 to-blue-100 dark:from-blue-800 dark:via-blue-700 dark:to-blue-800 text-blue-800 dark:text-blue-100 border-blue-300 dark:border-blue-700',
     description: 'Ask a question'
   },
   {
     type: 'customerResponseNode',
     label: 'Customer Response',
     icon: MessageSquare,
-    color: 'bg-gradient-to-br from-yellow-100 via-yellow-50 to-yellow-100 text-yellow-800 border-yellow-300',
+    color: 'bg-gradient-to-br from-yellow-100 via-yellow-50 to-yellow-100 dark:from-yellow-800 dark:via-yellow-700 dark:to-yellow-800 text-yellow-800 dark:text-yellow-100 border-yellow-300 dark:border-yellow-700',
     description: 'Handle response'
   },
   {
     type: 'webhookNode',
     label: 'Webhook',
     icon: Globe,
-    color: 'bg-gradient-to-br from-orange-100 via-orange-50 to-orange-100 text-orange-800 border-orange-300',
+    color: 'bg-gradient-to-br from-orange-100 via-orange-50 to-orange-100 dark:from-orange-800 dark:via-orange-700 dark:to-orange-800 text-orange-800 dark:text-orange-100 border-orange-300 dark:border-orange-700',
     description: 'API integration'
   },
   {
     type: 'facebookPixelNode',
     label: 'Facebook Pixel',
     icon: Facebook,
-    color: 'bg-gradient-to-br from-blue-100 via-blue-50 to-blue-100 text-blue-800 border-blue-300',
+    color: 'bg-gradient-to-br from-blue-100 via-blue-50 to-blue-100 dark:from-blue-800 dark:via-blue-700 dark:to-blue-800 text-blue-800 dark:text-blue-100 border-blue-300 dark:border-blue-700',
     description: 'Track FB conversions'
   },
   {
     type: 'transferNode',
     label: 'Transfer',
     icon: PhoneForwarded,
-    color: 'bg-gradient-to-br from-purple-100 via-purple-50 to-purple-100 text-purple-800 border-purple-300',
+    color: 'bg-gradient-to-br from-purple-100 via-purple-50 to-purple-100 dark:from-purple-800 dark:via-purple-700 dark:to-purple-800 text-purple-800 dark:text-purple-100 border-purple-300 dark:border-purple-700',
     description: 'Transfer call'
   },
   {
     type: 'endCallNode',
     label: 'End Call',
     icon: PhoneOff,
-    color: 'bg-gradient-to-br from-red-100 via-red-50 to-red-100 text-red-800 border-red-300',
+    color: 'bg-gradient-to-br from-red-100 via-red-50 to-red-100 dark:from-red-800 dark:via-red-700 dark:to-red-800 text-red-800 dark:text-red-100 border-red-300 dark:border-red-700',
     description: 'End conversation'
   }
 ]
@@ -75,7 +75,7 @@ export function NodePalette({ isCollapsed = false, onToggle }: NodePaletteProps 
 
   return (
     <div 
-      className={`bg-card border-r border-border h-full overflow-hidden transition-all duration-300 ease-in-out relative ${
+      className={`bg-card dark:bg-[hsl(235,25%,10%)] border-r border-border h-full overflow-hidden transition-all duration-300 ease-in-out relative ${
         collapsed ? 'w-12' : 'w-64'
       }`}
     >
