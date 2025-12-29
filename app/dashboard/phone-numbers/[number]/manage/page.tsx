@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
-import { ArrowLeft, Save, Loader2 } from 'lucide-react'
+import { ArrowLeft, Save, Loader2, HelpCircle } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -11,9 +11,11 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { toast } from "sonner"
 import { useAuth } from "@/contexts/auth-context"
 import { formatPhoneNumber } from "@/utils/phone-utils"
+import React from "react"
 
 interface ManageNumberPageProps {
   params: Promise<{
@@ -44,6 +46,7 @@ export default function ManageNumberPage({ params }: ManageNumberPageProps) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [helpModalOpen, setHelpModalOpen] = useState<string | null>(null)
 
   const {
     register,
@@ -98,6 +101,176 @@ export default function ManageNumberPage({ params }: ManageNumberPageProps) {
 
     resolveParams()
   }, [params])
+
+  // Help content for each section
+  const getHelpContent = (section: string) => {
+    const helpContents: Record<string, { title: string; content: React.ReactNode }> = {
+      basic: {
+        title: "Basic Settings Help",
+        content: (
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-semibold mb-2">Prompt</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                This is the main instructions for your AI agent. Write clear, detailed instructions about how the agent should behave, what information it should provide, and how it should handle conversations.
+              </p>
+              <p className="text-sm font-medium">Example:</p>
+              <p className="text-sm text-muted-foreground italic">
+                "You are a friendly customer service agent for ABC Company. Your role is to:
+                <br />- Answer questions about our products politely
+                <br />- Help customers with orders and returns
+                <br />- Schedule appointments when requested
+                <br />- Always be professional and helpful"
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                <strong>Tip:</strong> Keep it under 2,000 characters for best results. Be specific about what the agent should do.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Pathway ID (Optional)</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                If you have created a pathway (a visual call flow) in the pathway builder, you can use it here instead of writing a prompt. The pathway will override the prompt field.
+              </p>
+              <p className="text-sm font-medium">When to use:</p>
+              <p className="text-sm text-muted-foreground">
+                Use a pathway when you have a complex call flow with multiple steps, decision points, or integrations. Leave empty to use the prompt instead.
+              </p>
+              <p className="text-sm font-medium mt-2">Example:</p>
+              <p className="text-sm text-muted-foreground">pathway_abc123</p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Pathway Version</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                If you're using a pathway, you can specify which version to use. Leave empty to use the production (latest) version.
+              </p>
+              <p className="text-sm font-medium">Example:</p>
+              <p className="text-sm text-muted-foreground">Version 1, 2, 3, etc. Leave empty for the default production version.</p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">First Sentence</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                The exact first thing your AI agent will say when someone calls. This helps set a professional tone and makes the call feel more natural.
+              </p>
+              <p className="text-sm font-medium">Example:</p>
+              <p className="text-sm text-muted-foreground">"Hello, this is Sarah from ABC Company. How can I help you today?"</p>
+              <p className="text-sm text-muted-foreground mt-1">"Good morning! Thank you for calling. What can I assist you with?"</p>
+              <p className="text-sm text-muted-foreground mt-1">"Hi there! You've reached ABC Company. How may I help you?"</p>
+            </div>
+          </div>
+        )
+      },
+      agent: {
+        title: "Agent Parameters Help",
+        content: (
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-semibold mb-2">Voice</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                Choose the AI voice that will speak during calls. Each voice has a unique sound and personality.
+              </p>
+              <p className="text-sm font-medium">Example:</p>
+              <p className="text-sm text-muted-foreground">maya, james, ravi, sarah, etc.</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                <strong>Tip:</strong> Check the API documentation or your voice library to see all available voices.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Model</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                Choose the AI model that will handle conversations. Different models have different speeds and capabilities.
+              </p>
+              <p className="text-sm font-medium">Options:</p>
+              <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
+                <li><strong>Base (Recommended):</strong> Best balance of speed and quality. Good for most use cases.</li>
+                <li><strong>Turbo (Fastest):</strong> Faster responses, great for quick interactions or high-volume calls.</li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Background Track</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                Add subtle background sounds to make calls feel more natural, like being in an office or cafe.
+              </p>
+              <p className="text-sm font-medium">Options:</p>
+              <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
+                <li><strong>Default (Phone Static):</strong> Standard phone call sound</li>
+                <li><strong>Office:</strong> Subtle office background noise</li>
+                <li><strong>Cafe:</strong> Cafe ambiance sounds</li>
+                <li><strong>Restaurant:</strong> Restaurant background sounds</li>
+                <li><strong>None:</strong> No background sounds</li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Language</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                Set the language for conversations. The AI will speak and understand in this language.
+              </p>
+              <p className="text-sm font-medium">Example:</p>
+              <p className="text-sm text-muted-foreground">en-US (English - US), es-419 (Spanish - Latin America), fr-FR (French - France)</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                <strong>Tip:</strong> Use language codes like en-US, es-419, fr-FR, etc.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Interruption Threshold</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                How quickly the AI responds when interrupted. Lower values mean faster responses, higher values mean the AI waits longer before responding.
+              </p>
+              <p className="text-sm font-medium">Range:</p>
+              <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
+                <li><strong>50:</strong> Very fast response, allows quick interruptions</li>
+                <li><strong>100 (Recommended):</strong> Balanced response time</li>
+                <li><strong>200:</strong> More patient, waits longer before responding</li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Block Interruptions</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                When enabled, the AI will continue speaking even if the caller tries to interrupt. Useful for important announcements that must be heard completely.
+              </p>
+              <p className="text-sm font-medium">When to use:</p>
+              <p className="text-sm text-muted-foreground">Enable for important messages, appointment reminders, or legal notices that need to be heard fully.</p>
+            </div>
+          </div>
+        )
+      },
+      call: {
+        title: "Call Settings Help",
+        content: (
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-semibold mb-2">Record Calls</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                When enabled, all calls to this number will be recorded. You can access recordings via the recording_url after the call completes.
+              </p>
+              <p className="text-sm font-medium">When to use:</p>
+              <p className="text-sm text-muted-foreground">Enable recording for quality assurance, training purposes, or compliance requirements.</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                <strong>Important:</strong> Make sure you have permission to record calls according to local laws. Some regions require consent from both parties.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Summary Prompt</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                Custom instructions for how the AI should summarize each call. This helps you get the specific information you need from every conversation.
+              </p>
+              <p className="text-sm font-medium">Example:</p>
+              <p className="text-sm text-muted-foreground italic">
+                "Summarize the call focusing on:
+                <br />- Customer name and contact information
+                <br />- Main concern or question
+                <br />- Resolution status (resolved, pending, needs follow-up)
+                <br />- Any action items or next steps"
+              </p>
+              <p className="text-sm text-muted-foreground mt-2">
+                <strong>Tip:</strong> Be specific about what information you want in the summary. Maximum length: 2,000 characters.
+              </p>
+            </div>
+          </div>
+        )
+      }
+    }
+    return helpContents[section] || { title: "Help", content: "No help content available." }
+  }
 
   const onSubmit = async (data: FormData) => {
     if (!phoneNumber) {
@@ -230,7 +403,19 @@ export default function ManageNumberPage({ params }: ManageNumberPageProps) {
           {/* Basic Settings */}
           <Card>
             <CardHeader>
-              <CardTitle>Basic Settings</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                Basic Settings
+                <button
+                  onClick={(e) => {
+                    e.preventDefault()
+                    setHelpModalOpen('basic')
+                  }}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Help"
+                >
+                  <HelpCircle className="h-4 w-4" />
+                </button>
+              </CardTitle>
               <CardDescription>
                 Configure the core behavior of your inbound phone number
               </CardDescription>
@@ -294,7 +479,19 @@ export default function ManageNumberPage({ params }: ManageNumberPageProps) {
           {/* Agent Parameters */}
           <Card>
             <CardHeader>
-              <CardTitle>Agent Parameters</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                Agent Parameters
+                <button
+                  onClick={(e) => {
+                    e.preventDefault()
+                    setHelpModalOpen('agent')
+                  }}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Help"
+                >
+                  <HelpCircle className="h-4 w-4" />
+                </button>
+              </CardTitle>
               <CardDescription>
                 Customize voice, behavior, and interaction settings
               </CardDescription>
@@ -393,7 +590,19 @@ export default function ManageNumberPage({ params }: ManageNumberPageProps) {
           {/* Call Settings */}
           <Card>
             <CardHeader>
-              <CardTitle>Call Settings</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                Call Settings
+                <button
+                  onClick={(e) => {
+                    e.preventDefault()
+                    setHelpModalOpen('call')
+                  }}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                  aria-label="Help"
+                >
+                  <HelpCircle className="h-4 w-4" />
+                </button>
+              </CardTitle>
               <CardDescription>
                 Configure recording and summary options
               </CardDescription>
@@ -463,6 +672,21 @@ export default function ManageNumberPage({ params }: ManageNumberPageProps) {
           </div>
         </div>
       </form>
+
+      {/* Help Modal */}
+      <Dialog open={helpModalOpen !== null} onOpenChange={(open) => !open && setHelpModalOpen(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{helpModalOpen ? getHelpContent(helpModalOpen).title : "Help"}</DialogTitle>
+            <DialogDescription>
+              Learn more about this section and how to fill it out correctly.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4">
+            {helpModalOpen ? getHelpContent(helpModalOpen).content : null}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
