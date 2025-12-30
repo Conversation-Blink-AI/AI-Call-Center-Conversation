@@ -438,7 +438,7 @@ export function FlowchartCanvas({
 
         <div className="absolute top-4 right-4 z-10 flex gap-2">
           <SavePathwayModal reactFlowData={{ nodes, edges }} pathwayId={pathwayInfo?.pathway_id} />
-          <UpdatePathwayModal reactFlowData={{ nodes, edges }} />
+          <UpdatePathwayModal reactFlowData={{ nodes, edges }} pathwayId={pathwayInfo?.pathway_id} phoneNumber={phoneNumber} />
         </div>
 
         <ReactFlow

@@ -656,9 +656,6 @@ export default function VoicesPage() {
     <div className="container mx-auto py-8 h-screen overflow-hidden flex flex-col">
       <div className="mb-6 flex-shrink-0">
         <h1 className="text-3xl font-bold text-foreground mb-2">Voice Library</h1>
-        <p className="text-muted-foreground">
-          Top rated voices + Indian voices from {totalAvailable} available voices
-        </p>
       </div>
 
       {error && (
