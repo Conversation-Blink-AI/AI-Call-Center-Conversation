@@ -70,7 +70,6 @@ export function FlowchartCanvas({
   const [isEdgeEditorOpen, setIsEdgeEditorOpen] = useState(false)
   const [isLoadingFlowchart, setIsLoadingFlowchart] = useState(false)
   const [toolbarNode, setToolbarNode] = useState<Node | null>(null)
-  const [toolbarPosition, setToolbarPosition] = useState({ x: 0, y: 0 })
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [nodeToDelete, setNodeToDelete] = useState<string | null>(null)
   const [isMinimapDragging, setIsMinimapDragging] = useState(false)
@@ -168,7 +167,7 @@ export function FlowchartCanvas({
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
     event.stopPropagation()
     setToolbarNode(node)
-    setToolbarPosition({ x: node.position.x, y: node.position.y })
+    // Don't set toolbarPosition here - let NodeToolbar calculate it from node.position
     setSelectedEdge(null)
     setIsEdgeEditorOpen(false)
   }, [])
@@ -453,6 +452,16 @@ export function FlowchartCanvas({
           onPaneClick={onPaneClick}
           onNodeClick={onNodeClick}
           onEdgeClick={onEdgeClick}
+          onMove={(_, viewport) => {
+            // Force toolbar update during pan/zoom operations
+            // The toolbar's requestAnimationFrame will handle the actual update
+          }}
+          onMoveStart={() => {
+            // Toolbar will update via requestAnimationFrame
+          }}
+          onMoveEnd={() => {
+            // Toolbar will update via requestAnimationFrame
+          }}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           className="bg-background"
@@ -475,47 +484,57 @@ export function FlowchartCanvas({
           />
         </ReactFlow>
 
-        {toolbarNode && (
-          <NodeToolbar
-            nodeId={toolbarNode.id}
-            position={toolbarPosition}
-            onEdit={() => {
-              // Normalize node type to ensure editor drawer recognizes it
-              const normalizedNode = {
-                ...toolbarNode,
-                type: toolbarNode.type === 'Webhook' ? 'webhookNode' : toolbarNode.type
-              }
-              setSelectedNode(normalizedNode)
-              setIsEditorOpen(true)
-              setToolbarNode(null)
-            }}
-            onDelete={() => {
-              setNodeToDelete(toolbarNode.id)
-              setDeleteDialogOpen(true)
-            }}
-            onDuplicate={() => {
-              const nodeToDuplicate = nodes.find((n) => n.id === toolbarNode.id)
-              if (!nodeToDuplicate) return
-              const newNode: Node = {
-                ...nodeToDuplicate,
-                id: `${nodeToDuplicate.type}_${Date.now()}`,
-                position: {
-                  x: nodeToDuplicate.position.x + 50,
-                  y: nodeToDuplicate.position.y + 50,
-                },
-                selected: false,
-                data: {
-                  ...nodeToDuplicate.data,
-                  name: nodeToDuplicate.data.name
-                    ? `${nodeToDuplicate.data.name} (Copy)`
-                    : 'Copy',
-                },
-              }
-              setNodes((nds) => [...nds, newNode])
-              setToolbarNode(null)
-            }}
-          />
-        )}
+        {/* Toolbar positioned relative to ReactFlow pane */}
+        {toolbarNode && reactFlowInstance && (() => {
+          // Get the current node from nodes array to track position changes during drag
+          const currentNode = nodes.find((n) => n.id === toolbarNode.id)
+          if (!currentNode) return null
+          
+          return (
+            <NodeToolbar
+              nodeId={currentNode.id}
+              position={currentNode.position}
+              reactFlowInstance={reactFlowInstance}
+              nodeWidth={255}
+              wrapperRef={reactFlowWrapper}
+              onEdit={() => {
+                // Normalize node type to ensure editor drawer recognizes it
+                const normalizedNode = {
+                  ...currentNode,
+                  type: currentNode.type === 'Webhook' ? 'webhookNode' : currentNode.type
+                }
+                setSelectedNode(normalizedNode)
+                setIsEditorOpen(true)
+                setToolbarNode(null)
+              }}
+              onDelete={() => {
+                setNodeToDelete(currentNode.id)
+                setDeleteDialogOpen(true)
+              }}
+              onDuplicate={() => {
+                const nodeToDuplicate = nodes.find((n) => n.id === currentNode.id)
+                if (!nodeToDuplicate) return
+                const newNode: Node = {
+                  ...nodeToDuplicate,
+                  id: `${nodeToDuplicate.type}_${Date.now()}`,
+                  position: {
+                    x: nodeToDuplicate.position.x + 50,
+                    y: nodeToDuplicate.position.y + 50,
+                  },
+                  selected: false,
+                  data: {
+                    ...nodeToDuplicate.data,
+                    name: nodeToDuplicate.data.name
+                      ? `${nodeToDuplicate.data.name} (Copy)`
+                      : 'Copy',
+                  },
+                }
+                setNodes((nds) => [...nds, newNode])
+                setToolbarNode(null)
+              }}
+            />
+          )
+        })()}
       </div>
 
       <NodeEditorDrawer
