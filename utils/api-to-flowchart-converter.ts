@@ -113,10 +113,11 @@ export function convertApiToReactFlow(apiData: ApiFlowData): ReactFlowData {
     // Determine proper node type based on API response
     let nodeType = mapApiNodeTypeToReactFlow(node.type)
 
-    // Ensure proper positioning if not provided
+    // Use provided position if available, otherwise will be set by enhanceFlowchartLayout
+    // Don't set default positions here - let the tree layout algorithm handle it
     const position = node.position || {
-      x: 250 + (index % 3) * 300, // Spread nodes horizontally
-      y: index * 150 // Vertical spacing
+      x: 0, // Will be calculated by enhanceFlowchartLayout
+      y: 0  // Will be calculated by enhanceFlowchartLayout
     }
 
     // Clean and enhance node data
@@ -238,27 +239,175 @@ export function validateApiData(data: any): data is ApiFlowData {
 }
 
 /**
- * Enhances flowchart with automatic positioning
+ * Enhances flowchart with tree-based hierarchical positioning
  */
 export function enhanceFlowchartLayout(data: ReactFlowData): ReactFlowData {
-  console.log('🎨 Enhancing flowchart layout...')
+  console.log('🎨 Enhancing flowchart layout with tree structure...')
 
-  const enhancedNodes = data.nodes.map((node, index) => {
-    // Create a more intelligent positioning system
-    const row = Math.floor(index / 3)
-    const col = index % 3
+  const { nodes, edges } = data
+  
+  // Find root node (node with no incoming edges, or greeting node)
+  const rootNode = nodes.find(node => {
+    const isGreeting = node.type === 'greetingNode' || 
+                      node.data?.isStart === true ||
+                      node.data?.name?.toLowerCase().includes('greeting')
+    if (isGreeting) return true
+    
+    // Check if node has no incoming edges
+    return !edges.some(edge => edge.target === node.id)
+  }) || nodes[0] // Fallback to first node
 
+  if (!rootNode) {
+    console.warn('⚠️ No root node found, using default layout')
+    return data
+  }
+
+  // Build adjacency list (children map)
+  const childrenMap = new Map<string, string[]>()
+  const parentMap = new Map<string, string>()
+  
+  edges.forEach(edge => {
+    if (!childrenMap.has(edge.source)) {
+      childrenMap.set(edge.source, [])
+    }
+    childrenMap.get(edge.source)!.push(edge.target)
+    parentMap.set(edge.target, edge.source)
+  })
+
+  // Calculate tree structure (depth and horizontal position)
+  const nodeInfo = new Map<string, { depth: number; x: number; subtreeWidth: number }>()
+  const HORIZONTAL_SPACING = 300
+  const VERTICAL_SPACING = 200
+  const START_X = 400
+  const START_Y = 50
+
+  // Calculate subtree widths using DFS
+  function calculateSubtreeWidth(nodeId: string, depth: number): number {
+    const children = childrenMap.get(nodeId) || []
+    
+    if (children.length === 0) {
+      // Leaf node - takes minimum width
+      nodeInfo.set(nodeId, { depth, x: 0, subtreeWidth: HORIZONTAL_SPACING })
+      return HORIZONTAL_SPACING
+    }
+
+    // Calculate width of all children subtrees
+    let totalWidth = 0
+    const childWidths: number[] = []
+    
+    children.forEach(childId => {
+      const childWidth = calculateSubtreeWidth(childId, depth + 1)
+      childWidths.push(childWidth)
+      totalWidth += childWidth
+    })
+
+    // Add spacing between children
+    const spacing = Math.max(0, (children.length - 1) * 50)
+    const subtreeWidth = Math.max(HORIZONTAL_SPACING, totalWidth + spacing)
+    
+    nodeInfo.set(nodeId, { depth, x: 0, subtreeWidth })
+    return subtreeWidth
+  }
+
+  // Position nodes using calculated widths
+  function positionNodes(nodeId: string, depth: number, startX: number): number {
+    const info = nodeInfo.get(nodeId)
+    if (!info) return startX
+
+    const children = childrenMap.get(nodeId) || []
+    
+    if (children.length === 0) {
+      // Leaf node - position it
+      info.x = startX + HORIZONTAL_SPACING / 2
+      return startX + HORIZONTAL_SPACING
+    }
+
+    // Position children first (left to right)
+    let currentX = startX
+    const childPositions: number[] = []
+    
+    children.forEach(childId => {
+      const childInfo = nodeInfo.get(childId)
+      if (childInfo) {
+        const childWidth = childInfo.subtreeWidth
+        // Center the child within its subtree width
+        const childCenterX = currentX + childWidth / 2
+        currentX = positionNodes(childId, depth + 1, currentX)
+        childInfo.x = childCenterX
+        childPositions.push(childCenterX)
+      }
+    })
+
+    // Center parent above its children
+    if (childPositions.length > 0) {
+      const minChildX = Math.min(...childPositions)
+      const maxChildX = Math.max(...childPositions)
+      info.x = (minChildX + maxChildX) / 2
+    } else {
+      info.x = startX + HORIZONTAL_SPACING / 2
+    }
+
+    return currentX
+  }
+
+  // Calculate subtree widths starting from root
+  calculateSubtreeWidth(rootNode.id, 0)
+  
+  // Position all nodes
+  const rootInfo = nodeInfo.get(rootNode.id)
+  if (rootInfo) {
+    const totalWidth = rootInfo.subtreeWidth
+    const rootStartX = START_X - totalWidth / 2 + HORIZONTAL_SPACING / 2
+    positionNodes(rootNode.id, 0, rootStartX)
+  }
+
+  // Apply positions to nodes
+  const positionedNodes = nodes.map(node => {
+    const info = nodeInfo.get(node.id)
+    if (info) {
+      return {
+        ...node,
+        position: {
+          x: info.x,
+          y: START_Y + info.depth * VERTICAL_SPACING
+        }
+      }
+    }
+    
+    // Fallback for nodes not in tree (orphaned nodes)
+    const parentId = parentMap.get(node.id)
+    if (parentId) {
+      const parentInfo = nodeInfo.get(parentId)
+      if (parentInfo) {
+        return {
+          ...node,
+          position: {
+            x: parentInfo.x + HORIZONTAL_SPACING,
+            y: START_Y + (parentInfo.depth + 1) * VERTICAL_SPACING
+          }
+        }
+      }
+    }
+    
+    // Last resort - use index-based positioning
+    const index = nodes.findIndex(n => n.id === node.id)
     return {
       ...node,
       position: {
-        x: 100 + col * 300,
-        y: 50 + row * 180
+        x: START_X + (index % 3) * HORIZONTAL_SPACING,
+        y: START_Y + Math.floor(index / 3) * VERTICAL_SPACING
       }
     }
   })
 
+  console.log('✅ Tree layout applied:', {
+    rootNode: rootNode.id,
+    totalNodes: positionedNodes.length,
+    maxDepth: Math.max(...Array.from(nodeInfo.values()).map(i => i.depth))
+  })
+
   return {
-    nodes: enhancedNodes,
+    nodes: positionedNodes,
     edges: data.edges
   }
 }

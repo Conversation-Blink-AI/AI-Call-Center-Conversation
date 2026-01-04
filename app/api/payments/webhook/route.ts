@@ -208,14 +208,16 @@ async function handlePhoneNumberPurchase(
   phoneNumber: string,
   areaCode: string,
   countryCode: string,
-  sessionId: string
+  sessionId: string,
+  subscriptionId?: string
 ) {
   console.log('📞 [WEBHOOK] Starting phone number purchase process (Twilio):', {
     userId,
     phoneNumber,
     areaCode,
     countryCode,
-    sessionId
+    sessionId,
+    subscriptionId
   })
 
   // Validate Twilio credentials BEFORE starting purchase
@@ -317,24 +319,24 @@ async function handlePhoneNumberPurchase(
         let savedPhoneId: string
 
         if (existingNumber.rows.length > 0) {
-          console.log('⚠️ [WEBHOOK] Phone number already exists for user, updating status and pathwayid')
+          console.log('⚠️ [WEBHOOK] Phone number already exists for user, updating status, pathwayid, and subscription_id')
           const updateResult = await client.query(
             `
             UPDATE phone_numbers 
-            SET status = 'active', pathwayid = $3
+            SET status = 'active', pathwayid = $3, stripe_subscription_id = $4
             WHERE phone_number = $1 AND user_id = $2
             RETURNING *
           `,
-            [phoneNumber, userId, blandPathwayId],
+            [phoneNumber, userId, blandPathwayId, subscriptionId || null],
           )
           
           savedPhoneId = updateResult.rows[0].id
-          console.log('✅ [WEBHOOK] Phone number status and pathwayid updated:', savedPhoneId)
+          console.log('✅ [WEBHOOK] Phone number status, pathwayid, and subscription_id updated:', savedPhoneId)
         } else {
           // Insert new phone number
           const result = await client.query(
-            `INSERT INTO phone_numbers (phone_number, user_id, location, type, status, purchased_at, area_code, country_code, pathwayid)
-             VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8)
+            `INSERT INTO phone_numbers (phone_number, user_id, location, type, status, purchased_at, area_code, country_code, pathwayid, stripe_subscription_id)
+             VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8, $9)
              RETURNING *`,
             [
               phoneNumber,
@@ -345,6 +347,7 @@ async function handlePhoneNumberPurchase(
               extractedAreaCode,
               countryCode,
               blandPathwayId,
+              subscriptionId || null,
             ],
           )
 
@@ -401,6 +404,17 @@ async function handlePhoneNumberPurchase(
           [blandPathwayId, savedPhoneId],
         )
         console.log('✅ [WEBHOOK] phone_numbers.pathwayid updated:', blandPathwayId)
+
+        // Update subscription_id if provided and not already set
+        if (subscriptionId) {
+          await client.query(
+            `UPDATE phone_numbers 
+             SET stripe_subscription_id = $1
+             WHERE id = $2 AND (stripe_subscription_id IS NULL OR stripe_subscription_id != $1)`,
+            [subscriptionId, savedPhoneId],
+          )
+          console.log('✅ [WEBHOOK] phone_numbers.stripe_subscription_id saved:', subscriptionId)
+        }
 
         // Commit transaction
         await client.query('COMMIT')
@@ -620,6 +634,9 @@ export async function POST(req: Request) {
           const phoneNumber = session.metadata?.phone_number
           const areaCode = session.metadata?.area_code
           const countryCode = session.metadata?.country_code || 'US'
+          const subscriptionId = session.subscription as string | undefined
+          
+          console.log('🔔 [WEBHOOK] Subscription ID from session:', subscriptionId)
           
           if (!phoneNumber || !userId) {
             console.error('❌ [WEBHOOK] Missing phone number or user ID in subscription metadata:', {
@@ -630,9 +647,18 @@ export async function POST(req: Request) {
             break
           }
           
+          if (!subscriptionId) {
+            console.error('❌ [WEBHOOK] Missing subscription ID in checkout session:', {
+              sessionId: session.id,
+              mode: session.mode
+            })
+            // Continue anyway - subscription ID might be available later via invoice.paid event
+            console.warn('⚠️ [WEBHOOK] Continuing without subscription ID - will try to get it from invoice events')
+          }
+          
           // Purchase phone number from Bland.ai
           try {
-            await handlePhoneNumberPurchase(userId, phoneNumber, areaCode, countryCode, session.id)
+            await handlePhoneNumberPurchase(userId, phoneNumber, areaCode, countryCode, session.id, subscriptionId)
             console.log('✅ [WEBHOOK] Phone number purchase completed successfully')
           } catch (error) {
             console.error('❌ [WEBHOOK] Error purchasing phone number:', error)
@@ -830,6 +856,74 @@ export async function POST(req: Request) {
           // Always close the database connection
           await client.end()
           console.log('🔔 [WEBHOOK] Database connection closed')
+        }
+        break
+
+      case 'invoice.paid':
+        console.log('🔔 [WEBHOOK] Processing invoice.paid')
+        const invoice = event.data.object as any
+        
+        // Extract subscription ID from invoice
+        const invoiceSubscriptionId = invoice.subscription as string | undefined
+        
+        if (!invoiceSubscriptionId) {
+          console.log('🔔 [WEBHOOK] Invoice is not associated with a subscription, skipping')
+          break
+        }
+        
+        console.log('🔔 [WEBHOOK] Invoice paid for subscription:', invoiceSubscriptionId)
+        
+        // Try to find phone number by subscription metadata or customer
+        // First, get the subscription to access its metadata
+        try {
+          const subscription = await stripe.subscriptions.retrieve(invoiceSubscriptionId)
+          const subscriptionMetadata = subscription.metadata
+          
+          console.log('🔔 [WEBHOOK] Subscription metadata:', subscriptionMetadata)
+          
+          const phoneNumberFromMetadata = subscriptionMetadata?.phone_number
+          const userIdFromMetadata = subscriptionMetadata?.user_id
+          
+          if (phoneNumberFromMetadata && userIdFromMetadata) {
+            console.log('🔔 [WEBHOOK] Found phone number in subscription metadata, updating subscription_id')
+            
+            // Update phone number with subscription ID if not already set
+            const client = new Client({
+              connectionString: process.env.DATABASE_URL,
+              ssl: getSSLConfig(),
+            })
+            
+            try {
+              await client.connect()
+              
+              const updateResult = await client.query(
+                `UPDATE phone_numbers 
+                 SET stripe_subscription_id = $1
+                 WHERE phone_number = $2 
+                   AND user_id = $3 
+                   AND (stripe_subscription_id IS NULL OR stripe_subscription_id != $1)`,
+                [invoiceSubscriptionId, phoneNumberFromMetadata, userIdFromMetadata],
+              )
+              
+              if (updateResult.rowCount && updateResult.rowCount > 0) {
+                console.log('✅ [WEBHOOK] Updated phone number with subscription ID from invoice.paid event:', {
+                  phoneNumber: phoneNumberFromMetadata,
+                  subscriptionId: invoiceSubscriptionId,
+                  rowsUpdated: updateResult.rowCount
+                })
+              } else {
+                console.log('ℹ️ [WEBHOOK] Phone number already has this subscription ID or not found')
+              }
+            } catch (dbError) {
+              console.error('❌ [WEBHOOK] Error updating subscription ID from invoice.paid:', dbError)
+            } finally {
+              await client.end()
+            }
+          } else {
+            console.log('ℹ️ [WEBHOOK] Subscription metadata does not contain phone_number or user_id')
+          }
+        } catch (subscriptionError) {
+          console.error('❌ [WEBHOOK] Error retrieving subscription from invoice.paid:', subscriptionError)
         }
         break
 

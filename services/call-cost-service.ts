@@ -1,6 +1,7 @@
 
 import { db } from "@/lib/db"
 import { calculateCallCost } from "@/config/pricing"
+import { PhoneBlockService } from "@/services/phone-block-service"
 
 export interface CallCostData {
   callId: string
@@ -106,6 +107,17 @@ export class CallCostService {
       console.log(`   - Cost: ${costCents} cents`)
       console.log(`   - Old Balance: ${currentBalance} cents`)
       console.log(`   - New Balance: ${newBalance} cents`)
+
+      // Check if balance is 0 or negative, and block phone numbers if needed
+      if (newBalance <= 0) {
+        try {
+          console.log(`🚫 [CALL-COST] Balance is ${newBalance <= 0 ? 'zero or negative' : 'low'}, blocking phone numbers for user ${userId}`)
+          await PhoneBlockService.blockUserNumbers(userId)
+        } catch (blockError) {
+          // Don't fail cost processing if blocking fails - it's non-critical
+          console.error(`❌ [CALL-COST] Failed to block numbers after cost processing (non-critical):`, blockError)
+        }
+      }
       
       return { 
         success: true, 

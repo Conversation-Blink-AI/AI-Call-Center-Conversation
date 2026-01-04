@@ -2,6 +2,18 @@
 
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context"
+import { toast } from "sonner"
+import { PageContainer } from "@/components/layout/page-container"
+import { PageHeader } from "@/components/layout/page-header"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Badge } from "@/components/ui/badge"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Plus, Search, Wand2, Edit, Trash2, Phone, Calendar, User } from "lucide-react"
 
 // Sample data for call flows
 const callFlows = [
@@ -60,6 +72,8 @@ export default function CallFlowsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [filterBy, setFilterBy] = useState('all')
+  const [activeTab, setActiveTab] = useState('all')
+  const [searchQuery, setSearchQuery] = useState('')
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [newPathwayName, setNewPathwayName] = useState('')
   const [newPathwayDescription, setNewPathwayDescription] = useState('')

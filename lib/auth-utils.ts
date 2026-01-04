@@ -76,17 +76,32 @@ export async function getUserFromRequest(req: NextRequest): Promise<User | null>
     const token = req.cookies.get('auth-token')?.value
 
     if (!token) {
-      console.log("🔍 [AUTH-UTILS] No auth token found")
+      console.log("🔍 [AUTH-UTILS] No auth token found in cookies")
+      // Debug: log all cookies
+      const allCookies = req.cookies.getAll()
+      console.log("🔍 [AUTH-UTILS] Available cookies:", allCookies.map(c => c.name).join(', '))
       return null
     }
 
-    console.log("🔍 [AUTH-UTILS] Token found, verifying...")
+    console.log("🔍 [AUTH-UTILS] Token found, length:", token.length)
 
     // Verify JWT token
-    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string }
+    let decoded: { userId: string; [key: string]: any }
+    try {
+      decoded = jwt.verify(token, JWT_SECRET) as { userId: string }
+      console.log("🔍 [AUTH-UTILS] Token verified successfully, userId:", decoded.userId)
+    } catch (jwtError: any) {
+      console.error("❌ [AUTH-UTILS] JWT verification failed:", jwtError.message)
+      if (jwtError.name === 'TokenExpiredError') {
+        console.error("❌ [AUTH-UTILS] Token has expired")
+      } else if (jwtError.name === 'JsonWebTokenError') {
+        console.error("❌ [AUTH-UTILS] Invalid token format")
+      }
+      return null
+    }
 
     if (!decoded.userId) {
-      console.log("❌ [AUTH-UTILS] Invalid token payload")
+      console.log("❌ [AUTH-UTILS] Invalid token payload - no userId")
       return null
     }
 
@@ -96,7 +111,7 @@ export async function getUserFromRequest(req: NextRequest): Promise<User | null>
     const user = await getUserById(decoded.userId)
 
     if (!user) {
-      console.log("❌ [AUTH-UTILS] User not found in database")
+      console.log("❌ [AUTH-UTILS] User not found in database for userId:", decoded.userId)
       return null
     }
 

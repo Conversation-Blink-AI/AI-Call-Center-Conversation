@@ -23,7 +23,7 @@ export function FacebookPixelNode({ data, selected }: FacebookPixelNodeProps) {
   return (
     <div
       className={`
-      group relative bg-gradient-to-br from-blue-50 via-white to-blue-50 rounded-lg shadow-lg w-[255px] h-[100px] overflow-visible
+      group relative bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-blue-800 dark:via-blue-700 dark:to-blue-800 rounded-lg shadow-lg w-[255px] h-[100px] overflow-visible
       hover:shadow-xl transition-all duration-200
     `}
     >
@@ -42,7 +42,7 @@ export function FacebookPixelNode({ data, selected }: FacebookPixelNodeProps) {
       />
 
       {/* Header */}
-      <div className="bg-gradient-to-r from-blue-100 to-blue-50 text-blue-800 px-1.5 py-0.5 border-b border-blue-200 rounded-t-lg">
+      <div className="bg-gradient-to-r from-blue-100 to-blue-50 dark:from-blue-900 dark:to-blue-800 text-blue-800 dark:text-blue-100 px-1.5 py-0.5 border-b border-blue-200 dark:border-blue-700 rounded-t-lg">
         <div className="flex items-center space-x-1">
           <Facebook className="w-5 h-5 flex-shrink-0" />
           <span className="text-[14px] font-medium">Facebook Pixel</span>
@@ -52,18 +52,18 @@ export function FacebookPixelNode({ data, selected }: FacebookPixelNodeProps) {
       {/* Content */}
       <div className="p-1.5 flex-1">
         <div className="h-full flex flex-col">
-          <div className="text-[14px] font-medium text-gray-900" title={data.name || 'Facebook Pixel Event'}>
+          <div className="text-[14px] font-medium text-gray-900 dark:text-gray-100" title={data.name || 'Facebook Pixel Event'}>
             {data.name || 'Facebook Pixel Event'}
           </div>
 
           {data.eventName && (
-            <div className="text-[12px] opacity-80 text-gray-600 mt-0.5">
-              <span className="font-mono bg-blue-50 px-0.5 py-0.5 rounded text-[7px]">{data.eventName}</span>
+            <div className="text-[12px] opacity-80 text-gray-600 dark:text-gray-300 mt-0.5">
+              <span className="font-mono bg-blue-50 dark:bg-blue-900 px-0.5 py-0.5 rounded text-[7px]">{data.eventName}</span>
             </div>
           )}
 
           <div
-            className="text-[12px] opacity-80 text-gray-700 mt-0.5 overflow-hidden leading-tight"
+            className="text-[12px] opacity-80 text-gray-700 dark:text-gray-300 mt-0.5 overflow-hidden leading-tight"
             style={{ display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}
             title={data.text}
           >

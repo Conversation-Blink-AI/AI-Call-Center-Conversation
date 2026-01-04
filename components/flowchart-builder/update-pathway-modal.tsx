@@ -1,33 +1,25 @@
 
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { Button } from '../ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Textarea } from '../ui/textarea'
 import { ScrollArea } from '../ui/scroll-area'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import { toast } from '../ui/use-toast'
 import { convertReactFlowToBland, type ReactFlowData } from '../../services/reactflow-converter'
 import { Loader2, Send, Eye } from 'lucide-react'
 import { useAuth } from '@/contexts/auth-context'
 
-interface Pathway {
-  id: string
-  name: string
-  description?: string | null
-  bland_id?: string | null
-  phone_number?: string | null
-}
-
 interface UpdatePathwayModalProps {
   reactFlowData: ReactFlowData
-  pathwayId: string
+  pathwayId?: string
+  phoneNumber?: string | null
 }
 
-export function UpdatePathwayModal({ reactFlowData, pathwayId }: UpdatePathwayModalProps) {
+export function UpdatePathwayModal({ reactFlowData, pathwayId, phoneNumber }: UpdatePathwayModalProps) {
   const { user } = useAuth()
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -35,43 +27,73 @@ export function UpdatePathwayModal({ reactFlowData, pathwayId }: UpdatePathwayMo
   const [isSuccess, setIsSuccess] = useState(false)
 
   // Pathway fetching state
-  const [pathways, setPathways] = useState<Pathway[]>([])
   const [loadingPathways, setLoadingPathways] = useState(false)
 
   // Form fields
   const [manualPathwayId, setManualPathwayId] = useState(pathwayId || '')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  
+  // Update pathwayId when prop changes
+  useEffect(() => {
+    if (pathwayId) {
+      setManualPathwayId(pathwayId)
+    }
+  }, [pathwayId])
 
   const convertedData = convertReactFlowToBland(reactFlowData)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
 
-  // Fetch pathways when modal opens and user is available
+  // Scroll to top when preview is shown
   useEffect(() => {
-    const fetchPathways = async () => {
-      if (!user?.id || !isOpen) return
+    if (showPreview && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = 0
+    }
+  }, [showPreview])
+
+  // Auto-fetch pathway for phone number when modal opens
+  useEffect(() => {
+    const fetchPathwayForPhone = async () => {
+      if (!user?.id || !isOpen || !phoneNumber) return
 
       try {
         setLoadingPathways(true)
-        const response = await fetch('/api/pathways', {
+        const response = await fetch(`/api/lookup-pathway?phone=${encodeURIComponent(phoneNumber)}`, {
           credentials: 'include'
         })
 
         if (response.ok) {
           const data = await response.json()
-          setPathways(data.pathways || [])
+          if (data.success && data.pathway_id) {
+            // Auto-populate pathway ID
+            setManualPathwayId(data.pathway_id)
+            // Auto-populate name and description if available
+            if (data.pathway_name && !name) {
+              setName(data.pathway_name)
+            }
+            if (data.pathway_description && !description) {
+              setDescription(data.pathway_description)
+            }
+          } else {
+            toast({
+              title: "Warning",
+              description: data.message || "No pathway found for this phone number",
+              variant: "default",
+            })
+          }
         } else {
-          console.error('Failed to fetch pathways')
+          console.error('Failed to fetch pathway for phone number')
           toast({
             title: "Error",
-            description: "Failed to load pathways",
+            description: "Failed to load pathway for this phone number",
             variant: "destructive",
           })
         }
       } catch (error) {
-        console.error('Error fetching pathways:', error)
+        console.error('Error fetching pathway for phone number:', error)
         toast({
           title: "Error",
-          description: "An error occurred while loading pathways",
+          description: "An error occurred while loading pathway",
           variant: "destructive",
         })
       } finally {
@@ -79,8 +101,8 @@ export function UpdatePathwayModal({ reactFlowData, pathwayId }: UpdatePathwayMo
       }
     }
 
-    fetchPathways()
-  }, [user?.id, isOpen])
+    fetchPathwayForPhone()
+  }, [user?.id, isOpen, phoneNumber])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -179,12 +201,13 @@ export function UpdatePathwayModal({ reactFlowData, pathwayId }: UpdatePathwayMo
           🚀 Update
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-4xl max-h-[90vh]">
-        <DialogHeader>
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+        <DialogHeader className="flex-shrink-0">
           <DialogTitle>Update Pathway</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div ref={scrollContainerRef} className="flex-1 min-h-0 overflow-y-auto pr-4">
+          <div className="space-y-6">
           {isSuccess ? (
             // Success State
             <div className="text-center py-8 space-y-4">
@@ -204,124 +227,84 @@ export function UpdatePathwayModal({ reactFlowData, pathwayId }: UpdatePathwayMo
             // Form View
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="pathwayId">Select Pathway *</Label>
-                <Select
-                  value={manualPathwayId || ""}
-                  onValueChange={(value) => {
-                    setManualPathwayId(value)
-                    // Auto-fill name and description from selected pathway (only if fields are empty)
-                    const selectedPathway = pathways.find(
-                      (p) => (p.bland_id || p.id) === value
-                    )
-                    if (selectedPathway) {
-                      if (!name || name.trim() === '') {
-                        setName(selectedPathway.name)
-                      }
-                      if ((!description || description.trim() === '') && selectedPathway.description) {
-                        setDescription(selectedPathway.description)
-                      }
-                    }
-                  }}
-                  disabled={loadingPathways}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder={loadingPathways ? "Loading pathways..." : "Choose a pathway"} />
-                  </SelectTrigger>
-                  <SelectContent
-                    className="max-h-[200px] overflow-y-auto z-50"
-                    position="popper"
-                    sideOffset={4}
-                    avoidCollisions={true}
-                  >
-                    {pathways.length === 0 && !loadingPathways ? (
-                      <SelectItem value="" disabled>
-                        No pathways found
-                      </SelectItem>
-                    ) : (
-                      pathways.map((pathway) => (
-                        <SelectItem
-                          key={pathway.id}
-                          value={pathway.bland_id || pathway.id}
-                        >
-                          <div className="flex flex-col pointer-events-none">
-                            <span className="font-medium">{pathway.name}</span>
-                            {pathway.phone_number && (
-                              <span className="text-xs text-muted-foreground">
-                                Phone: {pathway.phone_number}
-                              </span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-                {manualPathwayId && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <span>Selected Pathway ID:</span>
-                    <code className="bg-gray-100 px-2 py-1 rounded text-xs font-mono">
-                      {manualPathwayId}
-                    </code>
-                  </div>
-                )}
-                <p className="text-xs text-gray-500">Select a pathway to update, or manually enter the pathway ID below</p>
-                <div className="mt-2">
-                  <Label htmlFor="pathwayIdManual" className="text-xs text-muted-foreground">
-                    Or enter Pathway ID manually:
-                  </Label>
-                  <Input
-                    id="pathwayIdManual"
-                    placeholder="Enter pathway ID"
-                    value={manualPathwayId}
-                    onChange={(e) => setManualPathwayId(e.target.value)}
-                    className="mt-1"
-                  />
+                <Label htmlFor="pathwayId">Selected Pathway ID *</Label>
+                <div className="px-1">
+                  {loadingPathways ? (
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Loading pathway for {phoneNumber}...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <Input
+                        id="pathwayId"
+                        value={manualPathwayId}
+                        onChange={(e) => setManualPathwayId(e.target.value)}
+                        placeholder="Pathway ID will be auto-selected..."
+                        required
+                      />
+                      {phoneNumber && manualPathwayId && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Pathway automatically selected for {phoneNumber}
+                        </p>
+                      )}
+                      {!phoneNumber && (
+                        <p className="text-xs text-gray-500 mt-1">
+                          Enter the pathway ID manually
+                        </p>
+                      )}
+                    </>
+                  )}
                 </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="name">Pathway Name *</Label>
-                <Input
-                  id="name"
-                  placeholder="My Pathway"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                />
+                <div className="px-1">
+                  <Input
+                    id="name"
+                    placeholder="My Pathway"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                  />
+                </div>
                 <p className="text-xs text-gray-500">The name of your conversational pathway</p>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  placeholder="A description of the pathway..."
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={3}
-                />
+                <div className="px-1">
+                  <Textarea
+                    id="description"
+                    placeholder="A description of the pathway..."
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={3}
+                  />
+                </div>
                 <p className="text-xs text-gray-500">Optional description of your pathway</p>
               </div>
 
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="font-medium mb-2">Converted Data Summary:</h4>
-                <div className="text-sm text-gray-600 space-y-2">
-                  <div className="bg-blue-50 p-2 rounded border-l-4 border-blue-400">
-                    <p><strong>Pathway ID:</strong> <code className="bg-blue-100 px-1 rounded text-xs">{manualPathwayId || 'Not set'}</code></p>
-                    <p className="text-xs text-blue-600 mt-1">This ID will be used in the API request to Bland.ai</p>
+              <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg border border-gray-200 dark:border-gray-700">
+                <h4 className="font-medium mb-2 text-gray-900 dark:text-gray-200">Converted Data Summary:</h4>
+                <div className="text-sm text-gray-700 dark:text-gray-300 space-y-2">
+                  <div className="bg-blue-50 dark:bg-blue-900/30 p-2 rounded border-l-4 border-blue-500 dark:border-blue-500">
+                    <p className="text-gray-900 dark:text-gray-200"><strong>Pathway ID:</strong> <code className="bg-blue-100 dark:bg-blue-800/50 px-1 rounded text-xs text-blue-800 dark:text-blue-200">{manualPathwayId || 'Not set'}</code></p>
+                    <p className="text-xs text-blue-700 dark:text-blue-400 mt-1">This ID will be used in the API request to Bland.ai</p>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <p><strong>Original Nodes:</strong> {reactFlowData.nodes.length}</p>
-                      <p><strong>Cleaned Nodes:</strong> {convertedData.nodes.length}</p>
+                      <p className="text-gray-900 dark:text-gray-200"><strong>Original Nodes:</strong> {reactFlowData.nodes.length}</p>
+                      <p className="text-gray-900 dark:text-gray-200"><strong>Cleaned Nodes:</strong> {convertedData.nodes.length}</p>
                     </div>
                     <div>
-                      <p><strong>Original Edges:</strong> {reactFlowData.edges.length}</p>
-                      <p><strong>Cleaned Edges:</strong> {convertedData.edges.length}</p>
+                      <p className="text-gray-900 dark:text-gray-200"><strong>Original Edges:</strong> {reactFlowData.edges.length}</p>
+                      <p className="text-gray-900 dark:text-gray-200"><strong>Cleaned Edges:</strong> {convertedData.edges.length}</p>
                     </div>
                   </div>
                 </div>
-                <p className="text-green-600 text-xs mt-2">✅ UI-specific properties will be removed before sending</p>
+                <p className="text-green-700 dark:text-green-400 text-xs mt-2">✅ UI-specific properties will be removed before sending</p>
               </div>
 
               <div className="flex gap-3 pt-4">
@@ -352,7 +335,7 @@ export function UpdatePathwayModal({ reactFlowData, pathwayId }: UpdatePathwayMo
           ) : (
             // Preview View
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between sticky top-0 bg-background dark:bg-background z-10 pb-2 pt-1 -mt-1 border-b">
                 <h3 className="font-semibold">Final Payload Preview</h3>
                 <Button
                   variant="outline"
@@ -373,7 +356,7 @@ export function UpdatePathwayModal({ reactFlowData, pathwayId }: UpdatePathwayMo
 
                 <div>
                   <h4 className="font-medium mb-2">JSON Payload:</h4>
-                  <ScrollArea className="h-96 w-full rounded-md border p-4">
+                  <ScrollArea className="h-48 w-full rounded-md border p-4">
                     <pre className="text-xs">
                       {JSON.stringify(finalPayload, null, 2)}
                     </pre>
@@ -400,6 +383,7 @@ export function UpdatePathwayModal({ reactFlowData, pathwayId }: UpdatePathwayMo
               </div>
             </div>
           )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

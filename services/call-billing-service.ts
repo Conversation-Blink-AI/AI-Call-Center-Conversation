@@ -1,5 +1,6 @@
 
 import { db } from "@/lib/db"
+import { PhoneBlockService } from "@/services/phone-block-service"
 
 export interface CallBillingResult {
   success: boolean
@@ -171,6 +172,18 @@ export class CallBillingService {
         console.log(`✅ [BILLING] Successfully billed call ${callId}`)
         console.log(`   - Charged: $${(costCents / 100).toFixed(2)}`)
         console.log(`   - New balance: $${(newBalance / 100).toFixed(2)}`)
+
+        // Check if balance is 0 or negative, and block phone numbers if needed
+        // This happens AFTER transaction commit to avoid blocking if billing fails
+        if (newBalance <= 0) {
+          try {
+            console.log(`🚫 [BILLING] Balance is ${newBalance <= 0 ? 'zero or negative' : 'low'}, blocking phone numbers for user ${userId}`)
+            await PhoneBlockService.blockUserNumbers(userId)
+          } catch (blockError) {
+            // Don't fail billing if blocking fails - it's non-critical
+            console.error(`❌ [BILLING] Failed to block numbers after billing (non-critical):`, blockError)
+          }
+        }
 
         return {
           success: true,

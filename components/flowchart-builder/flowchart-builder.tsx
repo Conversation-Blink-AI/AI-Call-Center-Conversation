@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import { ReactFlowProvider } from 'reactflow'
 import { FlowchartCanvas } from './flowchart-canvas'
 import { NodePalette } from './node-palette'
@@ -12,16 +12,21 @@ interface FlowchartBuilderProps {
 }
 
 export function FlowchartBuilder({ className, phoneNumber, pathwayInfo }: FlowchartBuilderProps = {}) {
+  const [isPaletteCollapsed, setIsPaletteCollapsed] = useState(false)
+
   return (
     <ReactFlowProvider>
       <div className={`flex h-full ${className || ''}`}>
         {/* Node Palette - Left Side */}
-        <div className="flex-shrink-0">
-          <NodePalette />
+        <div className="flex-shrink-0 transition-all duration-300 ease-in-out">
+          <NodePalette 
+            isCollapsed={isPaletteCollapsed}
+            onToggle={() => setIsPaletteCollapsed(!isPaletteCollapsed)}
+          />
         </div>
 
         {/* Main Canvas - Right Side */}
-        <div className="flex-1 relative">
+        <div className="flex-1 relative transition-all duration-300 ease-in-out">
           <FlowchartCanvas phoneNumber={phoneNumber} pathwayInfo={pathwayInfo} />
         </div>
       </div>

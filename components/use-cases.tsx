@@ -112,7 +112,7 @@ export function UseCases() {
                   ))}
                 </div>
 
-                <Link href="/dashboard/call-flows/editor">
+                <Link href="/login">
                   <Button className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white">
                     Build This Flow <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>

@@ -28,3 +28,14 @@ Continue building your app on:
 2. Deploy your chats from the v0 interface
 3. Changes are automatically pushed to this repository
 4. Vercel deploys the latest version from this repository
+
+## Development-only flags
+
+- **`ALLOW_UNAUTH_PATHWAY_GENERATION`** (implemented in `app/api/generate-pathway/route.ts`):
+  - In development (`NODE_ENV !== "production"`), this flag defaults to `true`, allowing `/api/generate-pathway` to work even if the `auth-token` cookie is missing.
+  - In production, the code path treats missing/invalid auth as a `401` error and requires a valid session cookie.
+  - Before deploying, verify that:
+    - You are logged in and `auth-token` is present in browser cookies.
+    - A POST to `/api/generate-pathway` includes that cookie.
+    - `/api/auth/me` returns `200` for an authenticated user.
+

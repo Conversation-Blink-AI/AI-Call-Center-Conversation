@@ -51,9 +51,23 @@ export function CustomEdge({
             fontSize: '9px',
             pointerEvents: 'all',
           }}
-          className="nodrag nopan bg-card border border-border text-foreground rounded px-1.5 py-0.5 text-[9px] font-medium shadow-sm transition-all duration-200 hover:bg-gradient-to-r hover:from-blue-500 hover:to-purple-500 hover:text-white hover:border-transparent hover:shadow-md"
+          className="nodrag nopan bg-card border border-border text-foreground rounded px-1.5 py-0.5 text-[9px] font-medium shadow-sm transition-all duration-200 hover:bg-gradient-to-r hover:from-blue-500 hover:to-purple-500 hover:text-white hover:border-transparent hover:shadow-md flex items-center gap-1"
         >
-          {data?.label || 'next'}
+          <span>{data?.label || 'next'}</span>
+          <svg 
+            xmlns="http://www.w3.org/2000/svg" 
+            width="12" 
+            height="12" 
+            viewBox="0 0 24 24"
+            fill="none" 
+            stroke="currentColor" 
+            strokeWidth="2" 
+            strokeLinecap="round" 
+            strokeLinejoin="round"
+            className="flex-shrink-0"
+          >
+            <path d="M4 20l4-1 11-11a2 2 0 0 0-3-3L5 16l-1 4z"/>
+          </svg>
         </div>
       </EdgeLabelRenderer>
     </>

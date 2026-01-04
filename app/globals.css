@@ -121,13 +121,6 @@
   animation: glow-pulse-dark 1.5s ease-in-out 3;
 }
 
-* {
-  transition-property: background-color, border-color, color, fill, stroke, opacity, box-shadow, transform, filter,
-    backdrop-filter;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 150ms;
-}
-
 .react-flow__node {
   transition: transform 0.2s ease;
   background: hsl(var(--card));
@@ -227,6 +220,12 @@
   transition: none !important;
 }
 
+/* Add left margin to inputs/textareas in node editor to prevent glow clipping */
+.node-editor-content input,
+.node-editor-content textarea {
+  margin-left: 4px;
+}
+
 /* Override any Tailwind animate classes with higher specificity */
 .no-popover-animation.animate-in,
 .no-popover-animation[data-state="open"].animate-in,
@@ -258,10 +257,45 @@
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  cursor: grab;
+  pointer-events: auto !important;
+}
+
+.react-flow__minimap:active {
+  cursor: grabbing;
+}
+
+.react-flow__minimap svg {
+  pointer-events: auto !important;
+}
+
+.dark .react-flow__minimap svg {
+  color: rgba(195, 209, 223, 1) !important;
+  background-color: rgba(3, 26, 79, 1) !important;
+}
+
+.dark .react-flow__minimap-node {
+  fill: rgba(142, 158, 175, 1) !important;
+}
+
+.react-flow__minimap-wrapper {
+  pointer-events: auto !important;
 }
 
 .dark .react-flow__minimap {
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+}
+
+/* Fade-in animation for node toolbar */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .react-flow__minimap-mask {
@@ -324,4 +358,39 @@
   .voice-cards-grid > *:nth-child(n+2) {
     margin-top: 0;
   }
+}
+
+/* Three dots loading animation */
+@keyframes dotPulse {
+  0%, 80%, 100% {
+    opacity: 0.3;
+    transform: scale(0.8);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.dot-loader {
+  animation: dotPulse 1.4s ease-in-out infinite;
+}
+
+/* Wave animation for emoji */
+@keyframes wave {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  25% {
+    transform: rotate(-20deg);
+  }
+  75% {
+    transform: rotate(20deg);
+  }
+}
+
+.wave-animation {
+  display: inline-block;
+  animation: wave 0.8s ease-out;
+  transform-origin: 70% 70%;
 }

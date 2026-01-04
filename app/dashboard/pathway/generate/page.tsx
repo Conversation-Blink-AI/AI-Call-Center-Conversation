@@ -1,18 +1,17 @@
-
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Loader2, Wand2, ArrowLeft, Save, Download, ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { Loader2, Wand2, ArrowLeft, ChevronLeft, ChevronRight, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { toast } from 'sonner'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { FlowchartCanvas } from '@/components/flowchart-builder/flowchart-canvas'
-import { convertReactFlowToBland } from '@/services/reactflow-converter'
+import { useAuth } from '@/contexts/auth-context'
 import type { Node, Edge } from 'reactflow'
 
 interface ReactFlowData {
@@ -20,14 +19,45 @@ interface ReactFlowData {
   edges: Edge[]
 }
 
-export default function GenerateCallFlowPage() {
+export default function GeneratePathwayPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const phoneNumber = searchParams.get('phoneNumber')
+  const { user, loading: authLoading, isAuthenticated } = useAuth()
   const [prompt, setPrompt] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [error, setError] = useState('')
   const [generatedFlowchart, setGeneratedFlowchart] = useState<ReactFlowData | null>(null)
-  const [isSaving, setIsSaving] = useState(false)
   const [isPanelCollapsed, setIsPanelCollapsed] = useState(false)
+
+  // Authentication check - same pattern as dashboard page
+  // Middleware handles server-side JWT verification, auth context handles client-side
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Handle unauthenticated users - redirect to home (same as dashboard)
+  if (!authLoading && !user) {
+    useEffect(() => {
+      router.push("/")
+    }, [router])
+
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+          <p className="text-muted-foreground">Redirecting to home page...</p>
+        </div>
+      </div>
+    )
+  }
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -35,25 +65,63 @@ export default function GenerateCallFlowPage() {
       return
     }
 
+    // User is already authenticated at this point (checked by middleware + auth context)
+    // No need for additional auth checks - trust the auth context state
+    if (!user) {
+      setError('You must be logged in to generate call flows.')
+      router.push('/')
+      return
+    }
+
     setIsGenerating(true)
-    setError('')
+    setError('') // Clear any previous errors
     setGeneratedFlowchart(null)
 
     try {
       console.log('🚀 Generating call flow with prompt:', prompt)
+      console.log('👤 User authenticated:', user.email)
+      console.log('👤 User ID:', user.id)
       
-      const response = await fetch('/api/generate-pathway', {
+      // Get API key from localStorage if available
+      const apiKey = typeof window !== 'undefined' ? localStorage.getItem('openrouter_api_key') : null
+      
+      console.log('📤 Making API request to /api/generate-pathway (NO AUTH REQUIRED)')
+      
+      // Use absolute URL to ensure cookies are sent
+      const apiUrl = `${window.location.origin}/api/generate-pathway`
+      
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
-        body: JSON.stringify({ prompt }),
+        credentials: 'include',
+        mode: 'same-origin',
+        cache: 'no-store', // Force no cache
+        body: JSON.stringify({ 
+          prompt,
+          ...(apiKey && { apiKey })
+        }),
       })
+      
+      console.log('📡 Response status:', response.status, response.statusText)
+      console.log('📡 Response headers:', Object.fromEntries(response.headers.entries()))
 
       const result = await response.json()
+      console.log('📡 Response body:', result)
 
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to generate call flow')
+        // Log the full error for debugging
+        console.error('❌ API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          result: result
+        })
+        
+        const errorMessage = result.message || result.error || 'Failed to generate call flow'
+        const errorDetails = result.details ? `\n\nDetails: ${result.details}` : ''
+        throw new Error(`${errorMessage}${errorDetails}`)
       }
 
       console.log('✅ Generated flowchart data:', result)
@@ -70,73 +138,6 @@ export default function GenerateCallFlowPage() {
     }
   }
 
-  const handleSaveAsPathway = async () => {
-    if (!generatedFlowchart) {
-      toast.error('No flowchart to save')
-      return
-    }
-
-    setIsSaving(true)
-    try {
-      // Convert ReactFlow data to Bland.ai format
-      const blandData = convertReactFlowToBland(generatedFlowchart)
-      
-      // Create pathway name from prompt
-      const pathwayName = prompt.length > 50 
-        ? `${prompt.substring(0, 47)}...` 
-        : prompt
-
-      console.log('💾 Saving pathway:', pathwayName)
-      console.log('📊 Bland data:', blandData)
-
-      const response = await fetch('/api/pathways/create', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: pathwayName,
-          description: `Generated from prompt: ${prompt}`,
-          flowchart_data: blandData,
-          nodes: blandData.nodes,
-          edges: blandData.edges
-        }),
-      })
-
-      const result = await response.json()
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to save pathway')
-      }
-
-      toast.success('Pathway saved successfully!')
-      router.push(`/dashboard/call-flows?saved=${result.pathway.id}`)
-
-    } catch (err) {
-      console.error('❌ Save error:', err)
-      const errorMessage = err instanceof Error ? err.message : 'Failed to save pathway'
-      toast.error(errorMessage)
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
-  const handleDownloadJson = () => {
-    if (!generatedFlowchart) return
-
-    const dataStr = JSON.stringify(generatedFlowchart, null, 2)
-    const dataBlob = new Blob([dataStr], { type: 'application/json' })
-    const url = URL.createObjectURL(dataBlob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = 'generated-call-flow.json'
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    URL.revokeObjectURL(url)
-    
-    toast.success('JSON file downloaded!')
-  }
 
   const examplePrompts = [
     "Create a Medicare insurance qualification call flow that screens for eligibility and transfers qualified leads to an agent",
@@ -146,13 +147,20 @@ export default function GenerateCallFlowPage() {
     "Build a lead qualification flow for real estate that determines buying timeline and connects with local agents"
   ]
 
+  const getBackUrl = () => {
+    if (phoneNumber) {
+      return `/dashboard/pathway/${phoneNumber}`
+    }
+    return '/dashboard/pathway'
+  }
+
   return (
     <div className="fixed inset-0 z-50 bg-background">
       <div className="h-full flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b bg-card shadow-sm z-10">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => router.push("/dashboard/call-flows")}>
+            <Button variant="ghost" size="icon" onClick={() => router.push(getBackUrl())}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
             <div>
@@ -162,7 +170,6 @@ export default function GenerateCallFlowPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Panel Toggle */}
             <Button 
               variant="outline" 
               size="icon"
@@ -171,31 +178,6 @@ export default function GenerateCallFlowPage() {
             >
               {isPanelCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
             </Button>
-
-            {generatedFlowchart && (
-              <>
-                <Button 
-                  variant="outline" 
-                  onClick={handleDownloadJson}
-                  className="flex items-center gap-1"
-                >
-                  <Download className="h-4 w-4" />
-                  Download JSON
-                </Button>
-                <Button 
-                  onClick={handleSaveAsPathway}
-                  disabled={isSaving}
-                  className="flex items-center gap-1"
-                >
-                  {isSaving ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4" />
-                  )}
-                  Save as Pathway
-                </Button>
-              </>
-            )}
           </div>
         </div>
 
@@ -203,7 +185,6 @@ export default function GenerateCallFlowPage() {
           {/* Collapsible Input Panel */}
           {!isPanelCollapsed && (
             <div className="w-80 lg:w-96 transition-all duration-300 ease-in-out border-r bg-card shadow-lg overflow-hidden flex flex-col">
-              {/* Panel Header with Collapse Button */}
               <div className="flex items-center justify-between p-4 border-b bg-muted/50">
                 <h3 className="font-semibold text-sm">AI Flow Generator</h3>
                 <Button 
@@ -216,7 +197,6 @@ export default function GenerateCallFlowPage() {
                 </Button>
               </div>
 
-              {/* Panel Content */}
               <div className="flex-1 p-4 overflow-y-auto space-y-4">
                 <div>
                   <Label htmlFor="prompt" className="text-sm font-medium">Call Flow Description</Label>
@@ -255,7 +235,6 @@ export default function GenerateCallFlowPage() {
                   )}
                 </Button>
 
-                {/* Example Prompts */}
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">Example Prompts:</Label>
                   <div className="space-y-1">
@@ -276,7 +255,6 @@ export default function GenerateCallFlowPage() {
             </div>
           )}
 
-          {/* Floating Panel Toggle for Collapsed State */}
           {isPanelCollapsed && (
             <div className="absolute top-4 left-4 z-20">
               <Button 
@@ -290,7 +268,6 @@ export default function GenerateCallFlowPage() {
             </div>
           )}
 
-          {/* Full Screen Canvas */}
           <div className="flex-1 relative bg-background w-full">
             {!generatedFlowchart && !isGenerating && (
               <div className="absolute inset-0 flex items-center justify-center">

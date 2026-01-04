@@ -32,6 +32,16 @@ import { SavePathwayModal } from './save-pathway-modal'
 import { UpdatePathwayModal } from './update-pathway-modal'
 import { convertBlandToReactFlow } from '../../services/reactflow-converter'
 import { toast } from 'sonner'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 const edgeTypes = { custom: CustomEdge }
 
@@ -60,7 +70,10 @@ export function FlowchartCanvas({
   const [isEdgeEditorOpen, setIsEdgeEditorOpen] = useState(false)
   const [isLoadingFlowchart, setIsLoadingFlowchart] = useState(false)
   const [toolbarNode, setToolbarNode] = useState<Node | null>(null)
-  const [toolbarPosition, setToolbarPosition] = useState({ x: 0, y: 0 })
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [nodeToDelete, setNodeToDelete] = useState<string | null>(null)
+  const [isMinimapDragging, setIsMinimapDragging] = useState(false)
+  const minimapRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => setMounted(true), [])
 
@@ -154,7 +167,7 @@ export function FlowchartCanvas({
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
     event.stopPropagation()
     setToolbarNode(node)
-    setToolbarPosition({ x: node.position.x, y: node.position.y })
+    // Don't set toolbarPosition here - let NodeToolbar calculate it from node.position
     setSelectedEdge(null)
     setIsEdgeEditorOpen(false)
   }, [])
@@ -227,6 +240,142 @@ export function FlowchartCanvas({
     [reactFlowInstance, setNodes],
   )
 
+  // Handle minimap click to pan the canvas (for single clicks)
+  const handleMinimapClick = useCallback((event: React.MouseEvent, position: { x: number; y: number }) => {
+    if (!reactFlowInstance) return
+    
+    // Get the ReactFlow pane element to get actual dimensions
+    const paneElement = reactFlowWrapper.current?.querySelector('.react-flow__pane') as HTMLElement
+    const paneWidth = paneElement?.clientWidth || window.innerWidth || 800
+    const paneHeight = paneElement?.clientHeight || window.innerHeight || 600
+    
+    // Get current viewport
+    const viewport = reactFlowInstance.getViewport()
+    
+    // Calculate new viewport position to center on the clicked point
+    // position is already in flow coordinates from ReactFlow
+    const newX = -position.x * viewport.zoom + paneWidth / 2
+    const newY = -position.y * viewport.zoom + paneHeight / 2
+    
+    reactFlowInstance.setViewport({ x: newX, y: newY, zoom: viewport.zoom })
+  }, [reactFlowInstance, reactFlowWrapper])
+
+  // Attach event listeners directly to minimap DOM element
+  useEffect(() => {
+    if (!minimapRef.current || !reactFlowInstance) return
+
+    let cleanup: (() => void) | null = null
+    let retryTimeout: NodeJS.Timeout | null = null
+
+    const setupMinimapListeners = () => {
+      const minimapElement = minimapRef.current?.querySelector('.react-flow__minimap') as HTMLElement
+      if (!minimapElement) {
+        // Retry after a short delay if minimap isn't ready
+        retryTimeout = setTimeout(setupMinimapListeners, 100)
+        return
+      }
+
+      const minimapSvg = minimapElement.querySelector('svg') as SVGSVGElement
+      if (!minimapSvg) {
+        retryTimeout = setTimeout(setupMinimapListeners, 100)
+        return
+      }
+
+      const calculateFlowPosition = (clientX: number, clientY: number) => {
+        const svgRect = minimapSvg.getBoundingClientRect()
+        const clickX = clientX - svgRect.left
+        const clickY = clientY - svgRect.top
+
+        // Get the viewBox from the SVG
+        const viewBox = minimapSvg.viewBox.baseVal
+        const viewBoxX = viewBox.x
+        const viewBoxY = viewBox.y
+        const viewBoxWidth = viewBox.width
+        const viewBoxHeight = viewBox.height
+
+        // Calculate the position in flow coordinates
+        const flowX = viewBoxX + (clickX / svgRect.width) * viewBoxWidth
+        const flowY = viewBoxY + (clickY / svgRect.height) * viewBoxHeight
+
+        return { flowX, flowY }
+      }
+
+      const panToPosition = (flowX: number, flowY: number) => {
+        const paneElement = reactFlowWrapper.current?.querySelector('.react-flow__pane') as HTMLElement
+        const paneWidth = paneElement?.clientWidth || window.innerWidth || 800
+        const paneHeight = paneElement?.clientHeight || window.innerHeight || 600
+        const viewport = reactFlowInstance.getViewport()
+        
+        const newX = -flowX * viewport.zoom + paneWidth / 2
+        const newY = -flowY * viewport.zoom + paneHeight / 2
+        
+        reactFlowInstance.setViewport({ x: newX, y: newY, zoom: viewport.zoom })
+      }
+
+      let isDragging = false
+
+      const handleMouseDown = (e: MouseEvent) => {
+        // Allow dragging anywhere on the minimap
+        const target = e.target as HTMLElement
+        const isMinimapArea = target.closest('.react-flow__minimap') || 
+                             target.tagName === 'svg' || 
+                             target.tagName === 'rect' ||
+                             target.closest('.react-flow__minimap-mask')
+        
+        if (isMinimapArea) {
+          e.preventDefault()
+          e.stopPropagation()
+          isDragging = true
+          setIsMinimapDragging(true)
+          
+          const { flowX, flowY } = calculateFlowPosition(e.clientX, e.clientY)
+          panToPosition(flowX, flowY)
+        }
+      }
+
+      const handleMouseMove = (e: MouseEvent) => {
+        if (!isDragging) return
+        
+        e.preventDefault()
+        e.stopPropagation()
+        
+        const { flowX, flowY } = calculateFlowPosition(e.clientX, e.clientY)
+        panToPosition(flowX, flowY)
+      }
+
+      const handleMouseUp = () => {
+        if (isDragging) {
+          isDragging = false
+          setIsMinimapDragging(false)
+        }
+      }
+
+      // Attach listeners to both the minimap element and SVG (capture phase)
+      minimapElement.addEventListener('mousedown', handleMouseDown, true)
+      minimapSvg.addEventListener('mousedown', handleMouseDown, true)
+      window.addEventListener('mousemove', handleMouseMove)
+      window.addEventListener('mouseup', handleMouseUp)
+
+      cleanup = () => {
+        minimapElement.removeEventListener('mousedown', handleMouseDown, true)
+        minimapSvg.removeEventListener('mousedown', handleMouseDown, true)
+        window.removeEventListener('mousemove', handleMouseMove)
+        window.removeEventListener('mouseup', handleMouseUp)
+      }
+    }
+
+    setupMinimapListeners()
+
+    return () => {
+      if (retryTimeout) {
+        clearTimeout(retryTimeout)
+      }
+      if (cleanup) {
+        cleanup()
+      }
+    }
+  }, [reactFlowInstance, reactFlowWrapper, nodes.length])
+
   const getDefaultNodeData = (nodeType: string) => {
     switch (nodeType) {
       case 'greetingNode':
@@ -288,7 +437,7 @@ export function FlowchartCanvas({
 
         <div className="absolute top-4 right-4 z-10 flex gap-2">
           <SavePathwayModal reactFlowData={{ nodes, edges }} pathwayId={pathwayInfo?.pathway_id} />
-          <UpdatePathwayModal reactFlowData={{ nodes, edges }} />
+          <UpdatePathwayModal reactFlowData={{ nodes, edges }} pathwayId={pathwayInfo?.pathway_id} phoneNumber={phoneNumber} />
         </div>
 
         <ReactFlow
@@ -303,12 +452,30 @@ export function FlowchartCanvas({
           onPaneClick={onPaneClick}
           onNodeClick={onNodeClick}
           onEdgeClick={onEdgeClick}
+          onMove={(_, viewport) => {
+            // Force toolbar update during pan/zoom operations
+            // The toolbar's requestAnimationFrame will handle the actual update
+          }}
+          onMoveStart={() => {
+            // Toolbar will update via requestAnimationFrame
+          }}
+          onMoveEnd={() => {
+            // Toolbar will update via requestAnimationFrame
+          }}
           nodeTypes={nodeTypes}
           edgeTypes={edgeTypes}
           className="bg-background"
         >
           <Controls />
-          <MiniMap />
+          <div
+            ref={minimapRef}
+            style={{ cursor: isMinimapDragging ? 'grabbing' : 'grab', display: 'inline-block', userSelect: 'none' }}
+            className="react-flow__minimap-wrapper"
+          >
+            <MiniMap 
+              onClick={handleMinimapClick}
+            />
+          </div>
           <Background
             variant="dots"
             gap={12}
@@ -317,45 +484,57 @@ export function FlowchartCanvas({
           />
         </ReactFlow>
 
-        {toolbarNode && (
-          <NodeToolbar
-            nodeId={toolbarNode.id}
-            position={toolbarPosition}
-            onEdit={() => {
-              setSelectedNode(toolbarNode)
-              setIsEditorOpen(true)
-              setToolbarNode(null)
-            }}
-            onDelete={() => {
-              if (window.confirm('Are you sure you want to delete this node?')) {
-                setNodes((nds) => nds.filter((n) => n.id !== toolbarNode.id))
-                setEdges((eds) => eds.filter((e) => e.source !== toolbarNode.id && e.target !== toolbarNode.id))
+        {/* Toolbar positioned relative to ReactFlow pane */}
+        {toolbarNode && reactFlowInstance && (() => {
+          // Get the current node from nodes array to track position changes during drag
+          const currentNode = nodes.find((n) => n.id === toolbarNode.id)
+          if (!currentNode) return null
+          
+          return (
+            <NodeToolbar
+              nodeId={currentNode.id}
+              position={currentNode.position}
+              reactFlowInstance={reactFlowInstance}
+              nodeWidth={255}
+              wrapperRef={reactFlowWrapper}
+              onEdit={() => {
+                // Normalize node type to ensure editor drawer recognizes it
+                const normalizedNode = {
+                  ...currentNode,
+                  type: currentNode.type === 'Webhook' ? 'webhookNode' : currentNode.type
+                }
+                setSelectedNode(normalizedNode)
+                setIsEditorOpen(true)
                 setToolbarNode(null)
-              }
-            }}
-            onDuplicate={() => {
-              const nodeToDuplicate = nodes.find((n) => n.id === toolbarNode.id)
-              if (!nodeToDuplicate) return
-              const newNode: Node = {
-                ...nodeToDuplicate,
-                id: `${nodeToDuplicate.type}_${Date.now()}`,
-                position: {
-                  x: nodeToDuplicate.position.x + 50,
-                  y: nodeToDuplicate.position.y + 50,
-                },
-                selected: false,
-                data: {
-                  ...nodeToDuplicate.data,
-                  name: nodeToDuplicate.data.name
-                    ? `${nodeToDuplicate.data.name} (Copy)`
-                    : 'Copy',
-                },
-              }
-              setNodes((nds) => [...nds, newNode])
-              setToolbarNode(null)
-            }}
-          />
-        )}
+              }}
+              onDelete={() => {
+                setNodeToDelete(currentNode.id)
+                setDeleteDialogOpen(true)
+              }}
+              onDuplicate={() => {
+                const nodeToDuplicate = nodes.find((n) => n.id === currentNode.id)
+                if (!nodeToDuplicate) return
+                const newNode: Node = {
+                  ...nodeToDuplicate,
+                  id: `${nodeToDuplicate.type}_${Date.now()}`,
+                  position: {
+                    x: nodeToDuplicate.position.x + 50,
+                    y: nodeToDuplicate.position.y + 50,
+                  },
+                  selected: false,
+                  data: {
+                    ...nodeToDuplicate.data,
+                    name: nodeToDuplicate.data.name
+                      ? `${nodeToDuplicate.data.name} (Copy)`
+                      : 'Copy',
+                  },
+                }
+                setNodes((nds) => [...nds, newNode])
+                setToolbarNode(null)
+              }}
+            />
+          )
+        })()}
       </div>
 
       <NodeEditorDrawer
@@ -372,6 +551,43 @@ export function FlowchartCanvas({
         onUpdateEdge={onUpdateEdge}
         onDeleteEdge={onDeleteEdge}
       />
+
+      <AlertDialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteDialogOpen(open)
+          if (!open) {
+            setToolbarNode(null)
+            setNodeToDelete(null)
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Node</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this node? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (nodeToDelete) {
+                  setNodes((nds) => nds.filter((n) => n.id !== nodeToDelete))
+                  setEdges((eds) => eds.filter((e) => e.source !== nodeToDelete && e.target !== nodeToDelete))
+                  setToolbarNode(null)
+                  setNodeToDelete(null)
+                }
+                setDeleteDialogOpen(false)
+              }}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   )
 }

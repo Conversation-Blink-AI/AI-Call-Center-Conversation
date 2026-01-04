@@ -132,7 +132,7 @@ export function RecentFlows() {
           </div>
         ))}
         <div className="mt-4 text-center">
-          <Button variant="link" onClick={() => router.push("/dashboard/call-flows")}>
+          <Button variant="link" onClick={() => router.push("/dashboard/pathway")}>
             View All Call Flows
           </Button>
         </div>

@@ -411,8 +411,18 @@ export default function BillingPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="h-full">
+        <ScrollArea className="h-full">
+          <div className="container mx-auto p-6 space-y-6">
+            <div className="flex flex-col space-y-2">
+              <h1 className="text-3xl font-bold tracking-tight">Billing & Payments</h1>
+              <p className="text-muted-foreground">Manage your subscriptions, payment methods, and billing history</p>
+            </div>
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+            </div>
+          </div>
+        </ScrollArea>
       </div>
     )
   }
@@ -506,7 +516,7 @@ export default function BillingPage() {
                 <p className="text-xs text-muted-foreground">Total monthly charges</p>
               </CardContent>
               <CardFooter>
-                <Button variant="outline" className="w-full" onClick={() => setActiveTab("subscriptions")}>
+                <Button variant="outline" className="w-full" onClick={() => router.push("/dashboard/billing/subscriptions")}>
                   Manage Subscriptions
                 </Button>
               </CardFooter>
@@ -584,7 +594,7 @@ export default function BillingPage() {
                       <TableHead>Description</TableHead>
                       <TableHead>Amount</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                      <TableHead className="text-right">Invoice</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>

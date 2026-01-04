@@ -11,17 +11,17 @@ interface CustomerResponseNodeData {
 
 export function CustomerResponseNode({ data, selected }: { data: any; selected?: boolean }) {
   return (
-    <div className={`px-3 py-2 shadow-md rounded-md bg-gradient-to-br from-yellow-100 via-yellow-50 to-yellow-100 w-[255px] h-[100px] transition-all duration-200 relative overflow-visible ${
+    <div className={`px-3 py-2 shadow-md rounded-md bg-gradient-to-br from-yellow-100 via-yellow-50 to-yellow-100 dark:from-yellow-800 dark:via-yellow-700 dark:to-yellow-800 w-[255px] h-[100px] transition-all duration-200 relative overflow-visible ${
       selected ? 'shadow-lg scale-105' : ''
     }`}>
 
       <div className="overflow-hidden h-full flex items-center">
         <div className="flex items-center space-x-1.5">
-          <MessageSquare className="w-5 h-5 text-yellow-600 flex-shrink-0" />
+          <MessageSquare className="w-5 h-5 text-yellow-600 dark:text-yellow-300 flex-shrink-0" />
           <div>
-            <div className="text-[14px] font-medium text-yellow-800">{data.name || 'Customer Response'}</div>
+            <div className="text-[14px] font-medium text-yellow-800 dark:text-yellow-100">{data.name || 'Customer Response'}</div>
             <div
-              className="text-[12px] opacity-80 text-yellow-700 mt-0.5 leading-tight overflow-hidden"
+              className="text-[12px] opacity-80 text-yellow-700 dark:text-yellow-200 mt-0.5 leading-tight overflow-hidden"
               style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}
               title={data.text || 'Handle customer input'}
             >

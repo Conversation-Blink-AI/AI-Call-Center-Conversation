@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { 
   Phone, 
   Send, 
@@ -30,7 +31,8 @@ import {
   Database,
   BarChart3,
   Webhook,
-  Zap
+  Zap,
+  HelpCircle
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
@@ -317,10 +319,295 @@ console.log('Call result:', result);`
   const [countryDropdownOpen, setCountryDropdownOpen] = useState(false)
   const [voiceDropdownOpen, setVoiceDropdownOpen] = useState(false)
   const [pathwayDropdownOpen, setPathwayDropdownOpen] = useState(false)
+  const [helpModalOpen, setHelpModalOpen] = useState<string | null>(null)
 
   useEffect(() => {
     setIsMounted(true)
   }, [])
+
+  // Help content for each section
+  const getHelpContent = (section: string) => {
+    const helpContents: Record<string, { title: string; content: React.ReactNode }> = {
+      basic: {
+        title: "Basic Settings Help",
+        content: (
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-semibold mb-2">Phone Number</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                Enter the phone number you want to call. Include the country code (like +1 for US, +91 for India).
+              </p>
+              <p className="text-sm font-medium">Example:</p>
+              <p className="text-sm text-muted-foreground">+1 1234567890 (US number)</p>
+              <p className="text-sm text-muted-foreground">+91 9876543210 (Indian number)</p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Voice</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                Choose the AI voice that will speak during the call. Each voice has a unique sound and personality.
+              </p>
+              <p className="text-sm font-medium">Example:</p>
+              <p className="text-sm text-muted-foreground">Select "ravi" for an Indian accent voice, or choose from other available voices.</p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Prompt or Pathway</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                You can either write a custom prompt (instructions for the AI) or select a pre-built pathway (a saved call flow).
+              </p>
+              <p className="text-sm font-medium">Prompt Example:</p>
+              <p className="text-sm text-muted-foreground italic">"You are a helpful customer service agent. Answer questions politely and help customers with their orders."</p>
+              <p className="text-sm font-medium mt-2">Pathway:</p>
+              <p className="text-sm text-muted-foreground">Select a saved pathway from the dropdown if you have created one before.</p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">First Sentence</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                The first thing the AI will say when the call connects. This helps set the tone for the conversation.
+              </p>
+              <p className="text-sm font-medium">Example:</p>
+              <p className="text-sm text-muted-foreground">"Hello! This is Sarah calling from ABC Company. How can I help you today?"</p>
+            </div>
+          </div>
+        )
+      },
+      model: {
+        title: "Model Settings Help",
+        content: (
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-semibold mb-2">Model</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                Choose the AI model that will handle the conversation. Different models have different speeds and capabilities.
+              </p>
+              <p className="text-sm font-medium">Options:</p>
+              <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
+                <li><strong>Base:</strong> Standard model, good balance of speed and quality</li>
+                <li><strong>Turbo:</strong> Faster responses, good for quick interactions</li>
+                <li><strong>Enhanced:</strong> More detailed and thoughtful responses</li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Language</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                Select the language for the conversation. The AI will speak and understand in this language.
+              </p>
+              <p className="text-sm font-medium">Example:</p>
+              <p className="text-sm text-muted-foreground">Choose "English" for English conversations, "Spanish" for Spanish, etc.</p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Temperature (0-1)</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                Controls how creative or predictable the AI responses are. Lower values (0.3-0.5) make responses more consistent. Higher values (0.7-0.9) make responses more varied and creative.
+              </p>
+              <p className="text-sm font-medium">Example:</p>
+              <p className="text-sm text-muted-foreground">Use 0.7 for balanced conversations, 0.3 for very consistent responses, 0.9 for creative conversations.</p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Interruption Threshold</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                How long (in milliseconds) the AI waits before it can be interrupted by the person on the call. Lower values allow quicker interruptions.
+              </p>
+              <p className="text-sm font-medium">Example:</p>
+              <p className="text-sm text-muted-foreground">100ms = quick interruptions allowed, 500ms = longer wait before interruption</p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Wait for Greeting</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                If checked, the AI will wait for the person to say "hello" or greet before starting the conversation. This makes calls feel more natural.
+              </p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Persona ID</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                Optional: If you have created a custom persona (a specific AI personality), enter its ID here.
+              </p>
+              <p className="text-sm font-medium">Example:</p>
+              <p className="text-sm text-muted-foreground">persona_123</p>
+            </div>
+          </div>
+        )
+      },
+      dispatch: {
+        title: "Dispatch Settings Help",
+        content: (
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-semibold mb-2">From Number</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                The phone number that will appear as the caller ID. This should be a number you own or have permission to use.
+              </p>
+              <p className="text-sm font-medium">Example:</p>
+              <p className="text-sm text-muted-foreground">+1 5551234567</p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Max Duration (minutes)</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                The maximum length of the call in minutes. The call will automatically end after this time.
+              </p>
+              <p className="text-sm font-medium">Example:</p>
+              <p className="text-sm text-muted-foreground">12 minutes = call ends after 12 minutes even if still talking</p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Timezone</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                Select the timezone for scheduling calls. This ensures calls happen at the right local time.
+              </p>
+              <p className="text-sm font-medium">Example:</p>
+              <p className="text-sm text-muted-foreground">America/New_York for Eastern Time, America/Los_Angeles for Pacific Time</p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Start Time</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                Schedule the call for a specific date and time. Leave empty to make the call immediately.
+              </p>
+              <p className="text-sm font-medium">Example:</p>
+              <p className="text-sm text-muted-foreground">2024-01-15, 10:30 AM - call will be made on January 15th at 10:30 AM</p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Transfer Phone Number</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                If you want to transfer the call to a human agent or another number, enter that number here. The AI can transfer the call when needed.
+              </p>
+              <p className="text-sm font-medium">Example:</p>
+              <p className="text-sm text-muted-foreground">+1 5559876543 - calls will be transferred to this number when requested</p>
+            </div>
+          </div>
+        )
+      },
+      audio: {
+        title: "Audio Settings Help",
+        content: (
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-semibold mb-2">Background Track</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                Add background sounds to make the call feel more natural, like being in an office or cafe.
+              </p>
+              <p className="text-sm font-medium">Options:</p>
+              <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
+                <li><strong>None:</strong> No background sounds</li>
+                <li><strong>Office:</strong> Subtle office background noise</li>
+                <li><strong>Cafe:</strong> Cafe ambiance sounds</li>
+                <li><strong>Nature:</strong> Natural outdoor sounds</li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Noise Cancellation</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                When enabled, the system removes background noise from the call, making it clearer for both parties.
+              </p>
+              <p className="text-sm font-medium">When to use:</p>
+              <p className="text-sm text-muted-foreground">Enable this if the person receiving the call might be in a noisy environment.</p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Block Interruptions</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                When enabled, the AI will continue speaking even if the other person tries to interrupt. Useful for important announcements.
+              </p>
+              <p className="text-sm font-medium">When to use:</p>
+              <p className="text-sm text-muted-foreground">Use for important messages that must be heard completely, like appointment reminders.</p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Record Call</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                When enabled, the call will be recorded so you can listen to it later for quality checks or training purposes.
+              </p>
+              <p className="text-sm font-medium">Note:</p>
+              <p className="text-sm text-muted-foreground">Make sure you have permission to record calls according to local laws.</p>
+            </div>
+          </div>
+        )
+      },
+      analysis: {
+        title: "Analysis & Reporting Help",
+        content: (
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-semibold mb-2">Summary Prompt</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                Custom instructions for how the AI should summarize the call. This helps you get the information you need from each call.
+              </p>
+              <p className="text-sm font-medium">Example:</p>
+              <p className="text-sm text-muted-foreground italic">"Summarize the call focusing on: customer name, main concern, resolution status, and follow-up needed."</p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Dispositions</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                Categories to classify the call outcome. Helps you organize and track different types of call results.
+              </p>
+              <p className="text-sm font-medium">Example:</p>
+              <p className="text-sm text-muted-foreground">interested, not-interested, callback, appointment-scheduled</p>
+              <p className="text-sm text-muted-foreground mt-1">Separate multiple dispositions with commas.</p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Keywords</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                Important words or phrases to track during the call. The system will highlight when these are mentioned.
+              </p>
+              <p className="text-sm font-medium">Example:</p>
+              <p className="text-sm text-muted-foreground">pricing, appointment, demo, refund, complaint</p>
+              <p className="text-sm text-muted-foreground mt-1">Separate multiple keywords with commas.</p>
+            </div>
+          </div>
+        )
+      },
+      postCall: {
+        title: "Post Call Actions Help",
+        content: (
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-semibold mb-2">Webhook URL</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                A web address where the system will send information about the call after it ends. This lets your app know when calls complete.
+              </p>
+              <p className="text-sm font-medium">Example:</p>
+              <p className="text-sm text-muted-foreground">https://your-app.com/webhook/call-completed</p>
+              <p className="text-sm text-muted-foreground mt-1">Your server should be ready to receive POST requests at this URL.</p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Webhook Events</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                Choose which events should trigger a webhook notification. This helps you get updates at the right times.
+              </p>
+              <p className="text-sm font-medium">Example:</p>
+              <p className="text-sm text-muted-foreground">call_started, call_ended, call_analyzed</p>
+              <p className="text-sm font-medium mt-2">Common Events:</p>
+              <ul className="text-sm text-muted-foreground list-disc list-inside space-y-1">
+                <li><strong>call_started:</strong> When the call begins</li>
+                <li><strong>call_ended:</strong> When the call finishes</li>
+                <li><strong>call_analyzed:</strong> When the call summary is ready</li>
+              </ul>
+            </div>
+          </div>
+        )
+      },
+      advanced: {
+        title: "Advanced Options Help",
+        content: (
+          <div className="space-y-4">
+            <div>
+              <h3 className="font-semibold mb-2">Pre-call DTMF Sequence</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                DTMF tones (like phone keypad sounds) to play before the call connects. Some phone systems require this to route calls correctly.
+              </p>
+              <p className="text-sm font-medium">Example:</p>
+              <p className="text-sm text-muted-foreground">1234# - plays tones 1, 2, 3, 4, then #</p>
+              <p className="text-sm text-muted-foreground mt-1">Use numbers 0-9, * and # symbols.</p>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-2">Ignore Button Press</h3>
+              <p className="text-sm text-muted-foreground mb-2">
+                When enabled, the AI will ignore any button presses (like pressing 1, 2, 3 on the phone) during the call. Useful for simple conversations without menu options.
+              </p>
+              <p className="text-sm font-medium">When to use:</p>
+              <p className="text-sm text-muted-foreground">Enable this for direct conversations where you don't want phone menu navigation.</p>
+            </div>
+          </div>
+        )
+      }
+    }
+    return helpContents[section] || { title: "Help", content: "No help content available." }
+  }
 
   if (!isMounted || loadingData) {
     return (
@@ -376,6 +663,16 @@ console.log('Call result:', result);`
                     <div className="flex items-center gap-2">
                       <Phone className="h-5 w-5" />
                       Basic
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setHelpModalOpen('basic')
+                        }}
+                        className="text-muted-foreground hover:text-foreground transition-colors"
+                        aria-label="Help"
+                      >
+                        <HelpCircle className="h-4 w-4" />
+                      </button>
                     </div>
                     {openSections.basic ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                   </CardTitle>
@@ -632,6 +929,16 @@ console.log('Call result:', result);`
                     <div className="flex items-center gap-2">
                       <Brain className="h-5 w-5" />
                       Model Settings
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setHelpModalOpen('model')
+                        }}
+                        className="text-muted-foreground hover:text-foreground transition-colors"
+                        aria-label="Help"
+                      >
+                        <HelpCircle className="h-4 w-4" />
+                      </button>
                     </div>
                     {openSections.model ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                   </CardTitle>
@@ -725,6 +1032,16 @@ console.log('Call result:', result);`
                     <div className="flex items-center gap-2">
                       <Clock className="h-5 w-5" />
                       Dispatch Settings
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setHelpModalOpen('dispatch')
+                        }}
+                        className="text-muted-foreground hover:text-foreground transition-colors"
+                        aria-label="Help"
+                      >
+                        <HelpCircle className="h-4 w-4" />
+                      </button>
                     </div>
                     {openSections.dispatch ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                   </CardTitle>
@@ -801,6 +1118,16 @@ console.log('Call result:', result);`
                     <div className="flex items-center gap-2">
                       <Mic className="h-5 w-5" />
                       Audio Settings
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setHelpModalOpen('audio')
+                        }}
+                        className="text-muted-foreground hover:text-foreground transition-colors"
+                        aria-label="Help"
+                      >
+                        <HelpCircle className="h-4 w-4" />
+                      </button>
                     </div>
                     {openSections.audio ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                   </CardTitle>
@@ -868,6 +1195,16 @@ console.log('Call result:', result);`
                     <div className="flex items-center gap-2">
                       <BarChart3 className="h-5 w-5" />
                       Analysis & Reporting
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setHelpModalOpen('analysis')
+                        }}
+                        className="text-muted-foreground hover:text-foreground transition-colors"
+                        aria-label="Help"
+                      >
+                        <HelpCircle className="h-4 w-4" />
+                      </button>
                     </div>
                     {openSections.analysis ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                   </CardTitle>
@@ -919,6 +1256,16 @@ console.log('Call result:', result);`
                     <div className="flex items-center gap-2">
                       <Webhook className="h-5 w-5" />
                       Post Call Actions
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setHelpModalOpen('postCall')
+                        }}
+                        className="text-muted-foreground hover:text-foreground transition-colors"
+                        aria-label="Help"
+                      >
+                        <HelpCircle className="h-4 w-4" />
+                      </button>
                     </div>
                     {openSections.postCall ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                   </CardTitle>
@@ -960,6 +1307,16 @@ console.log('Call result:', result);`
                     <div className="flex items-center gap-2">
                       <Zap className="h-5 w-5" />
                       Advanced Options
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setHelpModalOpen('advanced')
+                        }}
+                        className="text-muted-foreground hover:text-foreground transition-colors"
+                        aria-label="Help"
+                      >
+                        <HelpCircle className="h-4 w-4" />
+                      </button>
                     </div>
                     {openSections.advanced ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                   </CardTitle>
@@ -1027,6 +1384,21 @@ console.log('Call result:', result);`
           
         </div>
       </div>
+
+      {/* Help Modal */}
+      <Dialog open={helpModalOpen !== null} onOpenChange={(open) => !open && setHelpModalOpen(null)}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{helpModalOpen ? getHelpContent(helpModalOpen).title : "Help"}</DialogTitle>
+            <DialogDescription>
+              Learn more about this section and how to fill it out correctly.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4">
+            {helpModalOpen ? getHelpContent(helpModalOpen).content : null}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

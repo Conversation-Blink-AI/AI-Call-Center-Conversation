@@ -8,8 +8,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { AlertCircle, CheckCircle2, Moon, Sun, Monitor } from "lucide-react"
+import { AlertCircle, CheckCircle2, Moon, Sun, Monitor, Eye, EyeOff } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 
 export default function ProfilePage() {
   const { user, updateProfile } = useAuth()
@@ -19,6 +20,12 @@ export default function ProfilePage() {
   const [isUpdating, setIsUpdating] = useState(false)
   const [error, setError] = useState("")
   const [successMessage, setSuccessMessage] = useState("")
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false)
+  const [newPassword, setNewPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
+  const [passwordError, setPasswordError] = useState("")
+  const [passwordSuccess, setPasswordSuccess] = useState("")
 
   useEffect(() => {
     setMounted(true)
@@ -64,6 +71,46 @@ export default function ProfilePage() {
       setError("An unexpected error occurred. Please try again.")
     } finally {
       setIsUpdating(false)
+    }
+  }
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setPasswordError("")
+    setPasswordSuccess("")
+    setIsChangingPassword(true)
+
+    if (!newPassword || newPassword.length < 8) {
+      setPasswordError("Password must be at least 8 characters long")
+      setIsChangingPassword(false)
+      return
+    }
+
+    try {
+      const response = await fetch("/api/auth/change-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ password: newPassword }),
+      })
+
+      const result = await response.json()
+
+      if (result.success) {
+        setPasswordSuccess(result.message || "Password changed successfully")
+        setNewPassword("")
+        setTimeout(() => {
+          setIsChangePasswordOpen(false)
+          setPasswordSuccess("")
+        }, 2000)
+      } else {
+        setPasswordError(result.message || "Failed to change password")
+      }
+    } catch (err) {
+      setPasswordError("An unexpected error occurred. Please try again.")
+    } finally {
+      setIsChangingPassword(false)
     }
   }
 
@@ -178,9 +225,83 @@ export default function ProfilePage() {
                     <h3 className="text-lg font-medium">Change Password</h3>
                     <p className="text-sm text-gray-500">Update your password regularly for better security</p>
                   </div>
-                  <Button variant="outline">Change Password</Button>
+                  <Button variant="outline" onClick={() => setIsChangePasswordOpen(true)}>Change Password</Button>
                 </div>
               </div>
+
+              <Dialog open={isChangePasswordOpen} onOpenChange={setIsChangePasswordOpen}>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Change Password</DialogTitle>
+                    <DialogDescription>
+                      Enter your new password. Make sure it's at least 8 characters long.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleChangePassword}>
+                    <div className="space-y-4 py-4">
+                      {passwordSuccess && (
+                        <Alert className="bg-green-50 text-green-800 border-green-200">
+                          <CheckCircle2 className="h-4 w-4 text-green-800" />
+                          <AlertDescription>{passwordSuccess}</AlertDescription>
+                        </Alert>
+                      )}
+
+                      {passwordError && (
+                        <Alert variant="destructive">
+                          <AlertCircle className="h-4 w-4" />
+                          <AlertDescription>{passwordError}</AlertDescription>
+                        </Alert>
+                      )}
+
+                      <div className="space-y-2">
+                        <Label htmlFor="newPassword">New Password</Label>
+                        <div className="relative">
+                          <Input
+                            id="newPassword"
+                            type={showPassword ? "text" : "password"}
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            placeholder="Enter new password"
+                            disabled={isChangingPassword}
+                            className="pr-10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600"
+                            disabled={isChangingPassword}
+                          >
+                            {showPassword ? (
+                              <EyeOff className="h-4 w-4" />
+                            ) : (
+                              <Eye className="h-4 w-4" />
+                            )}
+                          </button>
+                        </div>
+                        <p className="text-xs text-muted-foreground">Must be at least 8 characters</p>
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setIsChangePasswordOpen(false)
+                          setNewPassword("")
+                          setPasswordError("")
+                          setPasswordSuccess("")
+                        }}
+                        disabled={isChangingPassword}
+                      >
+                        Cancel
+                      </Button>
+                      <Button type="submit" disabled={isChangingPassword}>
+                        {isChangingPassword ? "Changing..." : "Change Password"}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
             </CardContent>
           </Card>
         </TabsContent>

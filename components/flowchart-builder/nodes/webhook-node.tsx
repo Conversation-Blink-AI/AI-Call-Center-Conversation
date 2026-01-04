@@ -26,8 +26,9 @@ export function WebhookNode({ data, selected }: WebhookNodeProps) {
   return (
     <div
       className={`
-      group relative bg-gradient-to-br from-orange-50 via-white to-orange-50 rounded-lg shadow-lg w-[255px] h-[100px] overflow-visible
-      hover:shadow-xl transition-all duration-200
+      group relative bg-gradient-to-br from-orange-50 via-white to-orange-50 dark:from-orange-800 dark:via-orange-700 dark:to-orange-800 rounded-lg shadow-lg w-[255px] h-[100px] overflow-visible
+      hover:shadow-xl transition-all duration-200 cursor-pointer
+      ${selected ? 'ring-2 ring-blue-500' : ''}
     `}
     >
       {/* Top Handle */}
@@ -45,7 +46,7 @@ export function WebhookNode({ data, selected }: WebhookNodeProps) {
       />
 
       {/* Header */}
-      <div className="bg-gradient-to-r from-orange-100 to-orange-50 text-orange-800 px-1.5 py-0.5 border-b border-orange-200 rounded-t-lg">
+      <div className="bg-gradient-to-r from-orange-100 to-orange-50 dark:from-orange-900 dark:to-orange-800 text-orange-800 dark:text-orange-100 px-1.5 py-0.5 border-b border-orange-200 dark:border-orange-700 rounded-t-lg">
         <div className="flex items-center space-x-1">
           <Globe className="w-5 h-5 flex-shrink-0" />
           <span className="text-[14px] font-medium">Webhook</span>
@@ -55,18 +56,18 @@ export function WebhookNode({ data, selected }: WebhookNodeProps) {
       {/* Content */}
       <div className="p-1.5 flex-1">
         <div className="h-full flex flex-col">
-          <div className="text-[14px] font-medium text-gray-900" title={data.name || 'Webhook Request'}>
+          <div className="text-[14px] font-medium text-gray-900 dark:text-gray-100" title={data.name || 'Webhook Request'}>
             {data.name || 'Webhook Request'}
           </div>
 
           {data.method && data.url && (
-            <div className="text-[12px] opacity-80 text-gray-600 mt-0.5">
-              <span className="font-mono bg-orange-50 px-0.5 py-0.5 rounded text-[7px]">{data.method}</span>
+            <div className="text-[12px] opacity-80 text-gray-600 dark:text-gray-300 mt-0.5">
+              <span className="font-mono bg-orange-50 dark:bg-orange-900 px-0.5 py-0.5 rounded text-[7px]">{data.method}</span>
             </div>
           )}
 
           <div
-            className="text-[12px] opacity-80 text-gray-700 mt-0.5 overflow-hidden leading-tight"
+            className="text-[12px] opacity-80 text-gray-700 dark:text-gray-300 mt-0.5 overflow-hidden leading-tight"
             style={{ display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}
             title={data.text}
           >

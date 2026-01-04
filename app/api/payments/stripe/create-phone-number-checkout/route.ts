@@ -118,6 +118,15 @@ export async function POST(req: Request) {
         area_code: areaCode || '',
         country_code: countryCode,
         purchase_type: 'phone_number'
+      },
+      subscription_data: {
+        metadata: {
+          user_id: userId,
+          phone_number: phoneNumber,
+          area_code: areaCode || '',
+          country_code: countryCode,
+          purchase_type: 'phone_number'
+        }
       }
     })
     } catch (stripeError: any) {
@@ -155,6 +164,15 @@ export async function POST(req: Request) {
               area_code: areaCode || '',
               country_code: countryCode,
               purchase_type: 'phone_number'
+            },
+            subscription_data: {
+              metadata: {
+                user_id: userId,
+                phone_number: phoneNumber,
+                area_code: areaCode || '',
+                country_code: countryCode,
+                purchase_type: 'phone_number'
+              }
             }
           })
         } catch (retryError: any) {
