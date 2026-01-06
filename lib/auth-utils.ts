@@ -3,6 +3,7 @@ import * as jwt from "jsonwebtoken"
 import { Client } from "pg"
 import { NextRequest } from "next/server" // Assuming NextRequest is needed for the getUserFromRequest signature
 import { getSSLConfig } from "./db-client"
+import { normalizeEmail } from "./utils"
 
 // Define User type for clarity, assuming it has at least 'id' and 'email'
 interface User {
@@ -35,20 +36,22 @@ async function getUserById(userId: string): Promise<any | null> {
       [userId]
     )
 
-    // If not found and userId looks like test data, try by email
+    // If not found and userId looks like test data, try by email (case-insensitive)
     if (result.rows.length === 0 && userId.includes('test')) {
       console.log('🔄 [AUTH-UTILS] Trying to find user by email for test user')
+      const testEmail = userId.includes('@') ? normalizeEmail(userId) : 'test1@gmail.com'
       result = await client.query(
-        'SELECT * FROM users WHERE email = $1',
-        [userId.includes('@') ? userId : 'test1@gmail.com']
+        'SELECT * FROM users WHERE LOWER(email) = LOWER($1)',
+        [testEmail]
       )
     }
 
-    // If still not found, try by email directly
+    // If still not found, try by email directly (case-insensitive)
     if (result.rows.length === 0) {
+      const normalizedUserId = normalizeEmail(userId)
       result = await client.query(
-        'SELECT * FROM users WHERE email = $1',
-        [userId]
+        'SELECT * FROM users WHERE LOWER(email) = LOWER($1)',
+        [normalizedUserId]
       )
     }
 

@@ -3,6 +3,7 @@ import { Client } from "pg"
 import * as jwt from "jsonwebtoken"
 import { cookies } from "next/headers"
 import { getSSLConfig } from "@/lib/db-client"
+import { normalizeEmail } from "@/lib/utils"
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
 
@@ -17,7 +18,10 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
 
-    console.log("[AUTH/LOGIN] Attempting external API login for:", email)
+    // Normalize email to lowercase to prevent case-sensitivity issues
+    const normalizedEmail = normalizeEmail(email)
+
+    console.log("[AUTH/LOGIN] Attempting external API login for:", normalizedEmail)
 
     // Get external API URL
     const externalApiUrl = process.env.FOREX_URL || process.env.EXTERNAL_API_URL
@@ -34,7 +38,7 @@ export async function POST(request: Request) {
     const apiEndpoint = `${cleanApiUrl}/api/accounts/login`
 
     const externalLoginData = {
-      email,
+      email: normalizedEmail,
       password,
       platform: "AI Call"
     }
@@ -101,10 +105,10 @@ export async function POST(request: Request) {
       await client.connect()
       console.log("[AUTH/LOGIN] Successfully connected to database")
 
-      // Check if user exists in local database
+      // Check if user exists in local database (case-insensitive lookup)
       const existingUserResult = await client.query(
-        'SELECT * FROM users WHERE email = $1',
-        [email]
+        'SELECT * FROM users WHERE LOWER(email) = LOWER($1)',
+        [normalizedEmail]
       )
 
       if (existingUserResult.rows.length > 0) {
@@ -132,7 +136,7 @@ export async function POST(request: Request) {
             externalUserData.token,
             Boolean(externalUserData.verified), // Ensure boolean conversion
             'AI Call', // Corrected platform
-            email
+            normalizedEmail
           ]
         )
         localUser = updateResult.rows[0]
@@ -147,7 +151,7 @@ export async function POST(request: Request) {
           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW(), NOW())
           RETURNING *`,
           [
-            email,
+            normalizedEmail, // Store normalized email
             externalUserData.firstName,
             externalUserData.lastName,
             externalUserData.phoneNumber,
@@ -211,12 +215,12 @@ export async function POST(request: Request) {
 
     // Check if user is verified before allowing login
     if (!localUser.is_verified) {
-      console.log("[AUTH/LOGIN] User is not verified:", email)
+      console.log("[AUTH/LOGIN] User is not verified:", normalizedEmail)
       return NextResponse.json({
         success: false,
         message: "Please verify your email address before logging in. Check your inbox for the verification email.",
         requiresVerification: true,
-        email: email
+        email: normalizedEmail
       }, { status: 403 })
     }
 
