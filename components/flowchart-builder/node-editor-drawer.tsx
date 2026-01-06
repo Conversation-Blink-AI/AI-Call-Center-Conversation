@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Plus, Trash2, Send, Lock, FileText, Code } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 
 interface NodeEditorDrawerProps {
   isOpen: boolean
@@ -35,6 +36,20 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
       data: {
         ...selectedNode.data,
         [field]: value
+      }
+    }
+    onUpdateNode(selectedNode.id, updates)
+  }
+
+  const handleNestedFieldChange = (field: string, nestedField: string, value: any) => {
+    const currentValue = selectedNode.data[field] || {}
+    const updates = {
+      data: {
+        ...selectedNode.data,
+        [field]: {
+          ...currentValue,
+          [nestedField]: value
+        }
       }
     }
     onUpdateNode(selectedNode.id, updates)
@@ -224,13 +239,13 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
                 </div>
 
                 <div className="bg-card p-2 rounded border border-border">
-                  <p className="text-xs text-primary font-medium">✓ Pre-configured Settings:</p>
+                  <p className="text-xs text-primary font-medium">? Pre-configured Settings:</p>
                   <ul className="text-xs text-muted-foreground mt-1 space-y-1">
-                    <li>• Method: POST</li>
-                    <li>• Content-Type: application/json</li>
-                    <li>• Auto SHA-256 hashing for PII</li>
-                    <li>• Auto timestamp generation</li>
-                    <li>• Action source: voice_call</li>
+                    <li>� Method: POST</li>
+                    <li>� Content-Type: application/json</li>
+                    <li>� Auto SHA-256 hashing for PII</li>
+                    <li>� Auto timestamp generation</li>
+                    <li>� Action source: voice_call</li>
                   </ul>
                 </div>
               </div>
@@ -302,6 +317,7 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
       case 'transferNode':
         return (
           <div className="space-y-4">
+            {/* Basic Fields */}
             <div>
               <Label htmlFor="name">Node Name</Label>
               <Input
@@ -313,12 +329,23 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
             </div>
 
             <div>
-              <Label htmlFor="text">Transfer Message</Label>
+              <Label htmlFor="text">Transfer Message (Static Text)</Label>
               <Textarea
                 id="text"
                 value={selectedNode.data.text || ''}
                 onChange={(e) => handleFieldChange('text', e.target.value)}
                 placeholder="Transferring the call now. Please hold.."
+                rows={2}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="prompt">Prompt (Dynamic Text - Alternative to Static Text)</Label>
+              <Textarea
+                id="prompt"
+                value={selectedNode.data.prompt || ''}
+                onChange={(e) => handleFieldChange('prompt', e.target.value)}
+                placeholder="Generate a dynamic transfer message based on context..."
                 rows={2}
               />
             </div>
@@ -333,6 +360,110 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
                 placeholder="+19547951234"
               />
             </div>
+
+            <div>
+              <Label htmlFor="condition">Condition</Label>
+              <Textarea
+                id="condition"
+                value={selectedNode.data.condition || ''}
+                onChange={(e) => handleFieldChange('condition', e.target.value)}
+                placeholder="Condition that needs to be met to proceed from this node"
+                rows={2}
+              />
+            </div>
+
+            {/* Advanced Options - Accordion */}
+            <Accordion type="multiple" className="w-full">
+              <AccordionItem value="model-options">
+                <AccordionTrigger>Model Options</AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-3 pt-2">
+                    <div>
+                      <Label htmlFor="modelName" className="text-xs">Model Name</Label>
+                      <Input
+                        id="modelName"
+                        value={selectedNode.data.modelOptions?.modelName || ''}
+                        onChange={(e) => handleNestedFieldChange('modelOptions', 'modelName', e.target.value)}
+                        placeholder="Model name to use for this node"
+                        className="h-8"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="interruptionThreshold" className="text-xs">Interruption Threshold (0-1)</Label>
+                      <Input
+                        id="interruptionThreshold"
+                        type="number"
+                        min="0"
+                        max="1"
+                        step="0.1"
+                        value={selectedNode.data.modelOptions?.interruptionThreshold ?? ''}
+                        onChange={(e) => handleNestedFieldChange('modelOptions', 'interruptionThreshold', e.target.value ? parseFloat(e.target.value) : undefined)}
+                        placeholder="0.5"
+                        className="h-8"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="temperature" className="text-xs">Temperature (0-1)</Label>
+                      <Input
+                        id="temperature"
+                        type="number"
+                        min="0"
+                        max="1"
+                        step="0.1"
+                        value={selectedNode.data.modelOptions?.temperature ?? ''}
+                        onChange={(e) => handleNestedFieldChange('modelOptions', 'temperature', e.target.value ? parseFloat(e.target.value) : undefined)}
+                        placeholder="0.7"
+                        className="h-8"
+                      />
+                    </div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="fine-tuning-examples">
+                <AccordionTrigger>Fine-tuning Examples</AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-3 pt-2">
+                    <div>
+                      <Label htmlFor="pathwayExamples" className="text-xs">Pathway Examples</Label>
+                      <Textarea
+                        id="pathwayExamples"
+                        value={selectedNode.data.pathwayExamples || ''}
+                        onChange={(e) => handleFieldChange('pathwayExamples', e.target.value)}
+                        placeholder="Fine-tuning examples for the agent at this node for the pathways chosen"
+                        rows={3}
+                        className="text-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="conditionExamples" className="text-xs">Condition Examples</Label>
+                      <Textarea
+                        id="conditionExamples"
+                        value={selectedNode.data.conditionExamples || ''}
+                        onChange={(e) => handleFieldChange('conditionExamples', e.target.value)}
+                        placeholder="Fine-tuning examples for the condition at this node"
+                        rows={3}
+                        className="text-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="dialogueExamples" className="text-xs">Dialogue Examples</Label>
+                      <Textarea
+                        id="dialogueExamples"
+                        value={selectedNode.data.dialogueExamples || ''}
+                        onChange={(e) => handleFieldChange('dialogueExamples', e.target.value)}
+                        placeholder="Fine-tuning examples for the dialogue at this node"
+                        rows={3}
+                        className="text-sm"
+                      />
+                    </div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+
+            {/* Extract Variables */}
+            {renderExtractVars()}
           </div>
         )
 
@@ -546,8 +677,8 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
           requestOptions.body = selectedNode.data.body;
         }
 
-        console.log('🧪 Testing API:', selectedNode.data.url);
-        console.log('🧪 Request options:', requestOptions);
+        console.log('?? Testing API:', selectedNode.data.url);
+        console.log('?? Request options:', requestOptions);
 
         const response = await fetch(selectedNode.data.url, requestOptions);
         clearTimeout(timeoutId);
@@ -572,7 +703,7 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
 
       } catch (error: any) {
         clearTimeout(timeoutId);
-        console.error('❌ API Test failed:', error);
+        console.error('? API Test failed:', error);
         setTestResult({
           success: false,
           error: error.message || 'Unknown error occurred',
@@ -719,7 +850,7 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
                     onClick={() => handleHeaderRemove(index)}
                     className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
                   >
-                    ✕
+                    ?
                   </Button>
                 </div>
               ))}
@@ -844,7 +975,7 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
             <div className="mt-3 p-3 border rounded-lg bg-muted">
               <div className="flex items-center justify-between mb-2">
                 <Label className="text-sm font-medium">
-                  {testResult.success ? '✅ Test Result' : '❌ Test Failed'}
+                  {testResult.success ? '? Test Result' : '? Test Failed'}
                 </Label>
                 <Badge variant={testResult.success ? "default" : "destructive"} className="text-xs">
                   {testResult.success ? `${testResult.status} ${testResult.statusText}` : 'Error'}

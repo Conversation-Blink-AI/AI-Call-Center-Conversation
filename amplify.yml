@@ -17,6 +17,8 @@ frontend:
           echo "STRIPE_SECRET_KEY=$STRIPE_SECRET_KEY" >> .env.production
           echo "STRIPE_WEBHOOK_SECRET=$STRIPE_WEBHOOK_SECRET" >> .env.production
           echo "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=$NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY" >> .env.production
+          echo "META_CAPI_ACCESS_TOKEN=$META_CAPI_ACCESS_TOKEN" >> .env.production
+          echo "META_PIXEL_ID=$META_PIXEL_ID" >> .env.production
           echo "NODE_ENV=production" >> .env.production
           echo "Environment variables written to .env.production"
           echo "Verifying critical environment variables..."
@@ -28,6 +30,12 @@ frontend:
           fi
           if [ -z "$BLAND_AI_API_KEY" ]; then
             echo "WARNING: BLAND_AI_API_KEY is not set in AWS Amplify environment variables"
+          fi
+          if [ -z "$META_CAPI_ACCESS_TOKEN" ]; then
+            echo "WARNING: META_CAPI_ACCESS_TOKEN is not set in AWS Amplify environment variables"
+          fi
+          if [ -z "$META_PIXEL_ID" ]; then
+            echo "WARNING: META_PIXEL_ID is not set in AWS Amplify environment variables"
           fi
         - npm run build
   artifacts:

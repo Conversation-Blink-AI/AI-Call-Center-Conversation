@@ -6,8 +6,20 @@ import { PhoneForwarded, Pencil, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 
 interface TransferNodeData {
-  text: string
+  name?: string
+  text?: string
+  prompt?: string
+  condition?: string
   transferNumber?: string
+  modelOptions?: {
+    modelName?: string
+    interruptionThreshold?: number
+    temperature?: number
+  }
+  pathwayExamples?: string
+  conditionExamples?: string
+  dialogueExamples?: string
+  extractVars?: any[]
 }
 
 export function TransferNode({ data, selected }: { data: any; selected?: boolean }) {

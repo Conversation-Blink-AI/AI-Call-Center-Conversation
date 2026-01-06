@@ -52,6 +52,8 @@ BLAND_AI_API_KEY=your-bland-ai-api-key
 STRIPE_SECRET_KEY=your-stripe-secret-key
 STRIPE_WEBHOOK_SECRET=your-stripe-webhook-secret
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=your-stripe-publishable-key
+META_CAPI_ACCESS_TOKEN=your-meta-conversions-api-access-token
+META_PIXEL_ID=499073848448643
 FOREX_URL=your-forex-api-url
 EXTERNAL_API_URL=your-external-api-url
 NODE_ENV=production
@@ -125,6 +127,8 @@ Make sure to add these in DigitalOcean App Platform:
 - [ ] `STRIPE_SECRET_KEY` - Stripe secret key
 - [ ] `STRIPE_WEBHOOK_SECRET` - Stripe webhook secret
 - [ ] `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` - Stripe publishable key
+- [ ] `META_CAPI_ACCESS_TOKEN` - Meta Conversions API access token (for Facebook Pixel tracking)
+- [ ] `META_PIXEL_ID` - Meta Pixel ID (default: 499073848448643)
 - [ ] `FOREX_URL` - External API URL (if used)
 - [ ] `EXTERNAL_API_URL` - External API URL (if used)
 - [ ] `NODE_ENV=production` - Set to production
