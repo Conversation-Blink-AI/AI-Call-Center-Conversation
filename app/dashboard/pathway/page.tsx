@@ -9,6 +9,16 @@ import { Badge } from "@/components/ui/badge"
 import { Phone, ArrowRight, Plus, AlertCircle, RefreshCw, Copy } from "lucide-react"
 import { formatPhoneNumber } from "@/utils/phone-utils"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
 import { useEffect, useState } from "react"
 import { useAuth } from "@/contexts/auth"
@@ -41,6 +51,8 @@ export default function PathwayListingPage() {
   const [pathways, setPathways] = useState<Pathway[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showDeactiveDialog, setShowDeactiveDialog] = useState(false)
+  const [pendingPhoneNumber, setPendingPhoneNumber] = useState<string | null>(null)
 
   const isInitialized = true
   const authLoading = false
@@ -104,9 +116,56 @@ export default function PathwayListingPage() {
     fetchData()
   }, [user])
 
-  const handleManagePathway = (phoneNumber: string) => {
-    const cleanNumber = phoneNumber.replace(/^\+\+/, '+').replace(/\D/g, "")
-    router.push(`/dashboard/pathway/${cleanNumber}`)
+  const handleManagePathway = (phoneNumber: string, status: string) => {
+    // Normalize status for comparison (trim whitespace and convert to lowercase)
+    const normalizedStatus = status ? status.trim().toLowerCase() : ''
+    
+    // Check if the phone number is in deactive state
+    // Handles: "deactive", "deacative" (typo), "inactive", etc.
+    // Check for exact matches and variations
+    const isDeactive = 
+      normalizedStatus === 'deactive' ||
+      normalizedStatus === 'deacative' || // Handle typo "Deacative"
+      normalizedStatus === 'inactive' ||
+      normalizedStatus.includes('deactive') || 
+      normalizedStatus.includes('deacative') || // Handle typo "Deacative" 
+      normalizedStatus.startsWith('deact') || // Catch "deactive", "deactivated", etc.
+      normalizedStatus.startsWith('deac') // Catch "deacative" typo
+    
+    console.log('[PATHWAY-PAGE] handleManagePathway called:', {
+      phoneNumber,
+      originalStatus: status,
+      normalizedStatus,
+      isDeactive,
+      statusLength: status?.length,
+      normalizedLength: normalizedStatus.length
+    })
+    
+    if (isDeactive) {
+      // Show confirmation dialog
+      console.log('[PATHWAY-PAGE] Showing deactive confirmation dialog')
+      setPendingPhoneNumber(phoneNumber)
+      setShowDeactiveDialog(true)
+    } else {
+      // Proceed directly if not deactive
+      console.log('[PATHWAY-PAGE] Proceeding directly to pathway editor (status is active)')
+      const cleanNumber = phoneNumber.replace(/^\+\+/, '+').replace(/\D/g, "")
+      router.push(`/dashboard/pathway/${cleanNumber}`)
+    }
+  }
+
+  const handleConfirmEdit = () => {
+    if (pendingPhoneNumber) {
+      const cleanNumber = pendingPhoneNumber.replace(/^\+\+/, '+').replace(/\D/g, "")
+      router.push(`/dashboard/pathway/${cleanNumber}`)
+    }
+    setShowDeactiveDialog(false)
+    setPendingPhoneNumber(null)
+  }
+
+  const handleCancelEdit = () => {
+    setShowDeactiveDialog(false)
+    setPendingPhoneNumber(null)
   }
 
   const [copiedId, setCopiedId] = useState<string | null>(null)
@@ -120,6 +179,32 @@ export default function PathwayListingPage() {
     setTimeout(() => {
       setCopiedId(null)
     }, 2000)
+  }
+
+  // Helper function to check if status is deactive
+  const isDeactiveStatus = (status: string): boolean => {
+    if (!status) return false
+    const normalizedStatus = status.trim().toLowerCase()
+    return (
+      normalizedStatus === 'deactive' ||
+      normalizedStatus === 'deacative' ||
+      normalizedStatus === 'inactive' ||
+      normalizedStatus.includes('deactive') ||
+      normalizedStatus.includes('deacative') ||
+      normalizedStatus.startsWith('deact') ||
+      normalizedStatus.startsWith('deac')
+    )
+  }
+
+  // Helper function to get badge variant based on status
+  const getStatusBadgeVariant = (status: string) => {
+    if (isDeactiveStatus(status)) {
+      return 'destructive' // Red/orange color for deactive
+    }
+    if (status?.toLowerCase() === 'active') {
+      return 'default' // Primary color for active
+    }
+    return 'secondary' // Gray for other statuses
   }
 
   if (loading) {
@@ -194,24 +279,32 @@ export default function PathwayListingPage() {
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {phoneNumbers.map((phone) => {
             const hasPathway = phone.pathway_id
+            const isDeactive = isDeactiveStatus(phone.status)
 
             return (
-              <Card key={phone.id} className="shadow-sm hover:shadow-md transition-shadow">
+              <Card 
+                key={phone.id} 
+                className={`shadow-sm hover:shadow-md transition-shadow ${
+                  isDeactive 
+                    ? 'border-destructive/50 bg-destructive/5 opacity-90' 
+                    : ''
+                }`}
+              >
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <Phone className="h-5 w-5 text-blue-600" />
+                      <Phone className={`h-5 w-5 ${isDeactive ? 'text-destructive' : 'text-blue-600'}`} />
                       <div className="flex items-center gap-2">
-                        <CardTitle className="text-lg">{formatPhoneNumber(phone.number)}</CardTitle>
-                        <Badge 
-                          variant={phone.status === "active" ? "default" : "secondary"}
-                        >
+                        <CardTitle className={`text-lg ${isDeactive ? 'text-destructive' : ''}`}>
+                          {formatPhoneNumber(phone.number)}
+                        </CardTitle>
+                        <Badge variant={getStatusBadgeVariant(phone.status)}>
                           {phone.status}
                         </Badge>
                       </div>
                     </div>
                   </div>
-                  <CardDescription className="mt-2">
+                  <CardDescription className={`mt-2 ${isDeactive ? 'text-destructive/70' : ''}`}>
                     {phone.location} • {phone.type}
                   </CardDescription>
                 </CardHeader>
@@ -220,10 +313,16 @@ export default function PathwayListingPage() {
                   {hasPathway ? (
                     <div className="space-y-3">
                       <div className="flex items-start gap-3">
-                        <div className="h-2 w-2 bg-green-500 rounded-full mt-2 flex-shrink-0"></div>
+                        <div 
+                          className={`h-2 w-2 rounded-full mt-2 flex-shrink-0 ${
+                            isDeactive ? 'bg-destructive' : 'bg-green-500'
+                          }`}
+                        ></div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-1">
-                            <span className="text-sm font-medium text-green-700">
+                            <span className={`text-sm font-medium ${
+                              isDeactive ? 'text-destructive' : 'text-green-700'
+                            }`}>
                               Pathway Connected
                             </span>
                           </div>
@@ -277,7 +376,7 @@ export default function PathwayListingPage() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleManagePathway(phone.number)}
+                    onClick={() => handleManagePathway(phone.number, phone.status)}
                     className="w-full justify-center"
                   >
                     <ArrowRight className="h-4 w-4 mr-2" />
@@ -289,6 +388,21 @@ export default function PathwayListingPage() {
           })}
         </div>
       )}
+
+      <AlertDialog open={showDeactiveDialog} onOpenChange={setShowDeactiveDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Number is Deactive</AlertDialogTitle>
+            <AlertDialogDescription>
+              This Number is Deactive state do you still want to edit the Pathway?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={handleCancelEdit}>No</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmEdit}>Yes</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
