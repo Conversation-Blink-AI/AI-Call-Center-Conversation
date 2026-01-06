@@ -4,6 +4,7 @@ import { Client } from "pg"
 import * as jwt from "jsonwebtoken"
 import { cookies } from "next/headers"
 import { getSSLConfig } from "@/lib/db-client"
+import { normalizeEmail } from "@/lib/utils"
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
 
@@ -18,7 +19,10 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
 
-    console.log("[AUTH/SIGNUP] Attempting external signup for:", email)
+    // Normalize email to lowercase to prevent case-sensitivity issues
+    const normalizedEmail = normalizeEmail(email)
+
+    console.log("[AUTH/SIGNUP] Attempting external signup for:", normalizedEmail)
 
     // Call external API for signup FIRST
     const externalApiUrl = process.env.FOREX_URL || process.env.EXTERNAL_API_URL
@@ -37,7 +41,7 @@ export async function POST(request: Request) {
     const externalSignupData = {
       firstName,
       lastName,
-      email,
+      email: normalizedEmail,
       password,
       phoneNumber: phoneNumber || '',
       platform: "AI Call"
@@ -103,10 +107,10 @@ export async function POST(request: Request) {
     try {
       await client.connect()
 
-      // Check if user already exists in local database AFTER external API success
+      // Check if user already exists in local database AFTER external API success (case-insensitive lookup)
       const existingUser = await client.query(
-        'SELECT * FROM users WHERE email = $1',
-        [email]
+        'SELECT * FROM users WHERE LOWER(email) = LOWER($1)',
+        [normalizedEmail]
       )
 
       if (existingUser.rows.length > 0) {
@@ -137,7 +141,7 @@ export async function POST(request: Request) {
             true, // Set as verified since external API succeeded
             'AI Call',
             password,
-            email
+            normalizedEmail
           ]
         )
 
@@ -179,7 +183,7 @@ export async function POST(request: Request) {
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
          RETURNING *`,
         [
-          email,
+          normalizedEmail, // Store normalized email
           firstName,
           lastName,
           company || '',

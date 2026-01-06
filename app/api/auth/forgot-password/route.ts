@@ -1,5 +1,6 @@
 
 import { NextResponse } from "next/server"
+import { normalizeEmail } from "@/lib/utils"
 
 export async function POST(request: Request) {
   try {
@@ -12,7 +13,10 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
 
-    console.log("[AUTH/FORGOT-PASSWORD] Attempting forgot password for:", email)
+    // Normalize email to lowercase to prevent case-sensitivity issues
+    const normalizedEmail = normalizeEmail(email)
+
+    console.log("[AUTH/FORGOT-PASSWORD] Attempting forgot password for:", normalizedEmail)
 
     // Get external API URL
     const externalApiUrl = process.env.FOREX_URL || process.env.EXTERNAL_API_URL
@@ -29,7 +33,7 @@ export async function POST(request: Request) {
     const apiEndpoint = `${cleanApiUrl}/api/accounts/forgot-password`
 
     const requestData = {
-      email
+      email: normalizedEmail
     }
 
     console.log("[AUTH/FORGOT-PASSWORD] Calling external API:", apiEndpoint)

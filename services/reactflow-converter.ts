@@ -145,12 +145,28 @@ export function convertReactFlowToBland(reactFlowData: ReactFlowData): BlandFlow
     
     // Special handling for Transfer nodes
     if (node.type === 'transferNode') {
-      nodeWithPosition.type = 'Transfer'
-      nodeWithPosition.data = {
+      nodeWithPosition.type = 'Transfer Call'
+      // Build data object with all fields, removing undefined values
+      const transferData: any = {
         transferNumber: cleanData.transferNumber || cleanData.transfer_phone_number,
         name: cleanData.name || 'Transfer Call',
-        text: cleanData.text || 'Transferring call...'
       }
+      
+      // Add optional fields only if they exist
+      if (cleanData.text !== undefined && cleanData.text !== '') transferData.text = cleanData.text
+      if (cleanData.prompt !== undefined && cleanData.prompt !== '') transferData.prompt = cleanData.prompt
+      if (cleanData.condition !== undefined && cleanData.condition !== '') transferData.condition = cleanData.condition
+      if (cleanData.modelOptions !== undefined && Object.keys(cleanData.modelOptions || {}).length > 0) {
+        transferData.modelOptions = cleanData.modelOptions
+      }
+      if (cleanData.pathwayExamples !== undefined && cleanData.pathwayExamples !== '') transferData.pathwayExamples = cleanData.pathwayExamples
+      if (cleanData.conditionExamples !== undefined && cleanData.conditionExamples !== '') transferData.conditionExamples = cleanData.conditionExamples
+      if (cleanData.dialogueExamples !== undefined && cleanData.dialogueExamples !== '') transferData.dialogueExamples = cleanData.dialogueExamples
+      if (cleanData.extractVars !== undefined && Array.isArray(cleanData.extractVars) && cleanData.extractVars.length > 0) {
+        transferData.extractVars = cleanData.extractVars
+      }
+      
+      nodeWithPosition.data = transferData
       return nodeWithPosition
     }
     
@@ -218,6 +234,7 @@ export function convertBlandToReactFlow(blandData: BlandFlowData): ReactFlowData
     'Default': 'greetingNode', // Default fallback
     'Webhook': 'webhookNode',
     'Transfer': 'transferNode',
+    'Transfer Call': 'transferNode', // Handle both "Transfer" and "Transfer Call" for backward compatibility
     'End Call': 'endCallNode'
   }
   

@@ -1,4 +1,5 @@
 import { Client } from "pg"
+import { normalizeEmail } from "./utils"
 
 // Helper function to get SSL config for DigitalOcean
 function getSSLConfig() {
@@ -43,9 +44,10 @@ export async function getUserById(id: string) {
 }
 
 export async function getUserByEmail(email: string) {
+  const normalizedEmail = normalizeEmail(email)
   return executeQuery(
-    "SELECT * FROM users WHERE email = $1",
-    [email]
+    "SELECT * FROM users WHERE LOWER(email) = LOWER($1)",
+    [normalizedEmail]
   )
 }
 
@@ -57,12 +59,13 @@ export async function createUser(userData: {
   phone_number?: string
   passwordHash: string
 }) {
+  const normalizedEmail = normalizeEmail(userData.email)
   return executeQuery(`
     INSERT INTO users (email, name, company, role, phone_number, password_hash, created_at, updated_at)
     VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
     RETURNING id, email, name, company, role, phone_number, created_at, updated_at
   `, [
-    userData.email,
+    normalizedEmail,
     userData.name,
     userData.company || null,
     userData.role || 'user',

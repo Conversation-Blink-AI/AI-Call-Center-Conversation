@@ -6,6 +6,95 @@ import { toE164Format } from "@/utils/phone-utils"
 export const dynamic = "force-dynamic"
 
 /**
+ * Helper function to extract fields from webhook payload
+ * Priority: root level → variables object → alternative field names → null
+ */
+function extractField(body: any, field: string, altFields?: string[]): any {
+  // Try root level first
+  if (body[field] !== undefined && body[field] !== null) {
+    return body[field]
+  }
+  
+  // Try variables object
+  if (body.variables && body.variables[field] !== undefined && body.variables[field] !== null) {
+    return body.variables[field]
+  }
+  
+  // Try alternative field names at root level
+  if (altFields) {
+    for (const altField of altFields) {
+      if (body[altField] !== undefined && body[altField] !== null) {
+        return body[altField]
+      }
+      // Also check in variables object
+      if (body.variables && body.variables[altField] !== undefined && body.variables[altField] !== null) {
+        return body.variables[altField]
+      }
+    }
+  }
+  
+  return null
+}
+
+/**
+ * Helper function to extract and format transcript from various formats
+ */
+function extractTranscript(body: any): string | null {
+  // Try concatenated_transcript first (preferred - already formatted)
+  if (body.concatenated_transcript) {
+    return body.concatenated_transcript
+  }
+  
+  // Try transcripts array - format as conversation
+  if (body.transcripts && Array.isArray(body.transcripts) && body.transcripts.length > 0) {
+    return body.transcripts
+      .map((t: any) => {
+        const role = t.user || 'unknown'
+        const text = t.text || ''
+        return `${role}: ${text}`
+      })
+      .join('\n')
+  }
+  
+  // Fallback to root level fields
+  return body.transcription || body.transcript || null
+}
+
+/**
+ * Helper function to parse duration from various formats
+ */
+function parseDuration(body: any): number | null {
+  // Try corrected_duration (may be string)
+  const correctedDuration = body.corrected_duration
+  if (correctedDuration !== undefined && correctedDuration !== null) {
+    const parsed = typeof correctedDuration === 'string' 
+      ? parseFloat(correctedDuration) 
+      : Number(correctedDuration)
+    if (!isNaN(parsed)) {
+      return parsed
+    }
+  }
+  
+  // Try call_length (usually a number)
+  if (body.call_length !== undefined && body.call_length !== null) {
+    const parsed = Number(body.call_length)
+    if (!isNaN(parsed)) {
+      return parsed
+    }
+  }
+  
+  // Fallback to duration
+  if (body.duration !== undefined && body.duration !== null) {
+    const parsed = Number(body.duration)
+    if (!isNaN(parsed)) {
+      return parsed
+    }
+  }
+  
+  return null
+}
+
+/**
  * GET endpoint for webhook health check and testing
  */
 export async function GET(request: NextRequest) {
@@ -79,9 +168,11 @@ export async function POST(request: NextRequest) {
       }, { status: 400 })
     }
 
-    // Extract phone numbers - try multiple field name variations
-    const fromNumber = body.from || body.from_number || body.fromNumber || body['from_number']
-    const toNumber = body.to || body.to_number || body.toNumber || body['to_number']
+    // Extract phone numbers - try multiple field name variations (including nested variables)
+    const fromNumber = extractField(body, 'from', ['from_number', 'fromNumber']) || 
+                       body.from || body.from_number || body.fromNumber || body['from_number']
+    const toNumber = extractField(body, 'to', ['to_number', 'toNumber']) || 
+                     body.to || body.to_number || body.toNumber || body['to_number']
     
     console.log("🔔 [BLAND-WEBHOOK] Raw phone number values:")
     console.log("   - body.from:", body.from)
@@ -124,35 +215,35 @@ export async function POST(request: NextRequest) {
     console.log(`✅ [BLAND-WEBHOOK] Found user: ${userLookup.user_id}, phone_number_id: ${userLookup.phone_number_id}`)
 
     // Map webhook payload to call_logs format
-    // Mapping all Bland.ai built-in variables
+    // Mapping all Bland.ai built-in variables with support for nested variables object
     const callLogData = {
       call_id: actualCallId,
       user_id: userLookup.user_id,
       from_number: fromNumber ? toE164Format(fromNumber) : '',
       to_number: toNumber ? toE164Format(toNumber) : '',
-      duration_seconds: body.corrected_duration || body.call_length || body.duration || null,
-      status: body.status || null,
-      recording_url: body.recording_url || null,
-      transcript: body.transcription || body.transcript || null,
-      summary: body.summary || null,
-      pathway_id: body.pathway_id || null,
-      ended_reason: body.ended_reason || null,
-      start_time: body.started_at || body.start_time || null,
-      end_time: body.ended_at || body.end_time || null,
-      queue_time: body.queue_time || null,
-      latency_ms: body.latency || body.latency_ms || null,
-      interruptions: body.interruptions || null,
+      duration_seconds: parseDuration(body),
+      status: extractField(body, 'status') || body.status || null,
+      recording_url: extractField(body, 'recording_url') || body.recording_url || null,
+      transcript: extractTranscript(body),
+      summary: extractField(body, 'summary') || body.summary || null,
+      pathway_id: extractField(body, 'pathway_id') || body.pathway_id || null,
+      ended_reason: extractField(body, 'call_ended_by', ['ended_reason']) || body.call_ended_by || body.ended_reason || null,
+      start_time: extractField(body, 'started_at', ['start_time']) || body.started_at || body.start_time || null,
+      end_time: extractField(body, 'end_at', ['ended_at', 'end_time']) || body.end_at || body.ended_at || body.end_time || null,
+      queue_time: extractField(body, 'queue_time') || body.queue_time || null,
+      latency_ms: extractField(body, 'latency_ms', ['latency']) || body.latency_ms || body.latency || null,
+      interruptions: extractField(body, 'interruptions') || body.interruptions || null,
       phone_number_id: userLookup.phone_number_id || null,
-      // Bland.ai built-in variables mapping
-      phone_number: body.phone_number || null, // {{phone_number}} - Always the other party's number
-      country: body.country || null, // {{country}} - Country code (e.g., US)
-      state: body.state || null, // {{state}} - State/province abbreviation (e.g., CA)
-      city: body.city || null, // {{city}} - Full city name, capitalized
-      zip: body.zip || null, // {{zip}} - Zip code
-      short_from: body.short_from || null, // {{short_from}} - Outbound number with country code removed
-      short_to: body.short_to || null, // {{short_to}} - Inbound number with country code removed
-      call_timezone: body.now || body.call_timezone || null, // {{now}} - Current time in call's timezone
-      call_time_utc: body.now_utc || body.call_time_utc || null // {{now_utc}} - Current time in UTC
+      // Bland.ai built-in variables mapping (check nested variables object first)
+      phone_number: extractField(body, 'phone_number') || body.phone_number || null, // {{phone_number}} - Always the other party's number
+      country: extractField(body, 'country') || body.country || null, // {{country}} - Country code (e.g., US)
+      state: extractField(body, 'state') || body.state || null, // {{state}} - State/province (may be city name for some countries)
+      city: extractField(body, 'city') || body.city || null, // {{city}} - Full city name, capitalized
+      zip: extractField(body, 'zip') || body.zip || null, // {{zip}} - Zip code
+      short_from: extractField(body, 'short_from') || body.short_from || null, // {{short_from}} - Outbound number with country code removed
+      short_to: extractField(body, 'short_to') || body.short_to || null, // {{short_to}} - Inbound number with country code removed
+      call_timezone: extractField(body, 'now', ['call_timezone']) || body.now || body.call_timezone || null, // {{now}} - Current time in call's timezone
+      call_time_utc: extractField(body, 'now_utc', ['call_time_utc']) || body.now_utc || body.call_time_utc || null // {{now_utc}} - Current time in UTC
     }
 
     // Save call log to database

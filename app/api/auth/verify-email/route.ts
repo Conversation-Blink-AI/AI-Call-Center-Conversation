@@ -4,6 +4,7 @@ import { Client } from "pg"
 import * as jwt from "jsonwebtoken"
 import { cookies } from "next/headers"
 import { getSSLConfig } from "@/lib/db-client"
+import { normalizeEmail } from "@/lib/utils"
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
 
@@ -18,7 +19,10 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
 
-    console.log("[AUTH/VERIFY] Verifying email for:", email)
+    // Normalize email to lowercase to prevent case-sensitivity issues
+    const normalizedEmail = normalizeEmail(email)
+
+    console.log("[AUTH/VERIFY] Verifying email for:", normalizedEmail)
 
     const client = new Client({
       connectionString: process.env.DATABASE_URL,
@@ -28,13 +32,13 @@ export async function POST(request: Request) {
     try {
       await client.connect()
 
-      // Find user with matching email and verification token
+      // Find user with matching email and verification token (case-insensitive lookup)
       const result = await client.query(
         `UPDATE users 
          SET is_verified = true, verification_token = NULL, verification_expires_at = NULL, updated_at = NOW()
-         WHERE email = $1 AND verification_token = $2 AND verification_expires_at > NOW()
+         WHERE LOWER(email) = LOWER($1) AND verification_token = $2 AND verification_expires_at > NOW()
          RETURNING *`,
-        [email, verificationToken]
+        [normalizedEmail, verificationToken]
       )
 
       if (result.rows.length === 0) {
@@ -106,6 +110,9 @@ export async function GET(request: Request) {
       }, { status: 400 })
     }
 
+    // Normalize email to lowercase to prevent case-sensitivity issues
+    const normalizedEmail = normalizeEmail(email)
+
     const client = new Client({
       connectionString: process.env.DATABASE_URL,
       ssl: getSSLConfig()
@@ -115,8 +122,8 @@ export async function GET(request: Request) {
       await client.connect()
 
       const result = await client.query(
-        'SELECT is_verified, verification_expires_at FROM users WHERE email = $1',
-        [email]
+        'SELECT is_verified, verification_expires_at FROM users WHERE LOWER(email) = LOWER($1)',
+        [normalizedEmail]
       )
 
       if (result.rows.length === 0) {
