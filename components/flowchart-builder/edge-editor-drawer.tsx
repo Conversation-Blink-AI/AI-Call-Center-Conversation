@@ -14,7 +14,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Trash2 } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Trash2, HelpCircle } from 'lucide-react'
 
 interface EdgeEditorDrawerProps {
   isOpen: boolean
@@ -95,7 +96,37 @@ export function EdgeEditorDrawer({
         <div className="space-y-6 mt-6">
           {/* Pathway Label */}
           <div className="space-y-2">
-            <Label htmlFor="pathway-label">Pathway Label</Label>
+            <div className="flex items-center gap-2">
+              <Label htmlFor="pathway-label">Pathway Label</Label>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex items-center justify-center rounded-full focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      aria-label="Help with pathway label examples"
+                    >
+                      <HelpCircle className="h-4 w-4 text-muted-foreground hover:text-foreground transition-colors" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <div className="space-y-2">
+                      <p className="font-semibold mb-2">Example pathway labels:</p>
+                      <ul className="list-disc list-inside space-y-1 text-sm">
+                        <li>&quot;user said yes&quot;</li>
+                        <li>&quot;user said no&quot;</li>
+                        <li>&quot;Age &gt; 65&quot;</li>
+                        <li>&quot;opted for callback&quot;</li>
+                        <li>&quot;interested in pricing&quot;</li>
+                      </ul>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Keep labels short and descriptive of the condition that triggers this pathway.
+                      </p>
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
             <p className="text-sm text-muted-foreground">
               Enter a label that describes when this pathway should be chosen. Keep it short and succinct e.g. user said yes
             </p>

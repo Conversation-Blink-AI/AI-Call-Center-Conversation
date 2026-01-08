@@ -2,18 +2,34 @@ import { useState, useEffect } from 'react'
 import { Button } from './ui/button'
 import { loadStripe } from '@stripe/stripe-js'
 import { useToast } from './ui/use-toast'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from './ui/alert-dialog'
 
 export default function TopUpStripeButton({ amount, onSuccess }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const { toast } = useToast()
 
-  const handleTopUp = async () => {
+  const handleTopUpClick = () => {
+    // Show confirmation modal instead of alert
+    setShowConfirmDialog(true)
+  }
+
+  const handleConfirmPayment = async () => {
+    setShowConfirmDialog(false)
+    
     try {
       setLoading(true)
       setError(null)
-
-      alert(`Initiating Stripe payment for $${amount}`)
 
       // Create checkout session
       const response = await fetch('/api/payments/stripe/create-checkout-session', {
@@ -137,19 +153,41 @@ export default function TopUpStripeButton({ amount, onSuccess }) {
   }
 
   return (
-    <Button
-      onClick={handleTopUp}
-      disabled={loading}
-      className="w-full"
-    >
-      {loading ? (
-        <>
-          <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-b-transparent" />
-          Processing...
-        </>
-      ) : (
-        `Add $${amount} via Stripe`
-      )}
-    </Button>
+    <>
+      <Button
+        onClick={handleTopUpClick}
+        disabled={loading}
+        className="w-full"
+      >
+        {loading ? (
+          <>
+            <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-b-transparent" />
+            Processing...
+          </>
+        ) : (
+          `Add $${amount} via Stripe`
+        )}
+      </Button>
+
+      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Add Funds to Wallet</AlertDialogTitle>
+            <AlertDialogDescription>
+              You are about to add <strong>${amount}</strong> to your wallet via Stripe. 
+              You will be redirected to Stripe's secure payment page to complete the transaction.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowConfirmDialog(false)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmPayment}>
+              Continue to Payment
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }
