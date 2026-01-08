@@ -27,9 +27,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate required fields
-    const { phone_number } = body
+    const { phone_number, from } = body
     if (!phone_number) {
       return NextResponse.json({ error: "Phone number is required" }, { status: 400 })
+    }
+
+    // Validate from number is required
+    if (!from) {
+      return NextResponse.json({ error: "From number is required" }, { status: 400 })
     }
 
     // Check if either pathway_id or task is provided

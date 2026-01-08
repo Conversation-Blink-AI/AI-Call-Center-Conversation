@@ -96,10 +96,16 @@ interface CallData {
   precall_dtmf_sequence?: string
 }
 
+interface PurchasedNumber {
+  id: string
+  number: string
+}
+
 export default function SendCallPage() {
   const { user } = useAuth()
   const [pathways, setPathways] = useState<Pathway[]>([])
   const [voices, setVoices] = useState<Voice[]>([])
+  const [purchasedNumbers, setPurchasedNumbers] = useState<PurchasedNumber[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [loadingData, setLoadingData] = useState(true)
 
@@ -189,6 +195,20 @@ export default function SendCallPage() {
           }
         }
 
+        // Fetch user's purchased phone numbers
+        const phoneNumbersResponse = await fetch('/api/user/phone-numbers', {
+          credentials: 'include'
+        })
+        if (phoneNumbersResponse.ok) {
+          const phoneNumbersData = await phoneNumbersResponse.json()
+          if (phoneNumbersData.success && phoneNumbersData.phoneNumbers) {
+            setPurchasedNumbers(phoneNumbersData.phoneNumbers.map((pn: any) => ({
+              id: pn.id,
+              number: pn.number
+            })))
+          }
+        }
+
       } catch (error) {
         console.error('Error fetching data:', error)
         toast.error('Failed to load data')
@@ -214,6 +234,12 @@ export default function SendCallPage() {
     // Validate voice selection
     if (!callData.voice) {
       toast.error('Please select a voice')
+      return
+    }
+
+    // Validate from number selection
+    if (!callData.from) {
+      setFromNumberAlertOpen(true)
       return
     }
 
@@ -320,6 +346,7 @@ console.log('Call result:', result);`
   const [voiceDropdownOpen, setVoiceDropdownOpen] = useState(false)
   const [pathwayDropdownOpen, setPathwayDropdownOpen] = useState(false)
   const [helpModalOpen, setHelpModalOpen] = useState<string | null>(null)
+  const [fromNumberAlertOpen, setFromNumberAlertOpen] = useState(false)
 
   useEffect(() => {
     setIsMounted(true)
@@ -742,6 +769,51 @@ console.log('Call result:', result);`
                     )}
                   </div>
 
+                  {/* From Number Selection */}
+                  <div className="space-y-2">
+                    <Label htmlFor="from">From Number *</Label>
+                    <Select 
+                      value={callData.from || ""} 
+                      onValueChange={(value) => updateCallData('from', value)}
+                    >
+                      <SelectTrigger className="w-full" id="from">
+                        <SelectValue placeholder="Select a number">
+                          {callData.from || "Select a number"}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent 
+                        className="max-h-[200px] overflow-y-auto z-50" 
+                        position="popper"
+                        sideOffset={4}
+                        avoidCollisions={true}
+                      >
+                        {purchasedNumbers.length === 0 ? (
+                          <div className="px-2 py-4 text-sm text-muted-foreground text-center">
+                            No numbers available. Please purchase a number first.
+                          </div>
+                        ) : (
+                          purchasedNumbers.map((pn) => (
+                            <SelectItem 
+                              key={pn.id} 
+                              value={pn.number}
+                            >
+                              <div className="flex items-center gap-2">
+                                <Phone className="h-4 w-4" />
+                                <span>{pn.number}</span>
+                              </div>
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    {/* Show selected from number info */}
+                    {callData.from && (
+                      <p className="text-xs text-muted-foreground">
+                        Caller ID: {callData.from}
+                      </p>
+                    )}
+                  </div>
+
                   {/* Voice Selection */}
                   <div className="space-y-2">
                     <Label htmlFor="voice">Voice</Label>
@@ -1054,14 +1126,6 @@ console.log('Call result:', result);`
                 <CardContent className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label>From Number</Label>
-                      <Input
-                        placeholder="+1234567890"
-                        value={callData.from || ""}
-                        onChange={(e) => updateCallData('from', e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
                       <Label>Max Duration (minutes)</Label>
                       <Input
                         type="number"
@@ -1069,9 +1133,6 @@ console.log('Call result:', result);`
                         onChange={(e) => updateCallData('max_duration', e.target.value ? Number(e.target.value) : undefined)}
                       />
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label>Timezone</Label>
                       <Select value={callData.timezone || ""} onValueChange={(value) => updateCallData('timezone', value)}>
@@ -1396,6 +1457,26 @@ console.log('Call result:', result);`
           </DialogHeader>
           <div className="mt-4">
             {helpModalOpen ? getHelpContent(helpModalOpen).content : null}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* From Number Required Alert Modal */}
+      <Dialog open={fromNumberAlertOpen} onOpenChange={setFromNumberAlertOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-orange-500">
+              <Phone className="h-5 w-5" />
+              From Number Required
+            </DialogTitle>
+            <DialogDescription className="pt-2">
+              Please select a purchased number in the <strong>From Number</strong> field before sending a call.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4 flex justify-end">
+            <Button onClick={() => setFromNumberAlertOpen(false)}>
+              OK
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
