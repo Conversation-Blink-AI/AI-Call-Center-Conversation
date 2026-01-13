@@ -162,7 +162,8 @@ async function updateBlandInboundConfig(phoneNumber: string, pathwayId?: string)
 
   const requestBody: any = {
     // Set the inbound webhook to your Bland webhook endpoint
-    webhook_url: 'https://dev.conversation.blinklab.in/api/webhooks/bland',
+    webhook: 'https://dev.conversation.blinklab.in/api/webhooks/bland',
+    webhook_events: ['webhook'],
   }
 
   // Link pathway to number if pathway_id is provided
@@ -251,50 +252,97 @@ async function handlePhoneNumberPurchase(
 
     // Purchase the phone number from Twilio
     console.log('📞 [WEBHOOK] Calling Twilio API to purchase number...')
-    const purchasedNumber = await twilioClient.incomingPhoneNumbers.create({
-      phoneNumber,
-    })
+    let purchasedNumber: any = null
+    let twilioPurchaseError: any = null
+    let isAccountRestricted = false
+    
+    try {
+      purchasedNumber = await twilioClient.incomingPhoneNumbers.create({
+        phoneNumber,
+      })
 
-    console.log('✅ [WEBHOOK] Twilio purchase successful:', {
-      sid: purchasedNumber.sid,
-      phoneNumber: purchasedNumber.phoneNumber,
-      friendlyName: purchasedNumber.friendlyName,
-    })
+      console.log('✅ [WEBHOOK] Twilio purchase successful:', {
+        sid: purchasedNumber.sid,
+        phoneNumber: purchasedNumber.phoneNumber,
+        friendlyName: purchasedNumber.friendlyName,
+      })
+    } catch (twilioError: any) {
+      twilioPurchaseError = twilioError
+      const errorMessage = twilioError?.message || String(twilioError)
+      const errorCode = twilioError?.code || ''
+      
+      console.error('❌ [WEBHOOK] Twilio purchase failed:', {
+        message: errorMessage,
+        code: errorCode,
+        status: twilioError?.status
+      })
+      
+      // Check if this is an account restriction error
+      if (
+        errorMessage.includes('restricted') ||
+        errorMessage.includes('restriction') ||
+        errorMessage.includes('provisioning') ||
+        errorCode === 21211 || // Twilio error code for restrictions
+        errorCode === 21215
+      ) {
+        isAccountRestricted = true
+        console.warn('⚠️ [WEBHOOK] Account is restricted from provisioning phone numbers. Will save with restricted status.')
+      } else {
+        // For other errors, still throw to retry
+        throw twilioError
+      }
+    }
 
     // Extract area code and location from phone number (needed for database save)
     const extractedAreaCode = phoneNumber.replace(/\D/g, '').slice(1, 4) // Remove country code and get area code
     const location = getLocationFromAreaCode(extractedAreaCode)
 
     // Phase 4: Register number with Bland.ai (optional - continue on error)
-    console.log('📨 [WEBHOOK] Registering number with Bland.ai...')
-    try {
-      await registerNumbersWithBland([phoneNumber])
-      console.log('✅ [WEBHOOK] Phone number registered with Bland.ai')
-    } catch (blandRegError) {
-      console.warn('⚠️ [WEBHOOK] Bland.ai registration failed (continuing anyway):', blandRegError)
-      // Don't throw - optional step, we'll still save to DB
+    // Skip if account is restricted (number wasn't actually purchased)
+    if (!isAccountRestricted) {
+      console.log('📨 [WEBHOOK] Registering number with Bland.ai...')
+      try {
+        await registerNumbersWithBland([phoneNumber])
+        console.log('✅ [WEBHOOK] Phone number registered with Bland.ai')
+      } catch (blandRegError) {
+        console.warn('⚠️ [WEBHOOK] Bland.ai registration failed (continuing anyway):', blandRegError)
+        // Don't throw - optional step, we'll still save to DB
+      }
+    } else {
+      console.log('⏭️ [WEBHOOK] Skipping Bland.ai registration (account restricted)')
     }
 
-    // Phase 5: Create Bland.ai pathway (REQUIRED - fail if this fails)
+    // Phase 5: Create Bland.ai pathway
+    // For restricted accounts, we'll still try to create pathway but won't fail if it doesn't work
     console.log('🛤️ [WEBHOOK] Creating Bland.ai pathway for new number...')
-    let blandPathwayId: string
+    let blandPathwayId: string | null = null
     try {
       blandPathwayId = await createBlandPathway(phoneNumber)
       console.log('✅ [WEBHOOK] Bland.ai pathway created:', blandPathwayId)
     } catch (blandPathwayError) {
-      console.error('❌ [WEBHOOK] CRITICAL: Bland.ai pathway creation failed for new number:', blandPathwayError)
-      // Re-throw because this is critical - number is purchased but no pathway
-      throw new Error(`Failed to create Bland.ai pathway: ${blandPathwayError instanceof Error ? blandPathwayError.message : String(blandPathwayError)}`)
+      if (isAccountRestricted) {
+        // For restricted accounts, pathway creation failure is acceptable
+        console.warn('⚠️ [WEBHOOK] Bland.ai pathway creation failed (account restricted, continuing anyway):', blandPathwayError)
+      } else {
+        console.error('❌ [WEBHOOK] CRITICAL: Bland.ai pathway creation failed for new number:', blandPathwayError)
+        // Re-throw because this is critical - number is purchased but no pathway
+        throw new Error(`Failed to create Bland.ai pathway: ${blandPathwayError instanceof Error ? blandPathwayError.message : String(blandPathwayError)}`)
+      }
     }
 
     // Phase 6: Configure Bland.ai inbound webhook (optional - continue on error)
-    console.log('🌐 [WEBHOOK] Configuring Bland inbound webhook...')
-    try {
-      await updateBlandInboundConfig(phoneNumber, blandPathwayId)
-      console.log('✅ [WEBHOOK] Bland inbound webhook configured for phone number')
-    } catch (blandConfigError) {
-      console.warn('⚠️ [WEBHOOK] Bland inbound config failed (continuing anyway):', blandConfigError)
-      // Don't throw - optional step, we'll still save to DB
+    // Skip if account is restricted or no pathway was created
+    if (!isAccountRestricted && blandPathwayId) {
+      console.log('🌐 [WEBHOOK] Configuring Bland inbound webhook...')
+      try {
+        await updateBlandInboundConfig(phoneNumber, blandPathwayId)
+        console.log('✅ [WEBHOOK] Bland inbound webhook configured for phone number')
+      } catch (blandConfigError) {
+        console.warn('⚠️ [WEBHOOK] Bland inbound config failed (continuing anyway):', blandConfigError)
+        // Don't throw - optional step, we'll still save to DB
+      }
+    } else {
+      console.log('⏭️ [WEBHOOK] Skipping Bland inbound config (account restricted or no pathway)')
     }
 
     // Phase 7: Save everything to database in one transaction
@@ -318,20 +366,23 @@ async function handlePhoneNumberPurchase(
 
         let savedPhoneId: string
 
+        // Determine status based on whether purchase was successful
+        const phoneStatus = isAccountRestricted ? 'restricted' : 'active'
+        
         if (existingNumber.rows.length > 0) {
           console.log('⚠️ [WEBHOOK] Phone number already exists for user, updating status, pathwayid, and subscription_id')
           const updateResult = await client.query(
             `
             UPDATE phone_numbers 
-            SET status = 'active', pathwayid = $3, stripe_subscription_id = $4
+            SET status = $3, pathwayid = $4, stripe_subscription_id = $5
             WHERE phone_number = $1 AND user_id = $2
             RETURNING *
           `,
-            [phoneNumber, userId, blandPathwayId, subscriptionId || null],
+            [phoneNumber, userId, phoneStatus, blandPathwayId || null, subscriptionId || null],
           )
           
           savedPhoneId = updateResult.rows[0].id
-          console.log('✅ [WEBHOOK] Phone number status, pathwayid, and subscription_id updated:', savedPhoneId)
+          console.log(`✅ [WEBHOOK] Phone number status updated to '${phoneStatus}', pathwayid, and subscription_id updated:`, savedPhoneId)
         } else {
           // Insert new phone number
           const result = await client.query(
@@ -343,67 +394,82 @@ async function handlePhoneNumberPurchase(
               userId,
               location,
               'Local',
-              'active',
+              phoneStatus,
               extractedAreaCode,
               countryCode,
-              blandPathwayId,
+              blandPathwayId || null,
               subscriptionId || null,
             ],
           )
 
           const savedPhone = result.rows[0]
           savedPhoneId = savedPhone.id
-          console.log('✅ [WEBHOOK] Phone number saved to database:', savedPhone)
+          console.log(`✅ [WEBHOOK] Phone number saved to database with status '${phoneStatus}':`, savedPhone)
+          
+          // Log restriction details if applicable
+          if (isAccountRestricted) {
+            console.error('🚨 [WEBHOOK] IMPORTANT: Phone number saved with restricted status due to Twilio account restrictions:', {
+              phoneNumber,
+              userId,
+              error: twilioPurchaseError?.message || 'Unknown restriction error',
+              subscriptionId
+            })
+          }
         }
 
-        // Check if pathway already exists for this phone number (by phone_id)
-        const existingPathway = await client.query(
-          'SELECT id FROM pathways WHERE phone_id = $1',
-          [savedPhoneId],
-        )
-
-        if (existingPathway.rows.length === 0) {
-          // Create local pathway entry in pathways table
-          console.log('💾 [WEBHOOK] Creating local pathway entry in pathways table...')
-          const pathwayName = `Pathway for ${phoneNumber}`
-          const pathwayDescription = `Default pathway for ${phoneNumber}`
-          
-          const pathwayResult = await client.query(
-            `INSERT INTO pathways (name, description, creator_id, phone_number, phone_id, bland_id, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
-             RETURNING *`,
-            [
-              pathwayName,
-              pathwayDescription,
-              userId,
-              phoneNumber,
-              savedPhoneId,
-              blandPathwayId,
-            ],
+        // Only create/update pathway if we have a pathway ID
+        if (blandPathwayId) {
+          // Check if pathway already exists for this phone number (by phone_id)
+          const existingPathway = await client.query(
+            'SELECT id FROM pathways WHERE phone_id = $1',
+            [savedPhoneId],
           )
-          
-          const newPathway = pathwayResult.rows[0]
-          console.log('✅ [WEBHOOK] Local pathway created in pathways table:', newPathway.id)
-        } else {
-          // Update existing pathway with bland_id if not set
-          console.log('💾 [WEBHOOK] Updating existing pathway with bland_id...')
+
+          if (existingPathway.rows.length === 0) {
+            // Create local pathway entry in pathways table
+            console.log('💾 [WEBHOOK] Creating local pathway entry in pathways table...')
+            const pathwayName = `Pathway for ${phoneNumber}`
+            const pathwayDescription = `Default pathway for ${phoneNumber}`
+            
+            const pathwayResult = await client.query(
+              `INSERT INTO pathways (name, description, creator_id, phone_number, phone_id, bland_id, created_at, updated_at)
+               VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+               RETURNING *`,
+              [
+                pathwayName,
+                pathwayDescription,
+                userId,
+                phoneNumber,
+                savedPhoneId,
+                blandPathwayId,
+              ],
+            )
+            
+            const newPathway = pathwayResult.rows[0]
+            console.log('✅ [WEBHOOK] Local pathway created in pathways table:', newPathway.id)
+          } else {
+            // Update existing pathway with bland_id if not set
+            console.log('💾 [WEBHOOK] Updating existing pathway with bland_id...')
+            await client.query(
+              `UPDATE pathways 
+               SET bland_id = $1, updated_at = NOW()
+               WHERE phone_id = $2 AND (bland_id IS NULL OR bland_id != $1)`,
+              [blandPathwayId, savedPhoneId],
+            )
+            console.log('✅ [WEBHOOK] Pathway updated with bland_id')
+          }
+
+          // Update phone_numbers.pathwayid if not already set
           await client.query(
-            `UPDATE pathways 
-             SET bland_id = $1, updated_at = NOW()
-             WHERE phone_id = $2 AND (bland_id IS NULL OR bland_id != $1)`,
+            `UPDATE phone_numbers 
+             SET pathwayid = $1
+             WHERE id = $2 AND (pathwayid IS NULL OR pathwayid != $1)`,
             [blandPathwayId, savedPhoneId],
           )
-          console.log('✅ [WEBHOOK] Pathway updated with bland_id')
+          console.log('✅ [WEBHOOK] phone_numbers.pathwayid updated:', blandPathwayId)
+        } else {
+          console.log('⏭️ [WEBHOOK] Skipping pathway creation/update (no pathway ID available)')
         }
-
-        // Update phone_numbers.pathwayid if not already set
-        await client.query(
-          `UPDATE phone_numbers 
-           SET pathwayid = $1
-           WHERE id = $2 AND (pathwayid IS NULL OR pathwayid != $1)`,
-          [blandPathwayId, savedPhoneId],
-        )
-        console.log('✅ [WEBHOOK] phone_numbers.pathwayid updated:', blandPathwayId)
 
         // Update subscription_id if provided and not already set
         if (subscriptionId) {
@@ -429,9 +495,59 @@ async function handlePhoneNumberPurchase(
       await client.end()
     }
 
-    console.log('✅ [WEBHOOK] Phone number purchase completed successfully')
+    if (isAccountRestricted) {
+      console.warn('⚠️ [WEBHOOK] Phone number purchase completed with restrictions. Number saved with restricted status.')
+      // Don't throw - we've handled it gracefully by saving with restricted status
+      // This allows Stripe to mark the webhook as successful
+    } else {
+      console.log('✅ [WEBHOOK] Phone number purchase completed successfully')
+    }
   } catch (error) {
     console.error('❌ [WEBHOOK] Error purchasing phone number via Twilio:', error)
+    // Check if this is a restriction error that we might have missed
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    if (errorMessage.includes('restricted') || errorMessage.includes('restriction') || errorMessage.includes('provisioning')) {
+      console.warn('⚠️ [WEBHOOK] Detected restriction error in catch block. This should have been handled earlier.')
+      // Try to save with restricted status anyway
+      try {
+        const client = new Client({
+          connectionString: process.env.DATABASE_URL,
+          ssl: getSSLConfig(),
+        })
+        await client.connect()
+        const extractedAreaCode = phoneNumber.replace(/\D/g, '').slice(1, 4)
+        const location = getLocationFromAreaCode(extractedAreaCode)
+        
+        // Check if number already exists
+        const existingCheck = await client.query(
+          'SELECT id FROM phone_numbers WHERE phone_number = $1',
+          [phoneNumber]
+        )
+        
+        if (existingCheck.rows.length > 0) {
+          // Update existing number
+          await client.query(
+            `UPDATE phone_numbers 
+             SET status = $1, stripe_subscription_id = $2, user_id = $3
+             WHERE phone_number = $4`,
+            ['restricted', subscriptionId || null, userId, phoneNumber]
+          )
+        } else {
+          // Insert new number
+          await client.query(
+            `INSERT INTO phone_numbers (phone_number, user_id, location, type, status, purchased_at, area_code, country_code, stripe_subscription_id)
+             VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8)`,
+            [phoneNumber, userId, location, 'Local', 'restricted', extractedAreaCode, countryCode, subscriptionId || null]
+          )
+        }
+        await client.end()
+        console.log('✅ [WEBHOOK] Phone number saved with restricted status as fallback')
+        // Don't throw - we've handled it
+        return
+      } catch (fallbackError) {
+        console.error('❌ [WEBHOOK] Failed to save with restricted status in fallback:', fallbackError)
+      }
+    }
     throw error
   }
 }
@@ -656,14 +772,27 @@ export async function POST(req: Request) {
             console.warn('⚠️ [WEBHOOK] Continuing without subscription ID - will try to get it from invoice events')
           }
           
-          // Purchase phone number from Bland.ai
+          // Purchase phone number from Twilio/Bland.ai
           try {
             await handlePhoneNumberPurchase(userId, phoneNumber, areaCode, countryCode, session.id, subscriptionId)
             console.log('✅ [WEBHOOK] Phone number purchase completed successfully')
           } catch (error) {
-            console.error('❌ [WEBHOOK] Error purchasing phone number:', error)
-            // Re-throw error so Stripe can retry the webhook
-            throw error
+            const errorMessage = error instanceof Error ? error.message : String(error)
+            // Check if this is a restriction error - if so, don't retry
+            if (
+              errorMessage.includes('restricted') ||
+              errorMessage.includes('restriction') ||
+              errorMessage.includes('provisioning')
+            ) {
+              console.warn('⚠️ [WEBHOOK] Account restriction detected. Phone number should have been saved with restricted status.')
+              console.warn('⚠️ [WEBHOOK] Not retrying webhook - payment processed, number saved with restricted status')
+              // Don't throw - webhook succeeded in processing payment, just couldn't provision number
+              // The number should have been saved with restricted status in the fallback handler
+            } else {
+              console.error('❌ [WEBHOOK] Error purchasing phone number:', error)
+              // Re-throw error so Stripe can retry the webhook for other errors
+              throw error
+            }
           }
           break
         }

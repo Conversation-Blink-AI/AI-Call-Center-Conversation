@@ -10,6 +10,13 @@ interface CustomerResponseNodeData {
 }
 
 export function CustomerResponseNode({ data, selected }: { data: any; selected?: boolean }) {
+  // Determine which content to display: text takes priority, then prompt, then default
+  const displayText = (data.text && data.text.trim() !== '') 
+    ? data.text 
+    : (data.prompt && data.prompt.trim() !== '') 
+      ? data.prompt 
+      : 'Handle customer input';
+
   return (
     <div className={`px-3 py-2 shadow-md rounded-md bg-gradient-to-br from-yellow-100 via-yellow-50 to-yellow-100 dark:from-yellow-800 dark:via-yellow-700 dark:to-yellow-800 w-[255px] h-[100px] transition-all duration-200 relative overflow-visible ${
       selected ? 'shadow-lg scale-105' : ''
@@ -23,9 +30,9 @@ export function CustomerResponseNode({ data, selected }: { data: any; selected?:
             <div
               className="text-[12px] opacity-80 text-yellow-700 dark:text-yellow-200 mt-0.5 leading-tight overflow-hidden"
               style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}
-              title={data.text || 'Handle customer input'}
+              title={displayText}
             >
-              {data.text || 'Handle customer input'}
+              {displayText}
             </div>
           </div>
         </div>

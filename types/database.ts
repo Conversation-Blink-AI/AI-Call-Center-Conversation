@@ -10,6 +10,7 @@ export interface User {
   updated_at: string
   last_login: string | null
   password_hash: string
+  is_admin?: boolean
 }
 
 export interface Team {

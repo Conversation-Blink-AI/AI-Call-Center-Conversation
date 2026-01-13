@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -28,6 +28,23 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
   const [showBody, setShowBody] = React.useState(false);
   const [isTestingAPI, setIsTestingAPI] = React.useState(false);
   const [testResult, setTestResult] = React.useState<any>(null);
+  
+  // Static text toggle state for question nodes
+  const [useStaticText, setUseStaticText] = React.useState(true);
+  const previousNodeIdRef = React.useRef<string | null>(null);
+  
+  // Sync static text toggle with node data - only on node change, not on data updates
+  React.useEffect(() => {
+    if (selectedNode && selectedNode.id !== previousNodeIdRef.current) {
+      // Only initialize toggle when switching to a different node
+      previousNodeIdRef.current = selectedNode.id;
+      // Default to static text if text field exists, otherwise check for prompt
+      const hasText = selectedNode.data?.text && selectedNode.data.text.trim() !== '';
+      const hasPrompt = selectedNode.data?.prompt && selectedNode.data.prompt.trim() !== '';
+      const calculatedValue = hasText || !hasPrompt;
+      setUseStaticText(calculatedValue);
+    }
+  }, [selectedNode]);
 
   if (!selectedNode) return null
 
@@ -150,16 +167,55 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
               />
             </div>
 
-            <div>
-              <Label htmlFor="text">Message</Label>
-              <Textarea
-                id="text"
-                value={selectedNode.data.text || ''}
-                onChange={(e) => handleFieldChange('text', e.target.value)}
-                placeholder="What would you like to know?"
-                rows={3}
+            {/* Static Text Toggle */}
+            <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/50">
+              <div className="flex-1">
+                <Label htmlFor="static-text-toggle" className="text-base font-semibold">
+                  Static Text
+                </Label>
+                <p className="text-sm text-muted-foreground mt-1">
+                  When you want the agent to say a specific dialogue. Uncheck to use AI generated text
+                </p>
+              </div>
+              <Switch
+                id="static-text-toggle"
+                checked={useStaticText}
+                onCheckedChange={(checked) => {
+                  setUseStaticText(checked);
+                  // Clear the opposite field when switching
+                  if (checked) {
+                    handleFieldChange('prompt', '');
+                  } else {
+                    handleFieldChange('text', '');
+                  }
+                }}
               />
             </div>
+
+            {/* Conditional Text/Prompt Field */}
+            {useStaticText ? (
+              <div>
+                <Label htmlFor="text">Text</Label>
+                <Textarea
+                  id="text"
+                  value={selectedNode.data.text || ''}
+                  onChange={(e) => handleFieldChange('text', e.target.value)}
+                  placeholder="Exact text to be spoken by the agent"
+                  rows={3}
+                />
+              </div>
+            ) : (
+              <div>
+                <Label htmlFor="prompt">Prompt</Label>
+                <Textarea
+                  id="prompt"
+                  value={selectedNode.data.prompt || ''}
+                  onChange={(e) => handleFieldChange('prompt', e.target.value)}
+                  placeholder="Prompt for AI-generated dialogue"
+                  rows={3}
+                />
+              </div>
+            )}
 
             <div>
               <Label htmlFor="globalPrompt">Global Prompt (Optional)</Label>
@@ -172,6 +228,97 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
               />
             </div>
 
+            {/* Advanced Options - Accordion */}
+            <Accordion type="multiple" className="w-full">
+              <AccordionItem value="fine-tuning-examples">
+                <AccordionTrigger>Fine-tuning Examples</AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-3 pt-2">
+                    <div>
+                      <Label htmlFor="pathwayExamples" className="text-xs">Pathway Examples</Label>
+                      <Textarea
+                        id="pathwayExamples"
+                        value={selectedNode.data.pathwayExamples || ''}
+                        onChange={(e) => handleFieldChange('pathwayExamples', e.target.value)}
+                        placeholder="Fine-tuning examples for the agent at this node for the pathways chosen"
+                        rows={3}
+                        className="text-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="conditionExamples" className="text-xs">Condition Examples</Label>
+                      <Textarea
+                        id="conditionExamples"
+                        value={selectedNode.data.conditionExamples || ''}
+                        onChange={(e) => handleFieldChange('conditionExamples', e.target.value)}
+                        placeholder="Fine-tuning examples for the condition at this node"
+                        rows={3}
+                        className="text-sm"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="dialogueExamples" className="text-xs">Dialogue Examples</Label>
+                      <Textarea
+                        id="dialogueExamples"
+                        value={selectedNode.data.dialogueExamples || ''}
+                        onChange={(e) => handleFieldChange('dialogueExamples', e.target.value)}
+                        placeholder="Fine-tuning examples for the dialogue at this node"
+                        rows={3}
+                        className="text-sm"
+                      />
+                    </div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+
+              <AccordionItem value="model-options">
+                <AccordionTrigger>Model Options</AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-3 pt-2">
+                    <div>
+                      <Label htmlFor="modelName" className="text-xs">Model Name</Label>
+                      <Input
+                        id="modelName"
+                        value={selectedNode.data.modelOptions?.modelName || ''}
+                        onChange={(e) => handleNestedFieldChange('modelOptions', 'modelName', e.target.value)}
+                        placeholder="Model name to use for this node"
+                        className="h-8"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="interruptionThreshold" className="text-xs">Interruption Threshold (0-1)</Label>
+                      <Input
+                        id="interruptionThreshold"
+                        type="number"
+                        min="0"
+                        max="1"
+                        step="0.1"
+                        value={selectedNode.data.modelOptions?.interruptionThreshold ?? ''}
+                        onChange={(e) => handleNestedFieldChange('modelOptions', 'interruptionThreshold', e.target.value ? parseFloat(e.target.value) : undefined)}
+                        placeholder="0.5"
+                        className="h-8"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="temperature" className="text-xs">Temperature (0-1)</Label>
+                      <Input
+                        id="temperature"
+                        type="number"
+                        min="0"
+                        max="1"
+                        step="0.1"
+                        value={selectedNode.data.modelOptions?.temperature ?? ''}
+                        onChange={(e) => handleNestedFieldChange('modelOptions', 'temperature', e.target.value ? parseFloat(e.target.value) : undefined)}
+                        placeholder="0.7"
+                        className="h-8"
+                      />
+                    </div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+
+            {/* Extract Variables */}
             {renderExtractVars()}
           </div>
         )
@@ -1104,13 +1251,13 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
   )
 
   return (
-    <Sheet open={isOpen} onOpenChange={onClose}>
-      <SheetContent side="right" className="w-96 sm:w-[400px] flex flex-col">
-        <SheetHeader className="flex-shrink-0">
-          <SheetTitle>Edit Node Properties</SheetTitle>
-        </SheetHeader>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-5xl w-full max-h-[90vh] flex flex-col p-0">
+        <DialogHeader className="flex-shrink-0 px-6 pt-6 pb-4">
+          <DialogTitle>Edit Node Properties</DialogTitle>
+        </DialogHeader>
 
-        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto mt-6 space-y-4 pr-2 pl-2 py-2 node-editor-content">
+        <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-6 pb-6 space-y-4 node-editor-content">
           <div className="flex items-center space-x-2">
             <Badge variant="outline" title={`ID: ${selectedNode.id}`} className="cursor-help">
               {selectedNode.type}
@@ -1119,7 +1266,7 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
 
           {renderNodeFields()}
         </div>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   )
 }
