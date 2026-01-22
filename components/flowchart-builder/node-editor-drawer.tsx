@@ -28,6 +28,14 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
   const [showBody, setShowBody] = React.useState(false);
   const [isTestingAPI, setIsTestingAPI] = React.useState(false);
   const [testResult, setTestResult] = React.useState<any>(null);
+  const [metaConfigs, setMetaConfigs] = React.useState<Array<{
+    id: string
+    nickname: string
+    pixel_id: string
+    event_name: string
+  }>>([]);
+  const [metaConfigsLoading, setMetaConfigsLoading] = React.useState(false);
+  const [metaConfigsError, setMetaConfigsError] = React.useState<string>('');
   
   // Static text toggle state for question nodes
   const [useStaticText, setUseStaticText] = React.useState(true);
@@ -45,6 +53,28 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
       setUseStaticText(calculatedValue);
     }
   }, [selectedNode]);
+
+  React.useEffect(() => {
+    const loadMetaConfigs = async () => {
+      if (!selectedNode || selectedNode.type !== 'facebookPixelNode') return
+      setMetaConfigsLoading(true)
+      setMetaConfigsError('')
+      try {
+        const response = await fetch('/api/meta-capi/configs', { cache: 'no-store' })
+        const result = await response.json()
+        if (!response.ok) {
+          throw new Error(result?.error || 'Failed to load Meta CAPI configs')
+        }
+        setMetaConfigs(result.configs || [])
+      } catch (error: any) {
+        setMetaConfigsError(error.message || 'Failed to load Meta CAPI configs')
+      } finally {
+        setMetaConfigsLoading(false)
+      }
+    }
+
+    loadMetaConfigs()
+  }, [selectedNode?.id, selectedNode?.type])
 
   if (!selectedNode) return null
 
@@ -70,6 +100,13 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
       }
     }
     onUpdateNode(selectedNode.id, updates)
+  }
+
+  const handleMetaConfigSelect = (configId: string) => {
+    const selectedConfig = metaConfigs.find((config) => config.id === configId)
+    handleFieldChange('configId', configId)
+    handleFieldChange('configNickname', selectedConfig?.nickname || '')
+    handleFieldChange('eventName', selectedConfig?.event_name || selectedNode?.data?.eventName || '')
   }
 
   const handleExtractVarAdd = () => {
@@ -349,50 +386,46 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
 
             <div className="bg-muted p-3 rounded-lg border border-border">
               <h4 className="text-sm font-semibold text-foreground mb-3">Facebook Pixel Configuration</h4>
-              
+
               <div className="space-y-3">
                 <div>
-                  <Label htmlFor="pixelId">Pixel ID *</Label>
-                  <Input
-                    id="pixelId"
-                    value={selectedNode.data.pixelId || ''}
-                    onChange={(e) => handleFieldChange('pixelId', e.target.value)}
-                    placeholder="123456789012345"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Your Facebook Pixel ID</p>
+                  <Label htmlFor="metaConfig">Saved Config *</Label>
+                  <Select
+                    value={selectedNode.data.configId || ''}
+                    onValueChange={(value) => handleMetaConfigSelect(value)}
+                  >
+                    <SelectTrigger id="metaConfig">
+                      <SelectValue placeholder={metaConfigsLoading ? "Loading configs..." : "Select a config"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {metaConfigs.map((config) => (
+                        <SelectItem key={config.id} value={config.id}>
+                          {config.nickname}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {metaConfigsError && (
+                    <p className="text-xs text-destructive mt-1">{metaConfigsError}</p>
+                  )}
+                  <p className="text-xs text-muted-foreground mt-1">Create configs in Settings → Meta CAPI Configs.</p>
                 </div>
 
-                <div>
-                  <Label htmlFor="accessToken">Access Token *</Label>
-                  <Input
-                    id="accessToken"
-                    type="password"
-                    value={selectedNode.data.accessToken || ''}
-                    onChange={(e) => handleFieldChange('accessToken', e.target.value)}
-                    placeholder="EAAG..."
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Facebook Pixel Access Token</p>
-                </div>
-
-                <div>
-                  <Label htmlFor="eventName">Event Name *</Label>
-                  <Input
-                    id="eventName"
-                    value={selectedNode.data.eventName || ''}
-                    onChange={(e) => handleFieldChange('eventName', e.target.value)}
-                    placeholder="Lead"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">Standard events: Lead, Purchase, Contact, etc.</p>
-                </div>
+                {selectedNode.data.configId && (
+                  <div className="grid gap-2 text-xs text-muted-foreground">
+                    <p>Nickname: {selectedNode.data.configNickname || 'Unknown'}</p>
+                    {selectedNode.data.eventName && <p>Event: {selectedNode.data.eventName}</p>}
+                  </div>
+                )}
 
                 <div className="bg-card p-2 rounded border border-border">
-                  <p className="text-xs text-primary font-medium">? Pre-configured Settings:</p>
+                  <p className="text-xs text-primary font-medium">Pre-configured Settings:</p>
                   <ul className="text-xs text-muted-foreground mt-1 space-y-1">
-                    <li>� Method: POST</li>
-                    <li>� Content-Type: application/json</li>
-                    <li>� Auto SHA-256 hashing for PII</li>
-                    <li>� Auto timestamp generation</li>
-                    <li>� Action source: voice_call</li>
+                    <li>Method: POST</li>
+                    <li>Content-Type: application/json</li>
+                    <li>Auto SHA-256 hashing for PII</li>
+                    <li>Auto timestamp generation</li>
+                    <li>Action source: phone_call</li>
                   </ul>
                 </div>
               </div>

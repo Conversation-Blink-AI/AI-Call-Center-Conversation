@@ -2,13 +2,14 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { RefreshCw, Phone, Download, Play, Pause, FileText, Calendar, Clock, Volume2, Gauge } from "lucide-react"
+import { RefreshCw, Phone, Download, Play, Pause, FileText, Calendar, Clock, Volume2, Gauge, Info } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useUserCallData } from "@/hooks/use-user-call-data"
 import { useState, useRef, useEffect } from "react"
 
@@ -24,6 +25,10 @@ const ThreeDotsLoader = () => (
 export default function CallHistoryPage() {
   const { calls, totalCalls, userPhoneNumber, loading, error, lastUpdated, refetch } = useUserCallData()
   const [pageSize, setPageSize] = useState("50")
+  const [isDetailsOpen, setIsDetailsOpen] = useState(false)
+  const [detailsData, setDetailsData] = useState<any | null>(null)
+  const [detailsLoadingId, setDetailsLoadingId] = useState<string | null>(null)
+  const [detailsError, setDetailsError] = useState<string | null>(null)
 
   // Audio player state
   const [currentlyPlaying, setCurrentlyPlaying] = useState<string | null>(null)
@@ -135,6 +140,33 @@ export default function CallHistoryPage() {
     }
   }
 
+  const handleViewCallDetails = async (callId: string) => {
+    if (!callId) return
+    setIsDetailsOpen(true)
+    setDetailsLoadingId(callId)
+    setDetailsError(null)
+    setDetailsData(null)
+
+    try {
+      const response = await fetch(`/api/bland-ai/calls/${encodeURIComponent(callId)}`, {
+        method: "GET",
+        credentials: "include",
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data?.error || "Failed to fetch call details")
+      }
+
+      setDetailsData(data)
+    } catch (error: any) {
+      setDetailsError(error?.message || "Failed to fetch call details")
+    } finally {
+      setDetailsLoadingId(null)
+    }
+  }
+
 
   const formatAudioTime = (seconds: number) => {
     if (!seconds || isNaN(seconds)) return "0:00"
@@ -192,6 +224,13 @@ export default function CallHistoryPage() {
     } catch (error) {
       return "Invalid Time"
     }
+  }
+
+  const formatDateTime = (dateString?: string | null) => {
+    if (!dateString) return "—"
+    const date = new Date(dateString)
+    if (isNaN(date.getTime())) return "—"
+    return `${date.toLocaleDateString()} ${date.toLocaleTimeString()}`
   }
 
   const getStatusColor = (status: string) => {
@@ -501,6 +540,18 @@ export default function CallHistoryPage() {
                                 </div>
                               )}
 
+                              {call.id && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0"
+                                  onClick={() => handleViewCallDetails(call.id)}
+                                  title="View call details"
+                                >
+                                  <Info className="h-3 w-3" />
+                                </Button>
+                              )}
+
                               {call.transcript && (
                                 <Button
                                   variant="ghost"
@@ -577,6 +628,126 @@ export default function CallHistoryPage() {
             <p className="text-sm text-muted-foreground whitespace-pre-wrap">
               {selectedSummary?.summary}
             </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isDetailsOpen} onOpenChange={(open) => !open && setIsDetailsOpen(false)}>
+        <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Call Details</DialogTitle>
+          </DialogHeader>
+          <div className="mt-4">
+            {detailsLoadingId && (
+              <p className="text-sm text-muted-foreground">Loading details...</p>
+            )}
+            {detailsError && (
+              <p className="text-sm text-red-500">{detailsError}</p>
+            )}
+            {detailsData && (
+              <div className="space-y-6">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 text-sm">
+                  <div>
+                    <p className="text-muted-foreground">Call ID</p>
+                    <p className="font-mono break-all">{detailsData.call_id || detailsData.c_id || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">From</p>
+                    <p className="font-mono">{detailsData.from || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">To</p>
+                    <p className="font-mono">{detailsData.to || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Status</p>
+                    <p>{detailsData.status || detailsData.queue_status || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Call Length (min)</p>
+                    <p>{detailsData.call_length ?? "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Created At</p>
+                    <p>{formatDateTime(detailsData.created_at)}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Answered By</p>
+                    <p>{detailsData.answered_by || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Inbound</p>
+                    <p>{typeof detailsData.inbound === "boolean" ? (detailsData.inbound ? "Yes" : "No") : "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Recording URL</p>
+                    {detailsData.recording_url ? (
+                      <a
+                        href={detailsData.recording_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-primary hover:underline break-all"
+                      >
+                        Open Recording
+                      </a>
+                    ) : (
+                      <p>—</p>
+                    )}
+                  </div>
+                </div>
+
+                <Tabs defaultValue="summary">
+                  <TabsList>
+                    <TabsTrigger value="summary">Summary</TabsTrigger>
+                    <TabsTrigger value="request">Request Data</TabsTrigger>
+                    <TabsTrigger value="variables">Variables</TabsTrigger>
+                    <TabsTrigger value="transcripts">Transcripts</TabsTrigger>
+                    <TabsTrigger value="raw">Raw JSON</TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="summary">
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                      {detailsData.summary || "No summary available."}
+                    </p>
+                  </TabsContent>
+
+                  <TabsContent value="request">
+                    <pre className="text-xs text-muted-foreground whitespace-pre-wrap break-words">
+                      {JSON.stringify(detailsData.request_data || {}, null, 2)}
+                    </pre>
+                  </TabsContent>
+
+                  <TabsContent value="variables">
+                    <pre className="text-xs text-muted-foreground whitespace-pre-wrap break-words">
+                      {JSON.stringify(detailsData.variables || {}, null, 2)}
+                    </pre>
+                  </TabsContent>
+
+                  <TabsContent value="transcripts">
+                    {Array.isArray(detailsData.transcripts) && detailsData.transcripts.length > 0 ? (
+                      <div className="space-y-3">
+                        {detailsData.transcripts.map((entry: any, idx: number) => (
+                          <div key={entry.id || idx} className="rounded-md border border-border p-3 text-sm">
+                            <p className="text-xs text-muted-foreground mb-1">
+                              {entry.user || "speaker"} • {formatDateTime(entry.created_at)}
+                            </p>
+                            <p className="whitespace-pre-wrap">{entry.text}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No transcripts available.</p>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="raw">
+                    <pre className="text-xs text-muted-foreground whitespace-pre-wrap break-words">
+                      {JSON.stringify(detailsData, null, 2)}
+                    </pre>
+                  </TabsContent>
+                </Tabs>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

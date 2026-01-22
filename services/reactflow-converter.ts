@@ -47,31 +47,18 @@ export function convertReactFlowToBland(reactFlowData: ReactFlowData): BlandFlow
     
     // Special handling for Facebook Pixel nodes - convert to Webhook with preset config
     if (node.type === 'facebookPixelNode') {
-      const pixelId = cleanData.pixelId || ''
-      const accessToken = cleanData.accessToken || ''
-      const eventName = cleanData.eventName || 'Lead'
-      
-      // Build Facebook Conversions API URL
-      const url = `https://graph.facebook.com/v13.0/${pixelId}/events?access_token=${accessToken}`
-      
-      // Build Facebook CAPI payload
+      const configId = cleanData.configId || ''
+      const configNickname = cleanData.configNickname || ''
+      const eventName = cleanData.eventName || 'CallLead'
+      const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '')
+      const url = configId ? `${baseUrl}/api/integrations/meta-capi/${configId}` : ''
+
       const body = JSON.stringify({
-        data: [
-          {
-            event_name: eventName,
-            event_time: Math.floor(Date.now() / 1000),
-            action_source: 'phone_call',
-            event_id: '{{call.call_id}}',
-            user_data: {
-              ph: '{{call.from}}',
-              em: '{{email}}'
-            },
-            custom_data: {
-              call_duration: '{{call.call_length}}',
-              call_status: '{{call.status}}'
-            }
-          }
-        ]
+        call_id: '{{call_id}}',
+        from: '{{from}}',
+        to: '{{to}}',
+        ip: '{{ip}}',
+        user_agent: '{{user_agent}}'
       })
       
       return {
@@ -88,7 +75,11 @@ export function convertReactFlowToBland(reactFlowData: ReactFlowData): BlandFlow
               value: 'application/json'
             }
           ],
-          body: body
+          body: body,
+          configId,
+          configNickname,
+          eventName,
+          __reactFlowType: 'facebookPixelNode'
         }
       }
     }

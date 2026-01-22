@@ -93,6 +93,19 @@ curl -X POST https://your-domain.com/api/webhooks/bland \
   }'
 ```
 
+#### Step 1b: Test Meta CAPI Webhook (Config-based)
+
+```bash
+curl -X POST https://your-domain.com/api/integrations/meta-capi/<CONFIG_ID> \
+  -H "Content-Type: application/json" \
+  -d '{
+    "call_id": "test_call_123",
+    "from": "+14155552671",
+    "ip": "1.1.1.1",
+    "user_agent": "Mozilla/5.0"
+  }'
+```
+
 #### Step 2: Check Server Logs
 
 Look for these log messages:

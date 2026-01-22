@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Eye, EyeOff } from "lucide-react"
 import Link from "next/link"
+import { useToast } from "@/hooks/use-toast"
 
 export default function LoginPage() {
   const [email, setEmail] = useState("")
@@ -19,6 +20,20 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
   const { login, loading: authLoading, isAuthenticated } = useAuth()
+  const { toast } = useToast()
+
+  const getAuthErrorMessage = (message?: string) => {
+    if (!message) {
+      return "An unexpected error occurred"
+    }
+    const normalized = message.toLowerCase()
+    if (normalized.includes("authentication fail")) {
+      return "Invalid username or password"
+    }
+    return message
+  }
+
+  const isInvalidCredentials = (message: string) => message === "Invalid username or password"
 
   // ✅ Simple redirect check - no complex logic
   useEffect(() => {
@@ -36,12 +51,22 @@ export default function LoginPage() {
     try {
       const result = await login(email, password)
       if (!result.success) {
-        setError(result.message)
+        const errorMessage = getAuthErrorMessage(result.message)
+        if (isInvalidCredentials(errorMessage)) {
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: errorMessage,
+          })
+          setError("")
+        } else {
+          setError(errorMessage)
+        }
         setIsLoading(false)
       }
       // ✅ Don't set loading to false on success - let the redirect happen
     } catch (err) {
-      setError("An unexpected error occurred")
+      setError(getAuthErrorMessage())
       setIsLoading(false)
     }
   }

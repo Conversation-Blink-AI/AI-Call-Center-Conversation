@@ -27,7 +27,7 @@ export function CTASection() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
             <Link href="/signup">
               <Button className="bg-white text-blue-900 hover:bg-gray-100 text-lg px-8 py-6 h-auto">
-                Sing Up
+                Sign Up
               </Button>
             </Link>
           </div>

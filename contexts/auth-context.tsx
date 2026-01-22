@@ -11,6 +11,7 @@ export interface User {
   company?: string | null
   phoneNumber?: string | null
   role?: string
+  is_admin?: boolean
 }
 
 interface AuthContextType {

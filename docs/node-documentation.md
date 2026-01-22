@@ -149,26 +149,22 @@ The Blink.AI Flowchart Builder provides a comprehensive set of nodes for creatin
 
 ---
 
-#### 7. Facebook Lead Node
-**Purpose**: Track and manage leads from Facebook advertising campaigns.
+#### 7. Facebook Pixel Node (Meta CAPI)
+**Purpose**: Send call conversion events to Meta Conversions API using a saved config.
 
 **Configuration Options**:
-- `campaignId`: Facebook campaign identifier
-- `adSetId`: Ad set identifier
-- `leadData`: Lead information to track
-- `conversionEvents`: Events to track
+- `configId`: Saved Meta CAPI config (nickname, pixel ID, access token, event name)
+- `text`: Display message in the flowchart UI
 
 **Use Cases**:
-- Track Facebook ad conversions
-- Qualify Facebook leads
-- Integrate with Facebook Lead Ads
-- Measure campaign effectiveness
+- Track call conversions from ads
+- Attribute calls to Meta campaigns
+- Centralize Pixel credentials per user
 
 **Best Practices**:
-- Set up proper tracking
-- Comply with Facebook policies
-- Validate lead quality
-- Follow up promptly
+- Store tokens in Settings → Meta CAPI Configs
+- Use clear nicknames for multiple Pixels
+- Verify events in Meta Events Manager
 
 ---
 

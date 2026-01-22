@@ -8,9 +8,9 @@ interface FacebookPixelNodeProps {
   data: {
     name?: string
     text?: string
-    pixelId?: string
-    accessToken?: string
     eventName?: string
+    configId?: string
+    configNickname?: string
     url?: string
     method?: string
     headers?: any[]
@@ -67,7 +67,7 @@ export function FacebookPixelNode({ data, selected }: FacebookPixelNodeProps) {
             style={{ display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}
             title={data.text}
           >
-            {data.text || (data.pixelId ? `Pixel ID: ${data.pixelId}` : 'Configure Facebook Pixel')}
+            {data.text || (data.configNickname ? `Config: ${data.configNickname}` : 'Select Meta CAPI config')}
           </div>
         </div>
       </div>

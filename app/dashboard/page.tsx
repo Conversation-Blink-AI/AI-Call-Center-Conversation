@@ -114,6 +114,13 @@ export default function DashboardPage() {
     }
   }, [user?.id])
 
+  // Redirect unauthenticated users
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/")
+    }
+  }, [loading, user, router])
+
   // Calculate metrics from call data
   const calculateMetrics = () => {
     if (!calls || calls.length === 0) {
@@ -174,11 +181,6 @@ export default function DashboardPage() {
 
   // Handle unauthenticated users
   if (!loading && !user) {
-    // Redirect to home page if not authenticated
-    useEffect(() => {
-      router.push("/")
-    }, [router])
-
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -365,7 +367,7 @@ export default function DashboardPage() {
 
         {/* Quick Actions Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 mb-8">
-          <Card className="bg-card shadow-sm border border-border hover:shadow-md transition-shadow">
+          <Card className="h-full flex flex-col bg-card shadow-sm border border-border hover:shadow-md transition-shadow">
             <CardHeader className="pb-4">
               <div className="flex items-center space-x-2">
                 <div className="h-8 w-8 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -377,14 +379,14 @@ export default function DashboardPage() {
                 Browse and manage AI voices for your call flows
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="mt-auto">
               <Button asChild className="w-full bg-purple-600 hover:bg-purple-700">
                 <Link href="/dashboard/voices">Browse Voices</Link>
               </Button>
             </CardContent>
           </Card>
 
-          <Card className="bg-card shadow-sm border border-border hover:shadow-md transition-shadow">
+          <Card className="h-full flex flex-col bg-card shadow-sm border border-border hover:shadow-md transition-shadow">
             <CardHeader className="pb-4">
               <div className="flex items-center space-x-2">
                 <div className="h-8 w-8 bg-green-100 rounded-lg flex items-center justify-center">
@@ -396,7 +398,7 @@ export default function DashboardPage() {
                 Manage your phone numbers and purchase new ones
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="mt-auto space-y-3">
               <Button asChild className="w-full bg-green-600 hover:bg-green-700">
                 <Link href="/dashboard/phone-numbers">View Numbers</Link>
               </Button>
@@ -406,7 +408,7 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="bg-card shadow-sm border border-border hover:shadow-md transition-shadow">
+          <Card className="h-full flex flex-col bg-card shadow-sm border border-border hover:shadow-md transition-shadow">
             <CardHeader className="pb-4">
               <div className="flex items-center space-x-2">
                 <div className="h-8 w-8 bg-primary/10 rounded-lg flex items-center justify-center">
@@ -416,7 +418,7 @@ export default function DashboardPage() {
               </div>
               <CardDescription className="text-muted-foreground">View detailed analytics, call history, and database</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="mt-auto space-y-3">
               <Button asChild className="w-full bg-primary hover:bg-primary/90">
                 <Link href="/dashboard/calls">View Analytics</Link>
               </Button>
