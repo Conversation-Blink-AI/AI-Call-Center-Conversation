@@ -257,7 +257,7 @@ export default function CallHistoryPage() {
 
     const headers = [
       "Call ID", "From", "To", "Date", "Time", "Duration", "Status", 
-      "Pathway ID", "Ended Reason", "Recording URL", "Has Transcript", "Has Summary"
+      "Pathway ID", "Ended Reason", "Has Transcript", "Has Summary"
     ]
 
     const csvContent = [
@@ -273,7 +273,6 @@ export default function CallHistoryPage() {
           call.status || "",
           call.pathway_id || "",
           call.ended_reason || "",
-          call.recording_url || "",
           call.transcript ? "Yes" : "No",
           call.summary ? "Yes" : "No"
         ].map(field => `"${field}"`).join(",")
@@ -679,21 +678,6 @@ export default function CallHistoryPage() {
                     <p className="text-muted-foreground">Inbound</p>
                     <p>{typeof detailsData.inbound === "boolean" ? (detailsData.inbound ? "Yes" : "No") : "—"}</p>
                   </div>
-                  <div>
-                    <p className="text-muted-foreground">Recording URL</p>
-                    {detailsData.recording_url ? (
-                      <a
-                        href={detailsData.recording_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-primary hover:underline break-all"
-                      >
-                        Open Recording
-                      </a>
-                    ) : (
-                      <p>—</p>
-                    )}
-                  </div>
                 </div>
 
                 <Tabs defaultValue="summary">
@@ -702,7 +686,6 @@ export default function CallHistoryPage() {
                     <TabsTrigger value="request">Request Data</TabsTrigger>
                     <TabsTrigger value="variables">Variables</TabsTrigger>
                     <TabsTrigger value="transcripts">Transcripts</TabsTrigger>
-                    <TabsTrigger value="raw">Raw JSON</TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="summary">
@@ -738,12 +721,6 @@ export default function CallHistoryPage() {
                     ) : (
                       <p className="text-sm text-muted-foreground">No transcripts available.</p>
                     )}
-                  </TabsContent>
-
-                  <TabsContent value="raw">
-                    <pre className="text-xs text-muted-foreground whitespace-pre-wrap break-words">
-                      {JSON.stringify(detailsData, null, 2)}
-                    </pre>
                   </TabsContent>
                 </Tabs>
               </div>
