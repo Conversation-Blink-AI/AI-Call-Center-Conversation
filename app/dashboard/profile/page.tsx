@@ -26,10 +26,56 @@ export default function ProfilePage() {
   const [isChangingPassword, setIsChangingPassword] = useState(false)
   const [passwordError, setPasswordError] = useState("")
   const [passwordSuccess, setPasswordSuccess] = useState("")
+  const [metaConfigs, setMetaConfigs] = useState<Array<{
+    id: string
+    nickname: string
+    pixel_id: string
+    event_name: string
+    created_at: string
+  }>>([])
+  const [metaConfigLoading, setMetaConfigLoading] = useState(false)
+  const [metaConfigError, setMetaConfigError] = useState("")
+  const [metaConfigSuccess, setMetaConfigSuccess] = useState("")
+  const [newMetaConfig, setNewMetaConfig] = useState({
+    nickname: "",
+    pixelId: "",
+    accessToken: "",
+    eventName: ""
+  })
+  const [editingMetaConfigId, setEditingMetaConfigId] = useState<string | null>(null)
+  const [editMetaConfig, setEditMetaConfig] = useState({
+    nickname: "",
+    pixelId: "",
+    accessToken: "",
+    eventName: ""
+  })
 
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  const loadMetaConfigs = async () => {
+    if (!user) return
+    setMetaConfigLoading(true)
+    setMetaConfigError("")
+    try {
+      const response = await fetch("/api/meta-capi/configs", { cache: "no-store" })
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result?.error || "Failed to load Meta CAPI configs")
+      }
+      setMetaConfigs(result.configs || [])
+    } catch (error: any) {
+      setMetaConfigError(error.message || "Failed to load Meta CAPI configs")
+    } finally {
+      setMetaConfigLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    loadMetaConfigs()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id])
 
   if (!user) {
     return (
@@ -111,6 +157,102 @@ export default function ProfilePage() {
       setPasswordError("An unexpected error occurred. Please try again.")
     } finally {
       setIsChangingPassword(false)
+    }
+  }
+
+  const handleCreateMetaConfig = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setMetaConfigError("")
+    setMetaConfigSuccess("")
+
+    try {
+      const response = await fetch("/api/meta-capi/configs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nickname: newMetaConfig.nickname,
+          pixel_id: newMetaConfig.pixelId,
+          access_token: newMetaConfig.accessToken,
+          event_name: newMetaConfig.eventName
+        })
+      })
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result?.error || "Failed to create config")
+      }
+      setMetaConfigSuccess("Meta CAPI config created")
+      setNewMetaConfig({ nickname: "", pixelId: "", accessToken: "", eventName: "" })
+      await loadMetaConfigs()
+    } catch (error: any) {
+      setMetaConfigError(error.message || "Failed to create config")
+    }
+  }
+
+  const handleStartEditMetaConfig = (config: {
+    id: string
+    nickname: string
+    pixel_id: string
+    event_name: string
+  }) => {
+    setEditingMetaConfigId(config.id)
+    setEditMetaConfig({
+      nickname: config.nickname,
+      pixelId: config.pixel_id,
+      accessToken: "",
+      eventName: config.event_name
+    })
+    setMetaConfigError("")
+    setMetaConfigSuccess("")
+  }
+
+  const handleUpdateMetaConfig = async (configId: string) => {
+    setMetaConfigError("")
+    setMetaConfigSuccess("")
+    try {
+      const payload: Record<string, string> = {
+        nickname: editMetaConfig.nickname,
+        pixel_id: editMetaConfig.pixelId,
+        event_name: editMetaConfig.eventName
+      }
+      if (editMetaConfig.accessToken.trim()) {
+        payload.access_token = editMetaConfig.accessToken
+      }
+
+      const response = await fetch(`/api/meta-capi/configs/${configId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      })
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result?.error || "Failed to update config")
+      }
+      setMetaConfigSuccess("Meta CAPI config updated")
+      setEditingMetaConfigId(null)
+      setEditMetaConfig({ nickname: "", pixelId: "", accessToken: "", eventName: "" })
+      await loadMetaConfigs()
+    } catch (error: any) {
+      setMetaConfigError(error.message || "Failed to update config")
+    }
+  }
+
+  const handleDeleteMetaConfig = async (configId: string) => {
+    const confirmed = window.confirm("Delete this Meta CAPI config? This cannot be undone.")
+    if (!confirmed) return
+    setMetaConfigError("")
+    setMetaConfigSuccess("")
+    try {
+      const response = await fetch(`/api/meta-capi/configs/${configId}`, {
+        method: "DELETE"
+      })
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result?.error || "Failed to delete config")
+      }
+      setMetaConfigSuccess("Meta CAPI config deleted")
+      await loadMetaConfigs()
+    } catch (error: any) {
+      setMetaConfigError(error.message || "Failed to delete config")
     }
   }
 
@@ -356,6 +498,177 @@ export default function ProfilePage() {
                       <div className="h-8 w-8 bg-muted animate-pulse rounded"></div>
                     </div>
                   )}
+                </div>
+              </div>
+              <div className="mt-8 border-t pt-6">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h3 className="text-lg font-medium">Meta CAPI Configs</h3>
+                    <p className="text-sm text-muted-foreground">Store Meta Pixel credentials for Bland webhooks.</p>
+                  </div>
+                </div>
+
+                {metaConfigError && (
+                  <Alert variant="destructive" className="mt-4">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertDescription className="text-sm">{metaConfigError}</AlertDescription>
+                  </Alert>
+                )}
+
+                {metaConfigSuccess && (
+                  <Alert className="mt-4 bg-green-50 text-green-800 border-green-200">
+                    <CheckCircle2 className="h-4 w-4 text-green-800" />
+                    <AlertDescription className="text-sm">{metaConfigSuccess}</AlertDescription>
+                  </Alert>
+                )}
+
+                <form onSubmit={handleCreateMetaConfig} className="mt-4 grid gap-3">
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="meta-nickname" className="text-sm">Nickname</Label>
+                      <Input
+                        id="meta-nickname"
+                        value={newMetaConfig.nickname}
+                        onChange={(e) => setNewMetaConfig((prev) => ({ ...prev, nickname: e.target.value }))}
+                        placeholder="Main Pixel"
+                        className="h-9"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="meta-event-name" className="text-sm">Event Name</Label>
+                      <Input
+                        id="meta-event-name"
+                        value={newMetaConfig.eventName}
+                        onChange={(e) => setNewMetaConfig((prev) => ({ ...prev, eventName: e.target.value }))}
+                        placeholder="CallLead"
+                        className="h-9"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="meta-pixel-id" className="text-sm">Pixel ID</Label>
+                      <Input
+                        id="meta-pixel-id"
+                        value={newMetaConfig.pixelId}
+                        onChange={(e) => setNewMetaConfig((prev) => ({ ...prev, pixelId: e.target.value }))}
+                        placeholder="123456789012345"
+                        className="h-9"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="meta-access-token" className="text-sm">Access Token</Label>
+                      <Input
+                        id="meta-access-token"
+                        type="password"
+                        value={newMetaConfig.accessToken}
+                        onChange={(e) => setNewMetaConfig((prev) => ({ ...prev, accessToken: e.target.value }))}
+                        placeholder="EAAG..."
+                        className="h-9"
+                        required
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Button type="submit" size="sm">
+                      Add Config
+                    </Button>
+                  </div>
+                </form>
+
+                <div className="mt-6 space-y-3">
+                  {metaConfigLoading && (
+                    <p className="text-sm text-muted-foreground">Loading configs...</p>
+                  )}
+
+                  {!metaConfigLoading && metaConfigs.length === 0 && (
+                    <p className="text-sm text-muted-foreground">No configs yet. Add your first Meta CAPI config above.</p>
+                  )}
+
+                  {!metaConfigLoading && metaConfigs.map((config) => (
+                    <Card key={config.id} className="border">
+                      <CardContent className="pt-4 space-y-3">
+                        {editingMetaConfigId === config.id ? (
+                          <>
+                            <div className="grid gap-3 md:grid-cols-2">
+                              <div className="space-y-1.5">
+                                <Label className="text-xs">Nickname</Label>
+                                <Input
+                                  value={editMetaConfig.nickname}
+                                  onChange={(e) => setEditMetaConfig((prev) => ({ ...prev, nickname: e.target.value }))}
+                                  className="h-8"
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <Label className="text-xs">Event Name</Label>
+                                <Input
+                                  value={editMetaConfig.eventName}
+                                  onChange={(e) => setEditMetaConfig((prev) => ({ ...prev, eventName: e.target.value }))}
+                                  className="h-8"
+                                />
+                              </div>
+                            </div>
+                            <div className="grid gap-3 md:grid-cols-2">
+                              <div className="space-y-1.5">
+                                <Label className="text-xs">Pixel ID</Label>
+                                <Input
+                                  value={editMetaConfig.pixelId}
+                                  onChange={(e) => setEditMetaConfig((prev) => ({ ...prev, pixelId: e.target.value }))}
+                                  className="h-8"
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <Label className="text-xs">New Access Token</Label>
+                                <Input
+                                  type="password"
+                                  value={editMetaConfig.accessToken}
+                                  onChange={(e) => setEditMetaConfig((prev) => ({ ...prev, accessToken: e.target.value }))}
+                                  placeholder="Leave blank to keep existing"
+                                  className="h-8"
+                                />
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              <Button size="sm" onClick={() => handleUpdateMetaConfig(config.id)}>
+                                Save
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setEditingMetaConfigId(null)
+                                  setEditMetaConfig({ nickname: "", pixelId: "", accessToken: "", eventName: "" })
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="flex items-start justify-between">
+                              <div>
+                                <p className="text-sm font-medium">{config.nickname}</p>
+                                <p className="text-xs text-muted-foreground">Pixel: {config.pixel_id}</p>
+                                <p className="text-xs text-muted-foreground">Event: {config.event_name}</p>
+                              </div>
+                              <div className="flex gap-2">
+                                <Button size="sm" variant="outline" onClick={() => handleStartEditMetaConfig(config)}>
+                                  Edit
+                                </Button>
+                                <Button size="sm" variant="destructive" onClick={() => handleDeleteMetaConfig(config.id)}>
+                                  Delete
+                                </Button>
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </CardContent>
+                    </Card>
+                  ))}
                 </div>
               </div>
             </CardContent>

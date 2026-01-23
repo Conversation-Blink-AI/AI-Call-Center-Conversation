@@ -10,6 +10,13 @@ interface QuestionNodeData {
 }
 
 export function QuestionNode({ data, selected }: { data: any; selected?: boolean }) {
+  // Determine which content to display: text takes priority, then prompt, then default
+  const displayText = (data.text && data.text.trim() !== '') 
+    ? data.text 
+    : (data.prompt && data.prompt.trim() !== '') 
+      ? data.prompt 
+      : 'Ask a question';
+
   return (
     <div
       className={`px-3 py-2 shadow-md rounded-md bg-gradient-to-br from-blue-100 via-blue-50 to-blue-100 dark:from-blue-800 dark:via-blue-700 dark:to-blue-800 w-[255px] h-[100px] transition-all duration-200 relative overflow-visible ${
@@ -24,9 +31,9 @@ export function QuestionNode({ data, selected }: { data: any; selected?: boolean
             <div
               className="text-[12px] opacity-80 text-blue-700 dark:text-blue-200 mt-0.5 leading-tight overflow-hidden"
               style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}
-              title={data.text || 'Ask a question'}
+              title={displayText}
             >
-              {data.text || 'Ask a question'}
+              {displayText}
             </div>
           </div>
         </div>

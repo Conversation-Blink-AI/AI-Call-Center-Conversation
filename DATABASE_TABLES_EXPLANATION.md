@@ -134,6 +134,25 @@ CREATE TABLE phone_numbers (
 
 ---
 
+## Additional Tables
+
+### `meta_capi_configs` Table Structure
+Stores Meta Conversions API configuration per user.
+
+```sql
+CREATE TABLE meta_capi_configs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    nickname TEXT NOT NULL,
+    pixel_id TEXT NOT NULL,
+    access_token TEXT NOT NULL,
+    event_name TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
+---
+
 ## Why "Internal Server Error" is Happening
 
 The error "Server error: Internal server error" occurs when:

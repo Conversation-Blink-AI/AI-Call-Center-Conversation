@@ -131,7 +131,8 @@ export async function getUserFromRequest(req: NextRequest): Promise<User | null>
       passwordHash: user.passwordHash || user.password_hash,
       createdAt: user.createdAt || user.created_at,
       updatedAt: user.updatedAt || user.updated_at,
-      lastLogin: user.lastLogin || user.last_login
+      lastLogin: user.lastLogin || user.last_login,
+      is_admin: user.is_admin || false
     }
   } catch (error) {
     console.error("❌ [AUTH-UTILS] Error getting user from request:", error)
@@ -215,7 +216,8 @@ export async function getCurrentUser(): Promise<User | null> {
       passwordHash: user.passwordHash || user.password_hash,
       createdAt: user.createdAt || user.created_at,
       updatedAt: user.updatedAt || user.updated_at,
-      lastLogin: user.lastLogin || user.last_login
+      lastLogin: user.lastLogin || user.last_login,
+      is_admin: user.is_admin || false
     }
   } catch (error) {
     console.error("❌ [CURRENT-USER] Error getting current user:", error)

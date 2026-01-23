@@ -11,6 +11,7 @@ export interface User {
   company?: string | null
   phoneNumber?: string | null
   role?: string
+  is_admin?: boolean
 }
 
 interface AuthContextType {
@@ -106,12 +107,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       console.log("🔄 [AUTH-CONTEXT] Starting login for:", email)
 
+      // Clear any existing auth state before attempting login
+      setUser(null)
+      setIsAuthenticated(false)
+      localStorage.removeItem('auth-token')
+
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         credentials: "include",
+        cache: 'no-store', // Ensure we don't use cached responses
         body: JSON.stringify({ email, password }),
       })
 
@@ -216,35 +223,48 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       console.log("🚪 [AUTH-CONTEXT] Starting logout process...")
       
+      // Clear localStorage token first
+      localStorage.removeItem('auth-token')
+      console.log("✅ [AUTH-CONTEXT] Token cleared from localStorage")
+
+      // Clear user state immediately
+      setUser(null)
+      setIsAuthenticated(false)
+      setLoading(false)
+      
+      // Call logout API to clear server-side cookie
       await fetch("/api/auth/logout", {
         method: "POST",
         credentials: "include",
       })
 
-      // Clear localStorage token
-      localStorage.removeItem('auth-token')
-      console.log("✅ [AUTH-CONTEXT] Token cleared from localStorage")
-
-      setUser(null)
-      setIsAuthenticated(false)
-      
       console.log("✅ [AUTH-CONTEXT] Logout complete, redirecting to home page")
-      // Small delay to ensure state is updated before redirect
+      
+      // Redirect to home page
+      router.push("/")
+      
+      // Re-check auth state after a brief delay to ensure everything is cleared
       setTimeout(() => {
-        router.push("/")
-      }, 100)
+        checkAuth()
+      }, 200)
     } catch (err) {
       console.error("❌ [AUTH-CONTEXT] Logout error:", err)
       
       // Clear localStorage token even on error
       localStorage.removeItem('auth-token')
       
+      // Clear user state
       setUser(null)
       setIsAuthenticated(false)
-      // Small delay to ensure state is updated before redirect
+      setLoading(false)
+      
+      // Redirect to home page
+      router.push("/")
+      
+      // Re-check auth state after a brief delay
       setTimeout(() => {
-        router.push("/")
-      }, 100)
+        checkAuth()
+      }, 200)
     }
   }
 

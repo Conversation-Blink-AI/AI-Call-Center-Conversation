@@ -20,6 +20,7 @@ import {
   Mic,
   HelpCircle,
   Workflow,
+  Shield,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 
@@ -32,7 +33,7 @@ const navigation = [
   { name: "Call History", href: "/dashboard/call-history", icon: History },
   { name: "Phone Numbers", href: "/dashboard/phone-numbers", icon: Phone },
   { name: "Billing", href: "/dashboard/billing", icon: CreditCard },
-  { name: "Help", href: "/help", icon: HelpCircle },
+  { name: "Help", href: "/dashboard/help", icon: HelpCircle },
 ]
 
 export function DashboardSidebar() {
@@ -42,6 +43,8 @@ export function DashboardSidebar() {
   const router = useRouter()
   const { user, logout } = useAuth()
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const isAdmin = Boolean(user?.is_admin)
+  const navLinks = isAdmin ? [...navigation, { name: "Admin", href: "/admin", icon: Shield }] : navigation
 
   const handleLogout = async () => {
     try {
@@ -113,7 +116,7 @@ export function DashboardSidebar() {
       {/* Navigation - Takes up remaining space except for profile section */}
       <div className="flex-1 overflow-y-auto py-4" style={{ height: "calc(100vh - 64px - 80px)" }}>
         <nav className="space-y-1 px-2">
-          {navigation.map((link) => {
+          {navLinks.map((link) => {
             const isActive =
               link.href === "/dashboard"
                 ? pathname === "/dashboard" || pathname === "/dashboard/"

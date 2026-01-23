@@ -42,7 +42,8 @@ export async function GET(req: NextRequest) {
       verified: user.verified || user.is_verified || false,
       platforms: user.platforms || [],
       externalId: user.external_id,
-      externalToken: user.external_token
+      externalToken: user.external_token,
+      is_admin: user.is_admin || false
     }
 
     return NextResponse.json({ 

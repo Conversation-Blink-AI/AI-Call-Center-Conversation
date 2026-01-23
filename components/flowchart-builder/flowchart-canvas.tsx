@@ -412,9 +412,9 @@ export function FlowchartCanvas({
       case 'facebookPixelNode':
         return {
           name: 'Facebook Pixel Event',
-          pixelId: '',
-          accessToken: '',
-          eventName: 'Lead',
+          configId: '',
+          configNickname: '',
+          eventName: 'CallLead',
           actionSource: 'phone_call',
           eventData: {},
         }

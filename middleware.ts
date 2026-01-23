@@ -55,9 +55,10 @@ export async function middleware(req: NextRequest) {
       hasToken: !!token,
     })
 
-    // Protect /dashboard and /database routes
+    // Protect /dashboard, /database, and /admin routes
     const isProtectedPath = req.nextUrl.pathname.startsWith("/dashboard") || 
-                            req.nextUrl.pathname.startsWith("/database")
+                            req.nextUrl.pathname.startsWith("/database") ||
+                            req.nextUrl.pathname.startsWith("/admin")
 
     if (isProtectedPath) {
       if (!token) {
@@ -73,6 +74,12 @@ export async function middleware(req: NextRequest) {
       }
 
       console.log("[MIDDLEWARE] ✅ Token valid for user:", decoded.userId)
+      
+      // For /admin routes, we'll check is_admin in the layout/page components
+      // since middleware runs in Edge Runtime and database queries are limited
+      if (req.nextUrl.pathname.startsWith("/admin")) {
+        console.log("[MIDDLEWARE] 🔒 Admin route access - will verify is_admin in route handler")
+      }
     }
 
     // If user is authenticated and on login page, redirect to dashboard

@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Database Schema (Developer Reference)</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --bg: #ffffff;
+        --fg: #111827;
+        --muted: #6b7280;
+        --border: #e5e7eb;
+        --code-bg: #f3f4f6;
+        --accent: #2563eb;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #0b0f19;
+          --fg: #e5e7eb;
+          --muted: #9ca3af;
+          --border: #1f2937;
+          --code-bg: #111827;
+          --accent: #60a5fa;
+        }
+      }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: var(--fg);
+        background: var(--bg);
+        line-height: 1.5;
+      }
+      .container {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 32px 20px 80px;
+      }
+      h1, h2, h3 {
+        line-height: 1.25;
+      }
+      h1 {
+        font-size: 2rem;
+        margin-bottom: 0.5rem;
+      }
+      h2 {
+        margin-top: 2.25rem;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 0.4rem;
+      }
+      h3 {
+        margin-top: 1.5rem;
+      }
+      code, pre {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+        background: var(--code-bg);
+      }
+      code {
+        padding: 0.15rem 0.35rem;
+        border-radius: 4px;
+      }
+      pre {
+        padding: 12px 14px;
+        border-radius: 6px;
+        overflow: auto;
+      }
+      ul {
+        padding-left: 1.2rem;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .table-block {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 16px;
+        margin-top: 16px;
+      }
+      .table-block h3 {
+        margin-top: 0;
+      }
+      .badge {
+        display: inline-block;
+        font-size: 0.75rem;
+        padding: 2px 8px;
+        border-radius: 999px;
+        background: rgba(37, 99, 235, 0.12);
+        color: var(--accent);
+        margin-left: 6px;
+      }
+      .cols {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Database Schema (Developer Reference)</h1>
+      <p class="muted">
+        This page documents the current application database schema as defined
+        by the SQL scripts in <code>scripts/</code> and the setup/migration
+        entrypoints.
+      </p>
+
+      <h2>Source of Truth and Drift</h2>
+      <ol>
+        <li><strong>Baseline schema:</strong> <code>scripts/create-postgres-tables.sql</code></li>
+        <li><strong>Migrations/additions:</strong> <code>scripts/add-*.sql</code>,
+          <code>scripts/create-*-table.sql</code>, <code>scripts/migrate-*.sql</code>,
+          <code>scripts/fix-*.sql</code>
+        </li>
+        <li><strong>RLS policies:</strong> <code>scripts/enable-rls.sql</code></li>
+      </ol>
+      <p class="muted">
+        The setup API at <code>app/api/postgres/setup/route.ts</code> includes an
+        older schema and does not cover newer tables/columns. Database dumps
+        include legacy billing tables (see “Legacy/operational tables” below).
+      </p>
+
+      <h2>Entity Relationships (High Level)</h2>
+      <ul>
+        <li><code>users</code> 1--* <code>teams</code> (owner)</li>
+        <li><code>users</code> 1--* <code>team_members</code></li>
+        <li><code>teams</code> 1--* <code>pathways</code></li>
+        <li><code>pathways</code> 1--* <code>phone_numbers</code> (legacy) and 1--1 <code>phone_numbers</code> (current)</li>
+        <li><code>pathways</code> *--* <code>phone_numbers</code> via <code>pathway_phone_numbers</code></li>
+        <li><code>users</code> 1--* <code>phone_numbers</code></li>
+        <li><code>users</code> 1--* <code>calls</code></li>
+        <li><code>users</code> 1--* <code>call_logs</code></li>
+        <li><code>users</code> 1--* <code>payments</code></li>
+        <li><code>users</code> 1--* <code>admin_audit_logs</code></li>
+        <li><code>users</code> 1--1 <code>wallets</code> (legacy)</li>
+        <li><code>wallets</code> 1--* <code>wallet_transactions</code> (legacy)</li>
+      </ul>
+
+      <h2>Tables (Current Scripts)</h2>
+
+      <div class="table-block">
+        <h3>users <span class="badge">core</span></h3>
+        <p><strong>Source:</strong> <code>scripts/create-postgres-tables.sql</code> + migrations</p>
+        <div class="cols">
+          <div>
+            <strong>Columns</strong>
+            <ul>
+              <li><code>id</code> UUID PK</li>
+              <li><code>email</code> UNIQUE NOT NULL</li>
+              <li><code>first_name</code>, <code>last_name</code></li>
+              <li><code>company</code>, <code>phone_number</code></li>
+              <li><code>role</code> DEFAULT <code>'user'</code></li>
+              <li><code>password_hash</code> (legacy)</li>
+              <li><code>created_at</code>, <code>updated_at</code></li>
+              <li><code>last_login</code></li>
+              <li><code>external_id</code>, <code>external_token</code></li>
+              <li><code>is_verified</code>, <code>platform</code></li>
+              <li><code>verification_token</code>, <code>verification_expires_at</code></li>
+              <li><code>is_admin</code></li>
+              <li><code>stripe_customer_id</code></li>
+            </ul>
+          </div>
+          <div>
+            <strong>Indexes</strong>
+            <ul>
+              <li><code>idx_users_email</code></li>
+              <li><code>idx_users_external_id</code></li>
+              <li><code>idx_users_is_verified</code></li>
+              <li><code>idx_users_is_admin</code> (partial)</li>
+              <li><code>idx_users_stripe_customer_id</code></li>
+              <li><code>idx_users_first_name</code>, <code>idx_users_last_name</code></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-block">
+        <h3>teams</h3>
+        <p><strong>Source:</strong> <code>scripts/create-postgres-tables.sql</code></p>
+        <div class="cols">
+          <div>
+            <strong>Columns</strong>
+            <ul>
+              <li><code>id</code> UUID PK</li>
+              <li><code>name</code> NOT NULL</li>
+              <li><code>description</code></li>
+              <li><code>owner_id</code> FK → <code>users(id)</code></li>
+              <li><code>created_at</code>, <code>updated_at</code></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-block">
+        <h3>team_members</h3>
+        <p><strong>Source:</strong> <code>scripts/create-postgres-tables.sql</code></p>
+        <div class="cols">
+          <div>
+            <strong>Columns</strong>
+            <ul>
+              <li><code>id</code> UUID PK</li>
+              <li><code>team_id</code> FK → <code>teams(id)</code></li>
+              <li><code>user_id</code> FK → <code>users(id)</code></li>
+              <li><code>role</code> DEFAULT <code>'member'</code></li>
+              <li><code>joined_at</code></li>
+              <li>UNIQUE (<code>team_id</code>, <code>user_id</code>)</li>
+            </ul>
+          </div>
+          <div>
+            <strong>Indexes</strong>
+            <ul>
+              <li><code>idx_team_members_team_id</code></li>
+              <li><code>idx_team_members_user_id</code></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-block">
+        <h3>pathways</h3>
+        <p>
+          <strong>Source:</strong> <code>scripts/create-postgres-tables.sql</code> +
+          <code>scripts/migrate-pathway-phone-relationship.sql</code>
+        </p>
+        <div class="cols">
+          <div>
+            <strong>Columns</strong>
+            <ul>
+              <li><code>id</code> UUID PK</li>
+              <li><code>name</code>, <code>description</code></li>
+              <li><code>team_id</code> FK → <code>teams(id)</code></li>
+              <li><code>creator_id</code>, <code>updater_id</code> FK → <code>users(id)</code></li>
+              <li><code>data</code> JSONB, <code>bland_id</code></li>
+              <li><code>phone_number_id</code> UNIQUE FK → <code>phone_numbers(id)</code></li>
+            </ul>
+          </div>
+          <div>
+            <strong>Indexes</strong>
+            <ul>
+              <li><code>idx_pathways_team_id</code></li>
+              <li><code>idx_pathways_creator_id</code></li>
+              <li><code>idx_pathways_phone_number_id</code></li>
+            </ul>
+          </div>
+        </div>
+        <p class="muted">Note: replaces legacy <code>phone_numbers.pathway_id</code>.</p>
+      </div>
+
+      <div class="table-block">
+        <h3>phone_numbers</h3>
+        <p><strong>Source:</strong> <code>scripts/create-postgres-tables.sql</code> + migrations</p>
+        <div class="cols">
+          <div>
+            <strong>Columns</strong>
+            <ul>
+              <li><code>id</code> UUID PK</li>
+              <li><code>phone_number</code> UNIQUE NOT NULL</li>
+              <li><code>user_id</code> FK → <code>users(id)</code></li>
+              <li><code>location</code>, <code>type</code>, <code>status</code></li>
+              <li><code>assigned_to</code>, <code>subscription_plan</code></li>
+              <li><code>purchased_at</code></li>
+              <li><code>bland_block_id</code></li>
+            </ul>
+          </div>
+          <div>
+            <strong>Indexes</strong>
+            <ul>
+              <li><code>idx_phone_numbers_user_id</code></li>
+              <li><code>idx_phone_numbers_phone_number</code></li>
+              <li><code>idx_phone_numbers_bland_block_id</code> (partial)</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-block">
+        <h3>pathway_phone_numbers</h3>
+        <p><strong>Source:</strong> <code>scripts/create-postgres-tables.sql</code></p>
+        <div class="cols">
+          <div>
+            <strong>Columns</strong>
+            <ul>
+              <li><code>id</code> UUID PK</li>
+              <li><code>pathway_id</code> FK → <code>pathways(id)</code></li>
+              <li><code>phone_number_id</code> FK → <code>phone_numbers(id)</code></li>
+              <li><code>created_at</code></li>
+              <li>UNIQUE (<code>pathway_id</code>, <code>phone_number_id</code>)</li>
+            </ul>
+          </div>
+          <div>
+            <strong>Indexes</strong>
+            <ul>
+              <li><code>idx_pathway_phone_numbers_pathway_id</code></li>
+              <li><code>idx_pathway_phone_numbers_phone_number_id</code></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-block">
+        <h3>calls</h3>
+        <p><strong>Source:</strong> <code>scripts/create-postgres-tables.sql</code></p>
+        <div class="cols">
+          <div>
+            <strong>Columns</strong>
+            <ul>
+              <li><code>id</code> UUID PK</li>
+              <li><code>call_id</code> UNIQUE NOT NULL</li>
+              <li><code>user_id</code> FK → <code>users(id)</code></li>
+              <li><code>to_number</code>, <code>from_number</code></li>
+              <li><code>duration_seconds</code>, <code>status</code></li>
+              <li><code>recording_url</code>, <code>transcript</code>, <code>summary</code></li>
+              <li><code>cost_cents</code>, <code>pathway_id</code></li>
+              <li><code>ended_reason</code>, <code>start_time</code>, <code>end_time</code></li>
+              <li><code>queue_time</code>, <code>latency_ms</code>, <code>interruptions</code></li>
+              <li><code>phone_number_id</code> FK → <code>phone_numbers(id)</code></li>
+            </ul>
+          </div>
+          <div>
+            <strong>Indexes</strong>
+            <ul>
+              <li><code>idx_calls_user_id</code></li>
+              <li><code>idx_calls_call_id</code></li>
+              <li><code>idx_calls_from_number</code></li>
+              <li><code>idx_calls_to_number</code></li>
+              <li><code>idx_calls_created_at</code> (DESC)</li>
+              <li><code>idx_calls_status</code></li>
+              <li><code>idx_calls_phone_number_id</code></li>
+              <li><code>idx_calls_pathway_id</code></li>
+            </ul>
+          </div>
+        </div>
+        <p class="muted">Trigger: <code>update_calls_updated_at</code> on UPDATE.</p>
+      </div>
+
+      <div class="table-block">
+        <h3>call_logs</h3>
+        <p>
+          <strong>Source:</strong> <code>scripts/add-call-logs-table.sql</code> +
+          <code>scripts/add-cost-cents-to-call-logs.sql</code> +
+          <code>scripts/add-bland-variables-to-call-logs.sql</code>
+        </p>
+        <div class="cols">
+          <div>
+            <strong>Columns</strong>
+            <ul>
+              <li><code>id</code> UUID PK</li>
+              <li><code>call_id</code> UNIQUE NOT NULL</li>
+              <li><code>user_id</code> FK → <code>users(id)</code></li>
+              <li><code>from_number</code>, <code>to_number</code></li>
+              <li><code>duration_seconds</code>, <code>status</code></li>
+              <li><code>recording_url</code>, <code>transcript</code>, <code>summary</code></li>
+              <li><code>pathway_id</code>, <code>ended_reason</code></li>
+              <li><code>start_time</code>, <code>end_time</code></li>
+              <li><code>queue_time</code>, <code>latency_ms</code>, <code>interruptions</code></li>
+              <li><code>phone_number_id</code> FK → <code>phone_numbers(id)</code></li>
+              <li><code>cost_cents</code></li>
+              <li><code>phone_number</code>, <code>country</code>, <code>state</code>, <code>city</code>, <code>zip</code></li>
+              <li><code>short_from</code>, <code>short_to</code></li>
+              <li><code>call_timezone</code>, <code>call_time_utc</code></li>
+            </ul>
+          </div>
+          <div>
+            <strong>Indexes</strong>
+            <ul>
+              <li><code>idx_call_logs_user_id</code></li>
+              <li><code>idx_call_logs_call_id</code></li>
+              <li><code>idx_call_logs_from_number</code></li>
+              <li><code>idx_call_logs_to_number</code></li>
+              <li><code>idx_call_logs_created_at</code> (DESC)</li>
+              <li><code>idx_call_logs_status</code></li>
+              <li><code>idx_call_logs_phone_number_id</code></li>
+              <li><code>idx_call_logs_pathway_id</code></li>
+              <li><code>idx_call_logs_country</code></li>
+              <li><code>idx_call_logs_state</code></li>
+              <li><code>idx_call_logs_city</code></li>
+              <li><code>idx_call_logs_phone_number</code></li>
+            </ul>
+          </div>
+        </div>
+        <p class="muted">Trigger: <code>update_call_logs_updated_at</code> on UPDATE.</p>
+      </div>
+
+      <div class="table-block">
+        <h3>meta_capi_configs</h3>
+        <p><strong>Source:</strong> <code>scripts/create-meta-capi-configs-table.sql</code></p>
+        <div class="cols">
+          <div>
+            <strong>Columns</strong>
+            <ul>
+              <li><code>id</code> UUID PK</li>
+              <li><code>user_id</code> FK → <code>users(id)</code></li>
+              <li><code>nickname</code>, <code>pixel_id</code>, <code>access_token</code>, <code>event_name</code></li>
+              <li><code>created_at</code></li>
+            </ul>
+          </div>
+          <div>
+            <strong>Indexes</strong>
+            <ul>
+              <li><code>meta_capi_configs_user_id_idx</code></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-block">
+        <h3>payments</h3>
+        <p>
+          <strong>Source:</strong> <code>scripts/create-payments-table.sql</code> +
+          <code>scripts/fix-wallet-transactions-table.sql</code>
+        </p>
+        <div class="cols">
+          <div>
+            <strong>Columns</strong>
+            <ul>
+              <li><code>id</code> BIGSERIAL PK</li>
+              <li><code>gateway</code>, <code>gateway_payment_id</code></li>
+              <li><code>amount_cents</code>, <code>status</code></li>
+              <li><code>user_id</code> FK → <code>users(id)</code></li>
+              <li><code>created_at</code>, <code>updated_at</code></li>
+            </ul>
+          </div>
+          <div>
+            <strong>Indexes</strong>
+            <ul>
+              <li><code>idx_payments_user_id</code></li>
+              <li><code>idx_payments_gateway_payment_id</code></li>
+              <li><code>idx_payments_created_at</code> (DESC)</li>
+              <li><code>idx_payments_status</code></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="table-block">
+        <h3>admin_audit_logs</h3>
+        <p><strong>Source:</strong> <code>scripts/create-admin-audit-logs-table.sql</code></p>
+        <div class="cols">
+          <div>
+            <strong>Columns</strong>
+            <ul>
+              <li><code>id</code> UUID PK</li>
+              <li><code>admin_user_id</code> FK → <code>users(id)</code></li>
+              <li><code>action</code>, <code>resource_type</code></li>
+              <li><code>resource_id</code>, <code>old_value</code>, <code>new_value</code></li>
+              <li><code>metadata</code>, <code>ip_address</code></li>
+              <li><code>created_at</code></li>
+            </ul>
+          </div>
+          <div>
+            <strong>Indexes</strong>
+            <ul>
+              <li><code>idx_admin_audit_logs_admin_user_id</code></li>
+              <li><code>idx_admin_audit_logs_resource_type</code></li>
+              <li><code>idx_admin_audit_logs_resource_id</code></li>
+              <li><code>idx_admin_audit_logs_created_at</code> (DESC)</li>
+              <li><code>idx_admin_audit_logs_action</code></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <h2>Row Level Security (RLS)</h2>
+      <p><strong>Source:</strong> <code>scripts/enable-rls.sql</code></p>
+      <p>RLS is enabled on:</p>
+      <ul>
+        <li><code>users</code>, <code>phone_numbers</code>, <code>teams</code>, <code>team_members</code></li>
+        <li><code>pathways</code>, <code>activities</code>, <code>invitations</code></li>
+      </ul>
+      <p class="muted">
+        Policies use <code>current_user_id()</code> which reads
+        <code>app.current_user_id</code> from the session setting.
+      </p>
+
+      <h2>Legacy/Operational Tables (from <code>development_export.sql</code>)</h2>
+      <p class="muted">
+        These exist in database dumps and are referenced by billing code, but are
+        not created by the current scripts.
+      </p>
+      <div class="table-block">
+        <h3>wallets <span class="badge">legacy</span></h3>
+        <ul>
+          <li><code>id</code> BIGINT PK (sequence)</li>
+          <li><code>user_id</code> UUID NOT NULL</li>
+          <li><code>balance_cents</code> BIGINT DEFAULT 0</li>
+          <li><code>updated_at</code> TIMESTAMPTZ DEFAULT <code>now()</code></li>
+        </ul>
+      </div>
+      <div class="table-block">
+        <h3>wallet_transactions <span class="badge">legacy</span></h3>
+        <ul>
+          <li><code>id</code> BIGINT PK (sequence)</li>
+          <li><code>wallet_id</code> BIGINT NOT NULL</li>
+          <li><code>amount_cents</code> BIGINT NOT NULL</li>
+          <li><code>type</code> TEXT NOT NULL</li>
+          <li><code>provider_txn_id</code> TEXT NULL</li>
+          <li><code>metadata</code> JSONB NULL</li>
+          <li><code>created_at</code> TIMESTAMPTZ DEFAULT <code>now()</code></li>
+          <li><code>gateway</code> TEXT NULL (added via migration)</li>
+        </ul>
+      </div>
+      <div class="table-block">
+        <h3>number_subscriptions <span class="badge">legacy</span></h3>
+        <ul>
+          <li><code>id</code> BIGINT PK (sequence)</li>
+          <li><code>user_id</code> UUID NOT NULL</li>
+          <li><code>phone_number</code> VARCHAR NOT NULL</li>
+          <li><code>paypal_sub_id</code> TEXT NOT NULL</li>
+          <li><code>status</code> TEXT NOT NULL</li>
+          <li><code>next_billing_at</code> TIMESTAMPTZ NOT NULL</li>
+          <li><code>created_at</code> TIMESTAMPTZ DEFAULT <code>now()</code></li>
+        </ul>
+      </div>
+
+      <div class="table-block">
+        <h3>activities and invitations <span class="badge">setup API only</span></h3>
+        <p class="muted">
+          These are defined in <code>app/api/postgres/setup/route.ts</code> and exist
+          in dumps, but are not present in <code>scripts/create-postgres-tables.sql</code>.
+        </p>
+      </div>
+    </div>
+  </body>
+</html>
