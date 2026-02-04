@@ -10,15 +10,20 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode
 }) {
-  const { user } = useAuth()
+  const { user, loading } = useAuth()
   const router = useRouter()
   const [isChecking, setIsChecking] = useState(true)
 
   useEffect(() => {
     // Check if user is admin
     const checkAdmin = async () => {
+      if (loading) {
+        return
+      }
+
       if (!user) {
         router.push("/")
+        setIsChecking(false)
         return
       }
 
@@ -50,7 +55,7 @@ export default function AdminLayout({
     }
 
     checkAdmin()
-  }, [user, router])
+  }, [user, loading, router])
 
   // Prevent body scrolling
   useEffect(() => {

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useRef } from "react"
+import React, { useMemo, useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -32,7 +32,10 @@ import {
   BarChart3,
   Webhook,
   Zap,
-  HelpCircle
+  HelpCircle,
+  Play,
+  Pause,
+  Loader2
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
@@ -49,10 +52,10 @@ interface Pathway {
 interface Voice {
   id: string
   name: string
-  preview_url?: string
-  description?: string
-  public?: boolean
-  tags?: string[]
+  description: string | null
+  voiceId: string
+  tags: string[]
+  gender?: string | null
 }
 
 interface CallData {
@@ -105,9 +108,28 @@ export default function SendCallPage() {
   const { user } = useAuth()
   const [pathways, setPathways] = useState<Pathway[]>([])
   const [voices, setVoices] = useState<Voice[]>([])
+  const [voicesLoading, setVoicesLoading] = useState(false)
+  const [voicesError, setVoicesError] = useState<string | null>(null)
+  const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null)
+  const [loadingVoiceId, setLoadingVoiceId] = useState<string | null>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
   const [purchasedNumbers, setPurchasedNumbers] = useState<PurchasedNumber[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [loadingData, setLoadingData] = useState(true)
+
+  const getGenderEmoji = (gender?: string | null) => {
+    const normalizedGender = String(gender ?? "").trim().toLowerCase()
+    if (normalizedGender === "female") {
+      return { emoji: "👩", label: "Female voice" }
+    }
+    if (normalizedGender === "male") {
+      return { emoji: "👨", label: "Male voice" }
+    }
+    if (normalizedGender === "neutral") {
+      return { emoji: "🧑", label: "Neutral voice" }
+    }
+    return null
+  }
 
   // Collapsible sections state
   const [openSections, setOpenSections] = useState({
@@ -179,20 +201,28 @@ export default function SendCallPage() {
         }
 
         // Fetch voices
-        const voicesResponse = await fetch('/api/bland-ai/voices', {
-          credentials: 'include'
-        })
-        if (voicesResponse.ok) {
-          const voicesData = await voicesResponse.json()
-          setVoices(voicesData.voices || [])
-          // Set default voice to first available or "ravi" (Indian voice)
-          if (voicesData.voices?.length > 0 && !callData.voice) {
-            const raviVoice = voicesData.voices.find((v: Voice) => v.name === "ravi")
-            const indianVoice = voicesData.voices.find((v: Voice) => v.name.toLowerCase().includes("indian"))
-            const defaultVoice = raviVoice?.id || indianVoice?.id || voicesData.voices[0].id
-            console.log("Setting default voice:", defaultVoice, "from voice:", raviVoice?.name || indianVoice?.name || voicesData.voices[0].name)
-            updateCallData('voice', defaultVoice)
+        try {
+          setVoicesLoading(true)
+          setVoicesError(null)
+          const voicesResponse = await fetch('/api/voices', {
+            credentials: 'include'
+          })
+          if (voicesResponse.ok) {
+            const voicesData = await voicesResponse.json()
+            setVoices(voicesData.voices || [])
+            if (voicesData.voices?.length > 0 && !callData.voice) {
+              const defaultVoice = voicesData.voices[0].voiceId
+              updateCallData('voice', defaultVoice)
+            }
+          } else {
+            const errorData = await voicesResponse.json().catch(() => ({}))
+            throw new Error(errorData.error || "Failed to load voices")
           }
+        } catch (err) {
+          const errorMessage = err instanceof Error ? err.message : "Failed to load voices"
+          setVoicesError(errorMessage)
+        } finally {
+          setVoicesLoading(false)
         }
 
         // Fetch user's purchased phone numbers
@@ -219,6 +249,97 @@ export default function SendCallPage() {
 
     fetchData()
   }, [user?.id])
+
+  const selectedVoice = useMemo(() => {
+    if (!callData.voice) return null
+    return voices.find((voice) => voice.voiceId === callData.voice) || null
+  }, [callData.voice, voices])
+  const selectedVoiceGenderEmoji = getGenderEmoji(selectedVoice?.gender)
+
+  const stopVoiceSample = () => {
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current = null
+    }
+    setPlayingVoiceId(null)
+    setLoadingVoiceId(null)
+  }
+
+  const playVoiceSample = async (voiceId: string, voiceName: string) => {
+    try {
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
+      }
+
+      setPlayingVoiceId(null)
+      setLoadingVoiceId(voiceId)
+
+      const response = await fetch(`/api/bland-ai/voices/${voiceId}/sample`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: "Hey this is Hustle AI, can you hear me alright?"
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || "Failed to generate voice sample")
+      }
+
+      const contentType = response.headers.get("content-type")
+      let audioSource: string | null = null
+
+      if (contentType && contentType.includes("audio")) {
+        const audioBlob = await response.blob()
+        audioSource = URL.createObjectURL(audioBlob)
+      } else {
+        const data = await response.json()
+        audioSource = data.audio_url || null
+      }
+
+      if (!audioSource) {
+        throw new Error("No audio data received")
+      }
+
+      const audio = new Audio(audioSource)
+      audioRef.current = audio
+
+      audio.oncanplaythrough = () => {
+        setLoadingVoiceId(null)
+        setPlayingVoiceId(voiceId)
+        audio.play().catch(() => {
+          setPlayingVoiceId(null)
+          setLoadingVoiceId(null)
+        })
+      }
+
+      audio.onended = () => {
+        setPlayingVoiceId(null)
+        setLoadingVoiceId(null)
+        if (audioSource?.startsWith("blob:")) {
+          URL.revokeObjectURL(audioSource)
+        }
+      }
+
+      audio.onerror = () => {
+        setPlayingVoiceId(null)
+        setLoadingVoiceId(null)
+      }
+
+      audio.load()
+
+      console.log("🎵 [VOICE PREVIEW] Playing sample:", voiceName)
+    } catch (err) {
+      console.error("Error playing voice sample:", err)
+      setPlayingVoiceId(null)
+      setLoadingVoiceId(null)
+      toast.error("Failed to play voice preview")
+    }
+  }
 
   const handleSendCall = async () => {
     if (!callData.phone_number.trim()) {
@@ -817,57 +938,88 @@ console.log('Call result:', result);`
                   {/* Voice Selection */}
                   <div className="space-y-2">
                     <Label htmlFor="voice">Voice</Label>
-                    <Select 
-                      value={callData.voice || ""} 
-                      onValueChange={(value) => {
-                        console.log("Voice selected:", value)
-                        updateCallData('voice', value)
-                      }}
-                    >
-                      <SelectTrigger className="w-full" id="voice">
-                        <SelectValue placeholder="Select a voice">
-                          {callData.voice && voices.find(v => v.id === callData.voice) ? (
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center text-xs text-white flex-shrink-0">
-                                {voices.find(v => v.id === callData.voice)?.name.charAt(0)}
-                              </div>
-                              <span>{voices.find(v => v.id === callData.voice)?.name}</span>
-                            </div>
-                          ) : (
-                            "Select a voice"
-                          )}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent 
-                        className="max-h-[200px] overflow-y-auto z-50" 
-                        position="popper"
-                        sideOffset={4}
-                        avoidCollisions={true}
+                    <div className="flex items-center gap-2">
+                      <Select
+                        value={callData.voice || ""}
+                        onValueChange={(value) => updateCallData('voice', value)}
+                        disabled={voicesLoading || !!voicesError}
                       >
-                        {voices.map((voice) => (
-                          <SelectItem 
-                            key={voice.id} 
-                            value={voice.id}
-                          >
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center text-xs text-white flex-shrink-0">
-                                {voice.name.charAt(0)}
+                        <SelectTrigger className="w-full" id="voice">
+                          <SelectValue placeholder={voicesLoading ? "Loading voices..." : "Select a voice"}>
+                            {selectedVoice ? (
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center text-xs text-white flex-shrink-0">
+                                  {selectedVoice.name.charAt(0)}
+                                </div>
+                                <span>{selectedVoice.name}</span>
+                                {selectedVoiceGenderEmoji ? (
+                                  <span role="img" aria-label={selectedVoiceGenderEmoji.label}>
+                                    {selectedVoiceGenderEmoji.emoji}
+                                  </span>
+                                ) : null}
                               </div>
-                              <span>{voice.name}</span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {/* Show selected voice info */}
-                    {callData.voice && voices.find(v => v.id === callData.voice) && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <div className="w-5 h-5 rounded-full bg-orange-500 flex items-center justify-center text-xs text-white flex-shrink-0">
-                          {voices.find(v => v.id === callData.voice)?.name.charAt(0)}
-                        </div>
-                        <span className="font-medium">{voices.find(v => v.id === callData.voice)?.name}</span>
-                        <span className="text-xs">({callData.voice})</span>
-                      </div>
+                            ) : (
+                              "Select a voice"
+                            )}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent
+                          className="max-h-[200px] overflow-y-auto z-50"
+                          position="popper"
+                          sideOffset={4}
+                          avoidCollisions={true}
+                        >
+                          {voices.map((voice) => {
+                            const genderEmoji = getGenderEmoji(voice.gender)
+
+                            return (
+                              <SelectItem key={voice.id} value={voice.voiceId}>
+                                <div className="flex items-center gap-2">
+                                  <div className="w-6 h-6 rounded-full bg-orange-500 flex items-center justify-center text-xs text-white flex-shrink-0">
+                                    {voice.name.charAt(0)}
+                                  </div>
+                                  <span>{voice.name}</span>
+                                  {genderEmoji ? (
+                                    <span role="img" aria-label={genderEmoji.label}>
+                                      {genderEmoji.emoji}
+                                    </span>
+                                  ) : null}
+                                </div>
+                              </SelectItem>
+                            )
+                          })}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        disabled={!selectedVoice || loadingVoiceId === selectedVoice?.voiceId}
+                        onClick={() => {
+                          if (!selectedVoice) return
+                          if (playingVoiceId === selectedVoice.voiceId) {
+                            stopVoiceSample()
+                          } else {
+                            playVoiceSample(selectedVoice.voiceId, selectedVoice.name)
+                          }
+                        }}
+                        title={selectedVoice ? "Preview voice" : "Select a voice to preview"}
+                      >
+                        {loadingVoiceId === selectedVoice?.voiceId ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : playingVoiceId === selectedVoice?.voiceId ? (
+                          <Pause className="h-4 w-4" />
+                        ) : (
+                          <Play className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                    {voicesError ? (
+                      <p className="text-xs text-destructive">{voicesError}</p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Select a voice and preview before sending.
+                      </p>
                     )}
                   </div>
 

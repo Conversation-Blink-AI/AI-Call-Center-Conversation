@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { getUserFromRequest } from "@/lib/auth-utils"
 import { Client } from "pg"
 import { getSSLConfig } from "@/lib/db-client"
+import { hashPhoneNumber } from "@/lib/encryption"
+import { toE164Format } from "@/utils/phone-utils"
 
 export async function GET(
   request: Request,
@@ -15,6 +17,8 @@ export async function GET(
     }
 
     const phoneNumber = params.phoneNumber
+    const normalizedPhone = toE164Format(phoneNumber)
+    const phoneHash = hashPhoneNumber(normalizedPhone)
 
     const client = new Client({
       connectionString: process.env.DATABASE_URL,
@@ -27,8 +31,8 @@ export async function GET(
       SELECT p.*, pn.phone_number 
       FROM pathways p 
       JOIN phone_numbers pn ON p.phone_id = pn.id 
-      WHERE pn.phone_number = $1 AND pn.user_id = $2
-    `, [phoneNumber, user.id])
+      WHERE pn.user_id = $2 AND (pn.phone_number_hash = $1 OR pn.phone_number = $3)
+    `, [phoneHash, user.id, normalizedPhone])
 
     await client.end()
 

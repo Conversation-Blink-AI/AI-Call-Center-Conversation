@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { getUserFromRequest } from "@/lib/auth-utils"
 import { Client } from "pg"
 import { getSSLConfig } from "@/lib/db-client"
+import { hashPhoneNumber } from "@/lib/encryption"
+import { toE164Format } from "@/utils/phone-utils"
 
 export async function GET(request: Request) {
   try {
@@ -25,9 +27,11 @@ export async function GET(request: Request) {
 
     await client.connect()
 
+    const normalizedPhone = toE164Format(phoneNumber)
+    const phoneHash = hashPhoneNumber(normalizedPhone)
     const result = await client.query(
-      "SELECT pathway_id FROM phone_numbers WHERE phone_number = $1 AND user_id = $2",
-      [phoneNumber, user.id]
+      "SELECT pathway_id FROM phone_numbers WHERE user_id = $2 AND (phone_number_hash = $1 OR phone_number = $3)",
+      [phoneHash, user.id, normalizedPhone]
     )
 
     await client.end()

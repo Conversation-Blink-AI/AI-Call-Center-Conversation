@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { Client } from "pg"
 import crypto from "crypto"
 import { getSSLConfig } from "@/lib/db-client"
+import { decryptString } from "@/lib/encryption"
 
 export const dynamic = "force-dynamic"
 
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest, context: { params: { configId: 
     try {
       const result = await client.query(
         `
-        SELECT pixel_id, access_token, event_name
+        SELECT pixel_id, access_token, access_token_enc, event_name
         FROM meta_capi_configs
         WHERE id = $1
         LIMIT 1
@@ -84,7 +85,10 @@ export async function POST(request: NextRequest, context: { params: { configId: 
       ]
     }
 
-    const metaUrl = `https://graph.facebook.com/v18.0/${config.pixel_id}/events?access_token=${config.access_token}`
+    const accessToken = config.access_token_enc
+      ? decryptString(config.access_token_enc)
+      : config.access_token
+    const metaUrl = `https://graph.facebook.com/v18.0/${config.pixel_id}/events?access_token=${accessToken}`
     const metaResponse = await fetch(metaUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },

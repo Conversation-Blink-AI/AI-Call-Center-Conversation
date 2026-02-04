@@ -3,6 +3,7 @@ import { NextResponse } from "next/server"
 import { getUserFromRequest, getCurrentUser } from "./auth-utils"
 import { Client } from "pg"
 import { getSSLConfig } from "./db-client"
+import { encryptString } from "./encryption"
 
 export interface AdminUser {
   id: string
@@ -141,18 +142,23 @@ export async function logAdminAction(params: {
   try {
     await client.connect()
     
+    const oldValueJson = params.oldValue ? JSON.stringify(params.oldValue) : null
+    const newValueJson = params.newValue ? JSON.stringify(params.newValue) : null
     await client.query(
       `INSERT INTO admin_audit_logs (
         admin_user_id, action, resource_type, resource_id,
-        old_value, new_value, metadata, ip_address, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())`,
+        old_value, old_value_enc, new_value, new_value_enc,
+        metadata, ip_address, created_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())`,
       [
         params.adminUserId,
         params.action,
         params.resourceType,
         params.resourceId || null,
-        params.oldValue ? JSON.stringify(params.oldValue) : null,
-        params.newValue ? JSON.stringify(params.newValue) : null,
+        oldValueJson,
+        oldValueJson ? encryptString(oldValueJson) : null,
+        newValueJson,
+        newValueJson ? encryptString(newValueJson) : null,
         params.metadata ? JSON.stringify(params.metadata) : null,
         params.ipAddress || null
       ]

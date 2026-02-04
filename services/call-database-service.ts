@@ -1,5 +1,7 @@
 import { db } from "@/lib/db"
 import { Call } from "@/types/database"
+import { encryptString, hashPhoneNumber } from "@/lib/encryption"
+import { toE164Format } from "@/utils/phone-utils"
 
 export interface CallData {
   call_id: string
@@ -27,16 +29,19 @@ export class CallDatabaseService {
    * Store a call in the database
    */
   static async storeCall(callData: CallData): Promise<Call> {
+    const toNumber = callData.to_number ? toE164Format(callData.to_number) : ""
+    const fromNumber = callData.from_number ? toE164Format(callData.from_number) : ""
     const query = `
       INSERT INTO call_logs (
-        call_id, user_id, to_number, from_number, duration_seconds, 
-        status, recording_url, transcript, summary, 
+        call_id, user_id, to_number, from_number,
+        to_number_enc, to_number_hash, from_number_enc, from_number_hash,
+        duration_seconds, status, recording_url, recording_url_enc, transcript, transcript_enc, summary, summary_enc,
         pathway_id, ended_reason, start_time, end_time, 
         queue_time, latency_ms, interruptions, phone_number_id,
         created_at, updated_at
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, 
-        $10, $11, $12, $13, $14, $15, $16, $17, 
+        $1, $2, $3, $4, $5, $6, $7, $8,
+        $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
         NOW(), NOW()
       ) 
       ON CONFLICT (call_id) 
@@ -44,8 +49,11 @@ export class CallDatabaseService {
         duration_seconds = EXCLUDED.duration_seconds,
         status = EXCLUDED.status,
         recording_url = EXCLUDED.recording_url,
+        recording_url_enc = EXCLUDED.recording_url_enc,
         transcript = EXCLUDED.transcript,
+        transcript_enc = EXCLUDED.transcript_enc,
         summary = EXCLUDED.summary,
+        summary_enc = EXCLUDED.summary_enc,
         ended_reason = EXCLUDED.ended_reason,
         end_time = EXCLUDED.end_time,
         queue_time = EXCLUDED.queue_time,
@@ -58,13 +66,20 @@ export class CallDatabaseService {
     const values = [
       callData.call_id,
       callData.user_id,
-      callData.to_number,
-      callData.from_number,
+      toNumber,
+      fromNumber,
+      toNumber ? encryptString(toNumber) : null,
+      toNumber ? hashPhoneNumber(toNumber) : null,
+      fromNumber ? encryptString(fromNumber) : null,
+      fromNumber ? hashPhoneNumber(fromNumber) : null,
       callData.duration_seconds || null,
       callData.status || null,
       callData.recording_url || null,
+      callData.recording_url ? encryptString(callData.recording_url) : null,
       callData.transcript || null,
+      callData.transcript ? encryptString(callData.transcript) : null,
       callData.summary || null,
+      callData.summary ? encryptString(callData.summary) : null,
       callData.pathway_id || null,
       callData.ended_reason || null,
       callData.start_time || null,
@@ -106,9 +121,15 @@ export class CallDatabaseService {
     }
 
     if (phoneNumber) {
+      const normalizedPhone = toE164Format(phoneNumber)
+      const phoneHash = hashPhoneNumber(normalizedPhone)
       paramCount++
-      whereConditions.push(`(c.to_number = $${paramCount} OR c.from_number = $${paramCount})`)
-      values.push(phoneNumber)
+      const hashParam = paramCount
+      paramCount++
+      const phoneParam = paramCount
+      whereConditions.push(`(c.to_number_hash = $${hashParam} OR c.from_number_hash = $${hashParam} OR c.to_number = $${phoneParam} OR c.from_number = $${phoneParam})`)
+      values.push(phoneHash)
+      values.push(normalizedPhone)
     }
 
     if (startDate) {
@@ -199,7 +220,7 @@ export class CallDatabaseService {
     for (const apiCall of blandApiCalls) {
       try {
         // Map Bland.ai API response to our call data format
-        const callData: CallData = {
+          const callData: CallData = {
           call_id: apiCall.c_id || apiCall.id || apiCall.call_id,
           user_id: userId,
           to_number: apiCall.to || apiCall.to_number || '',
@@ -220,15 +241,24 @@ export class CallDatabaseService {
 
         // Find matching phone number ID
         if (callData.from_number || callData.to_number) {
+          const normalizedFrom = callData.from_number ? toE164Format(callData.from_number) : ""
+          const normalizedTo = callData.to_number ? toE164Format(callData.to_number) : ""
+          const fromHash = normalizedFrom ? hashPhoneNumber(normalizedFrom) : ""
+          const toHash = normalizedTo ? hashPhoneNumber(normalizedTo) : ""
           const phoneQuery = `
             SELECT id FROM phone_numbers 
-            WHERE user_id = $1 AND (phone_number = $2 OR phone_number = $3)
+            WHERE user_id = $1 AND (
+              phone_number_hash = $2 OR phone_number_hash = $3
+              OR phone_number = $4 OR phone_number = $5
+            )
             LIMIT 1
           `
           const phoneResult = await db.query(phoneQuery, [
             userId, 
-            callData.from_number, 
-            callData.to_number
+            fromHash,
+            toHash,
+            normalizedFrom,
+            normalizedTo
           ])
 
           if (phoneResult.rows[0]) {
@@ -237,24 +267,39 @@ export class CallDatabaseService {
         }
 
         // Insert the new call
+        const rawToNumber = apiCall.to_number || apiCall.to
+        const rawFromNumber = apiCall.from_number || apiCall.from
+        const normalizedTo = rawToNumber ? toE164Format(rawToNumber) : ""
+        const normalizedFrom = rawFromNumber ? toE164Format(rawFromNumber) : ""
         const insertResult = await db.query(`
           INSERT INTO call_logs (
-            call_id, user_id, to_number, from_number, duration_seconds, status,
-            recording_url, transcript, summary, pathway_id, ended_reason,
+            call_id, user_id, to_number, from_number,
+            to_number_enc, to_number_hash, from_number_enc, from_number_hash,
+            duration_seconds, status, recording_url, recording_url_enc, transcript, transcript_enc, summary, summary_enc,
+            pathway_id, ended_reason,
             start_time, end_time, created_at, updated_at
           ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW()
+            $1, $2, $3, $4, $5, $6, $7, $8,
+            $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
+            $19, $20, NOW(), NOW()
           ) RETURNING *
         `, [
           apiCall.c_id || apiCall.id,
           userId,
-          apiCall.to_number || apiCall.to,
-          apiCall.from_number || apiCall.from,
+          normalizedTo || null,
+          normalizedFrom || null,
+          normalizedTo ? encryptString(normalizedTo) : null,
+          normalizedTo ? hashPhoneNumber(normalizedTo) : null,
+          normalizedFrom ? encryptString(normalizedFrom) : null,
+          normalizedFrom ? hashPhoneNumber(normalizedFrom) : null,
           apiCall.duration || apiCall.call_length || 0,
           apiCall.status || 'unknown',
           apiCall.recording_url || null,
+          apiCall.recording_url ? encryptString(apiCall.recording_url) : null,
           apiCall.transcription || null,
+          apiCall.transcription ? encryptString(apiCall.transcription) : null,
           apiCall.summary || null,
+          apiCall.summary ? encryptString(apiCall.summary) : null,
           apiCall.pathway_id || null,
           apiCall.ended_reason || null,
           apiCall.started_at || apiCall.start_time,

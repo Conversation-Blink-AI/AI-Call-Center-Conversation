@@ -4,7 +4,7 @@
 import { Metadata } from 'next'
 
 export default function PublicApiDocumentationPage() {
-  const handleTestApi = () => {
+  const handleTestPurchaseNumber = () => {
     const email = (document.getElementById('test-email') as HTMLInputElement).value;
     const resultDiv = document.getElementById('test-result');
     
@@ -16,6 +16,48 @@ export default function PublicApiDocumentationPage() {
     if (resultDiv) resultDiv.innerHTML = '<div style="color: #3b82f6; padding: 15px; background: #f0f9ff; border: 1px solid #7dd3fc; border-radius: 8px;">🔄 Testing API...</div>';
     
     fetch(`/api/Public_api/getPurchaseNumber?email=${encodeURIComponent(email)}`)
+      .then(response => response.json())
+      .then(data => {
+        if (resultDiv) {
+          resultDiv.innerHTML = `
+            <div style="padding: 15px; background: #f0f9ff; border: 1px solid #7dd3fc; border-radius: 8px;">
+              <h4 style="margin: 0 0 10px 0; color: #1e40af;">API Response:</h4>
+              <pre style="background: #1e293b; color: #f8fafc; padding: 15px; border-radius: 6px; overflow-x: auto; font-size: 14px; margin: 0;">${JSON.stringify(data, null, 2)}</pre>
+            </div>
+          `;
+        }
+      })
+      .catch(error => {
+        if (resultDiv) {
+          resultDiv.innerHTML = `
+            <div style="color: #ef4444; padding: 15px; background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px;">
+              <strong>Error:</strong> ${error.message}
+            </div>
+          `;
+        }
+      });
+  };
+
+  const handleTestCallHistory = () => {
+    const email = (document.getElementById('call-history-email') as HTMLInputElement).value;
+    const page = (document.getElementById('call-history-page') as HTMLInputElement).value || "1";
+    const limit = (document.getElementById('call-history-limit') as HTMLInputElement).value || "50";
+    const resultDiv = document.getElementById('call-history-result');
+
+    if (!email) {
+      if (resultDiv) resultDiv.innerHTML = '<div style="color: #ef4444; padding: 15px; background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px;"><strong>Error:</strong> Please enter an email address</div>';
+      return;
+    }
+
+    if (resultDiv) resultDiv.innerHTML = '<div style="color: #3b82f6; padding: 15px; background: #f0f9ff; border: 1px solid #7dd3fc; border-radius: 8px;">🔄 Testing API...</div>';
+
+    const query = new URLSearchParams({
+      email,
+      page,
+      limit
+    });
+
+    fetch(`/api/Public_api/getCallHistory?${query.toString()}`)
       .then(response => response.json())
       .then(data => {
         if (resultDiv) {
@@ -51,7 +93,7 @@ export default function PublicApiDocumentationPage() {
       <div style={{display: 'none'}}>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Public API Documentation - getPurchaseNumber</title>
+        <title>Public API Documentation</title>
         <style dangerouslySetInnerHTML={{
           __html: `
             body {
@@ -214,9 +256,16 @@ export default function PublicApiDocumentationPage() {
             <p>Retrieve all purchased phone numbers for a specific user by providing their email address. This is a public API endpoint that doesn't require authentication.</p>
           </div>
 
+          <div className="endpoint-info">
+            <h2>getCallHistory Endpoint</h2>
+            <p><span className="method">GET</span> <span className="url">/Public_api/getCallHistory</span></p>
+            <p>Retrieve call history for a specific user by providing their email address. This endpoint reads from the <code>call_logs</code> table and supports pagination.</p>
+          </div>
+
           <h2>🔧 Quick Start</h2>
           <p>Get started with a simple request:</p>
           <pre>{`curl -X GET "https://conversation.hustleapp.co/Public_api/getPurchaseNumber?email=user@example.com"`}</pre>
+          <pre>{`curl -X GET "https://conversation.hustleapp.co/Public_api/getCallHistory?email=user@example.com&page=1&limit=50"`}</pre>
 
           <h2>📋 Parameters</h2>
           <table>
@@ -254,6 +303,23 @@ if (data.success) {
   console.error('Error:', data.message);
 }`}</pre>
 
+          <pre>{`const email = "user@example.com";
+const page = 1;
+const limit = 50;
+const response = await fetch(
+  \`/api/Public_api/getCallHistory?email=\${encodeURIComponent(email)}&page=\${page}&limit=\${limit}\`
+);
+const data = await response.json();
+
+if (data.success) {
+  console.log(\`Found \${data.count} calls (page \${data.page} of \${data.totalPages})\`);
+  data.callLogs.forEach(call => {
+    console.log(\`Call: \${call.call_id} • Status: \${call.status}\`);
+  });
+} else {
+  console.error('Error:', data.message);
+}`}</pre>
+
           <h3>Python</h3>
           <pre>{`import requests
 
@@ -265,6 +331,23 @@ if data['success']:
     print(f"Found {data['count']} phone numbers for {data['email']}")
     for phone in data['phoneNumbers']:
         print(f"Number: {phone['number']}, Location: {phone['location']}")
+else:
+    print(f"Error: {data['message']}")`}</pre>
+
+          <pre>{`import requests
+
+email = "user@example.com"
+page = 1
+limit = 50
+response = requests.get(
+    f"https://conversation.hustleapp.co/Public_api/getCallHistory?email={email}&page={page}&limit={limit}"
+)
+data = response.json()
+
+if data['success']:
+    print(f"Found {data['count']} calls for {data['email']}")
+    for call in data['callLogs']:
+        print(f"Call ID: {call['call_id']}, Status: {call['status']}")
 else:
     print(f"Error: {data['message']}")`}</pre>
 
@@ -293,6 +376,32 @@ getPurchaseNumbers("user@example.com").then(numbers => {
   numbers.forEach(phone => console.log(phone.number));
 });`}</pre>
 
+          <pre>{`const fetch = require('node-fetch');
+
+async function getCallHistory(email, page = 1, limit = 50) {
+  try {
+    const response = await fetch(
+      \`https://conversation.hustleapp.co/Public_api/getCallHistory?email=\${email}&page=\${page}&limit=\${limit}\`
+    );
+    const data = await response.json();
+
+    if (data.success) {
+      console.log(\`Found \${data.count} calls\`);
+      return data.callLogs;
+    } else {
+      throw new Error(data.message);
+    }
+  } catch (error) {
+    console.error('API Error:', error.message);
+    return [];
+  }
+}
+
+// Usage
+getCallHistory("user@example.com").then(calls => {
+  calls.forEach(call => console.log(call.call_id));
+});`}</pre>
+
           <h2>📤 Response Format</h2>
 
           <h3>Successful Response <span className="success-badge">200 OK</span></h3>
@@ -316,6 +425,31 @@ getPurchaseNumbers("user@example.com").then(numbers => {
     }
   ],
   "count": 1
+}`}</pre>
+          </div>
+
+          <h3>Successful Response (Call History) <span className="success-badge">200 OK</span></h3>
+          <div className="response-example">
+            <pre>{`{
+  "success": true,
+  "email": "user@example.com",
+  "user_name": "John Doe",
+  "callLogs": [
+    {
+      "id": "call-log-123",
+      "call_id": "call-abc",
+      "from_number": "+14155550100",
+      "to_number": "+14155550200",
+      "duration_seconds": 120,
+      "status": "completed",
+      "created_at": "2024-01-15T10:30:00.000Z"
+    }
+  ],
+  "count": 1,
+  "total": 12,
+  "page": 1,
+  "limit": 50,
+  "totalPages": 1
 }`}</pre>
           </div>
 
@@ -391,6 +525,44 @@ getPurchaseNumbers("user@example.com").then(numbers => {
             </tbody>
           </table>
 
+          <h3>Call History Root Fields</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Field</th>
+                <th>Type</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>callLogs</code></td>
+                <td>array</td>
+                <td>Array of call log objects</td>
+              </tr>
+              <tr>
+                <td><code>total</code></td>
+                <td>number</td>
+                <td>Total number of calls available</td>
+              </tr>
+              <tr>
+                <td><code>page</code></td>
+                <td>number</td>
+                <td>Current page number</td>
+              </tr>
+              <tr>
+                <td><code>limit</code></td>
+                <td>number</td>
+                <td>Number of items per page</td>
+              </tr>
+              <tr>
+                <td><code>totalPages</code></td>
+                <td>number</td>
+                <td>Total pages available</td>
+              </tr>
+            </tbody>
+          </table>
+
           <h3>Phone Number Object Fields</h3>
           <table>
             <thead>
@@ -454,6 +626,49 @@ getPurchaseNumbers("user@example.com").then(numbers => {
             </tbody>
           </table>
 
+          <h3>Call Log Object Fields</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Field</th>
+                <th>Type</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>call_id</code></td>
+                <td>string</td>
+                <td>Unique call identifier</td>
+              </tr>
+              <tr>
+                <td><code>from_number</code></td>
+                <td>string</td>
+                <td>Caller phone number</td>
+              </tr>
+              <tr>
+                <td><code>to_number</code></td>
+                <td>string</td>
+                <td>Recipient phone number</td>
+              </tr>
+              <tr>
+                <td><code>duration_seconds</code></td>
+                <td>number</td>
+                <td>Call duration in seconds</td>
+              </tr>
+              <tr>
+                <td><code>status</code></td>
+                <td>string</td>
+                <td>Call status</td>
+              </tr>
+              <tr>
+                <td><code>created_at</code></td>
+                <td>string</td>
+                <td>Call creation timestamp (ISO)</td>
+              </tr>
+            </tbody>
+          </table>
+
           <h2>⚠️ Error Handling</h2>
           <p>The API returns different HTTP status codes based on the situation:</p>
           <ul>
@@ -512,7 +727,7 @@ getPurchaseNumbers("user@example.com").then(numbers => {
               <br />
               <button 
                 id="test-btn"
-                onClick={handleTestApi}
+                onClick={handleTestPurchaseNumber}
                 style={{
                   background: '#3b82f6',
                   color: 'white',
@@ -532,6 +747,85 @@ getPurchaseNumbers("user@example.com").then(numbers => {
             </div>
             
             <div id="test-result" style={{marginTop: '20px'}}></div>
+          </div>
+
+          <div className="endpoint-info">
+            <h3>Try getCallHistory</h3>
+            <p>Enter an email address to test the getCallHistory endpoint:</p>
+
+            <div style={{marginTop: '20px'}}>
+              <label htmlFor="call-history-email" style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>Email Address:</label>
+              <input
+                type="email"
+                id="call-history-email"
+                placeholder="user@example.com"
+                style={{
+                  width: '100%',
+                  maxWidth: '400px',
+                  padding: '12px',
+                  border: '2px solid #cbd5e1',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  marginBottom: '15px'
+                }}
+              />
+              <div style={{display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '15px'}}>
+                <div>
+                  <label htmlFor="call-history-page" style={{display: 'block', marginBottom: '6px', fontWeight: 'bold'}}>Page</label>
+                  <input
+                    type="number"
+                    id="call-history-page"
+                    defaultValue="1"
+                    min="1"
+                    style={{
+                      width: '120px',
+                      padding: '10px',
+                      border: '2px solid #cbd5e1',
+                      borderRadius: '8px',
+                      fontSize: '16px'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="call-history-limit" style={{display: 'block', marginBottom: '6px', fontWeight: 'bold'}}>Limit</label>
+                  <input
+                    type="number"
+                    id="call-history-limit"
+                    defaultValue="50"
+                    min="1"
+                    max="500"
+                    style={{
+                      width: '120px',
+                      padding: '10px',
+                      border: '2px solid #cbd5e1',
+                      borderRadius: '8px',
+                      fontSize: '16px'
+                    }}
+                  />
+                </div>
+              </div>
+              <button
+                id="call-history-test-btn"
+                onClick={handleTestCallHistory}
+                style={{
+                  background: '#3b82f6',
+                  color: 'white',
+                  border: 'none',
+                  padding: '12px 24px',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseOver={handleMouseOver}
+                onMouseOut={handleMouseOut}
+              >
+                Test Call History
+              </button>
+            </div>
+
+            <div id="call-history-result" style={{marginTop: '20px'}}></div>
           </div>
 
           <h2>🆘 Support</h2>

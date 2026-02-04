@@ -146,8 +146,10 @@
             <ul>
               <li><code>id</code> UUID PK</li>
               <li><code>email</code> UNIQUE NOT NULL</li>
+              <li><code>email_enc</code>, <code>email_hash</code></li>
               <li><code>first_name</code>, <code>last_name</code></li>
               <li><code>company</code>, <code>phone_number</code></li>
+              <li><code>phone_number_enc</code>, <code>phone_number_hash</code>, <code>phone_number_last4</code></li>
               <li><code>role</code> DEFAULT <code>'user'</code></li>
               <li><code>password_hash</code> (legacy)</li>
               <li><code>created_at</code>, <code>updated_at</code></li>
@@ -163,11 +165,13 @@
             <strong>Indexes</strong>
             <ul>
               <li><code>idx_users_email</code></li>
+              <li><code>idx_users_email_hash</code></li>
               <li><code>idx_users_external_id</code></li>
               <li><code>idx_users_is_verified</code></li>
               <li><code>idx_users_is_admin</code> (partial)</li>
               <li><code>idx_users_stripe_customer_id</code></li>
               <li><code>idx_users_first_name</code>, <code>idx_users_last_name</code></li>
+              <li><code>idx_users_phone_number_hash</code></li>
             </ul>
           </div>
         </div>
@@ -254,6 +258,7 @@
             <ul>
               <li><code>id</code> UUID PK</li>
               <li><code>phone_number</code> UNIQUE NOT NULL</li>
+              <li><code>phone_number_enc</code>, <code>phone_number_hash</code>, <code>phone_number_last4</code></li>
               <li><code>user_id</code> FK → <code>users(id)</code></li>
               <li><code>location</code>, <code>type</code>, <code>status</code></li>
               <li><code>assigned_to</code>, <code>subscription_plan</code></li>
@@ -266,6 +271,7 @@
             <ul>
               <li><code>idx_phone_numbers_user_id</code></li>
               <li><code>idx_phone_numbers_phone_number</code></li>
+              <li><code>idx_phone_numbers_phone_number_hash</code></li>
               <li><code>idx_phone_numbers_bland_block_id</code> (partial)</li>
             </ul>
           </div>
@@ -347,14 +353,20 @@
               <li><code>call_id</code> UNIQUE NOT NULL</li>
               <li><code>user_id</code> FK → <code>users(id)</code></li>
               <li><code>from_number</code>, <code>to_number</code></li>
+              <li><code>from_number_enc</code>, <code>from_number_hash</code></li>
+              <li><code>to_number_enc</code>, <code>to_number_hash</code></li>
               <li><code>duration_seconds</code>, <code>status</code></li>
               <li><code>recording_url</code>, <code>transcript</code>, <code>summary</code></li>
+              <li><code>recording_url_enc</code>, <code>transcript_enc</code>, <code>summary_enc</code></li>
               <li><code>pathway_id</code>, <code>ended_reason</code></li>
               <li><code>start_time</code>, <code>end_time</code></li>
               <li><code>queue_time</code>, <code>latency_ms</code>, <code>interruptions</code></li>
               <li><code>phone_number_id</code> FK → <code>phone_numbers(id)</code></li>
               <li><code>cost_cents</code></li>
-              <li><code>phone_number</code>, <code>country</code>, <code>state</code>, <code>city</code>, <code>zip</code></li>
+              <li><code>country</code>, <code>state</code>, <code>city</code>, <code>zip</code></li>
+              <li><code>other_party_number</code></li>
+              <li><code>phone_number_enc</code>, <code>phone_number_hash</code> (encryption-only)</li>
+              <li><code>other_party_number_enc</code>, <code>other_party_number_hash</code></li>
               <li><code>short_from</code>, <code>short_to</code></li>
               <li><code>call_timezone</code>, <code>call_time_utc</code></li>
             </ul>
@@ -374,6 +386,10 @@
               <li><code>idx_call_logs_state</code></li>
               <li><code>idx_call_logs_city</code></li>
               <li><code>idx_call_logs_phone_number</code></li>
+              <li><code>idx_call_logs_from_number_hash</code></li>
+              <li><code>idx_call_logs_to_number_hash</code></li>
+              <li><code>idx_call_logs_phone_number_hash</code></li>
+              <li><code>idx_call_logs_other_party_number_hash</code></li>
             </ul>
           </div>
         </div>
@@ -389,7 +405,7 @@
             <ul>
               <li><code>id</code> UUID PK</li>
               <li><code>user_id</code> FK → <code>users(id)</code></li>
-              <li><code>nickname</code>, <code>pixel_id</code>, <code>access_token</code>, <code>event_name</code></li>
+              <li><code>nickname</code>, <code>pixel_id</code>, <code>access_token</code>, <code>access_token_enc</code>, <code>event_name</code></li>
               <li><code>created_at</code></li>
             </ul>
           </div>
@@ -413,7 +429,7 @@
             <strong>Columns</strong>
             <ul>
               <li><code>id</code> BIGSERIAL PK</li>
-              <li><code>gateway</code>, <code>gateway_payment_id</code></li>
+              <li><code>gateway</code>, <code>gateway_payment_id</code>, <code>gateway_payment_id_enc</code></li>
               <li><code>amount_cents</code>, <code>status</code></li>
               <li><code>user_id</code> FK → <code>users(id)</code></li>
               <li><code>created_at</code>, <code>updated_at</code></li>
@@ -424,6 +440,7 @@
             <ul>
               <li><code>idx_payments_user_id</code></li>
               <li><code>idx_payments_gateway_payment_id</code></li>
+              <li><code>idx_payments_gateway_payment_id_enc</code></li>
               <li><code>idx_payments_created_at</code> (DESC)</li>
               <li><code>idx_payments_status</code></li>
             </ul>
@@ -442,6 +459,7 @@
               <li><code>admin_user_id</code> FK → <code>users(id)</code></li>
               <li><code>action</code>, <code>resource_type</code></li>
               <li><code>resource_id</code>, <code>old_value</code>, <code>new_value</code></li>
+              <li><code>old_value_enc</code>, <code>new_value_enc</code></li>
               <li><code>metadata</code>, <code>ip_address</code></li>
               <li><code>created_at</code></li>
             </ul>

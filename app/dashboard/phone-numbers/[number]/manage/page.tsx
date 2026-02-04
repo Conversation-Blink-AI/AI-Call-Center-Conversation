@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
-import { ArrowLeft, Save, Loader2, HelpCircle } from 'lucide-react'
+import { ArrowLeft, Save, Loader2, HelpCircle, Play, Pause } from 'lucide-react'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -36,6 +36,17 @@ interface FormData {
   model: string
   language: string
   record: boolean
+  noise_cancellation: boolean
+  ignore_button_press: boolean
+}
+
+interface VoiceOption {
+  id: string
+  name: string
+  description: string | null
+  voiceId: string
+  tags: string[]
+  gender?: string | null
 }
 
 export default function ManageNumberPage({ params }: ManageNumberPageProps) {
@@ -47,6 +58,13 @@ export default function ManageNumberPage({ params }: ManageNumberPageProps) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [helpModalOpen, setHelpModalOpen] = useState<string | null>(null)
+  const [voices, setVoices] = useState<VoiceOption[]>([])
+  const [voicesLoading, setVoicesLoading] = useState(false)
+  const [voicesError, setVoicesError] = useState<string | null>(null)
+  const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null)
+  const [loadingVoiceId, setLoadingVoiceId] = useState<string | null>(null)
+  const audioRef = React.useRef<HTMLAudioElement | null>(null)
+  const missingVoiceIdsRef = React.useRef<Set<string>>(new Set())
 
   const {
     register,
@@ -68,6 +86,8 @@ export default function ManageNumberPage({ params }: ManageNumberPageProps) {
       model: 'base',
       language: 'en-US',
       record: false,
+      noise_cancellation: false,
+      ignore_button_press: false,
     },
   })
 
@@ -101,6 +121,223 @@ export default function ManageNumberPage({ params }: ManageNumberPageProps) {
 
     resolveParams()
   }, [params])
+
+  useEffect(() => {
+    const fetchVoices = async () => {
+      try {
+        setVoicesLoading(true)
+        setVoicesError(null)
+        const response = await fetch("/api/voices")
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to fetch voices")
+        }
+
+        setVoices(data.voices || [])
+      } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : "Failed to load voices"
+        setVoicesError(errorMessage)
+      } finally {
+        setVoicesLoading(false)
+      }
+    }
+
+    fetchVoices()
+  }, [])
+
+  useEffect(() => {
+    const fetchInboundSettings = async () => {
+      if (!phoneNumber) return
+
+      try {
+        const response = await fetch(`/api/bland-ai/inbound-number?phone_number=${encodeURIComponent(phoneNumber)}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+        })
+
+        const data = await response.json()
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to load inbound settings")
+        }
+
+        const voiceValue = typeof data.voice === "string" ? data.voice : ""
+        const modelValue = typeof data.model === "string" ? data.model : "base"
+        const backgroundTrackValue =
+          typeof data.background_track === "string" && data.background_track ? data.background_track : "null"
+        const languageValue = typeof data.language === "string" ? data.language : "en-US"
+        const interruptionThresholdValue =
+          typeof data.interruption_threshold === "number" ? data.interruption_threshold : 100
+        const recordValue = typeof data.record === "boolean" ? data.record : false
+        const summaryPromptValue = typeof data.summary_prompt === "string" ? data.summary_prompt : ""
+        const noiseCancellationValue = typeof data.noise_cancellation === "boolean" ? data.noise_cancellation : false
+        const ignoreButtonPressValue = typeof data.ignore_button_press === "boolean" ? data.ignore_button_press : false
+
+        setValue("voice", voiceValue)
+        setValue("model", modelValue)
+        setValue("background_track", backgroundTrackValue)
+        setValue("language", languageValue)
+        setValue("interruption_threshold", interruptionThresholdValue)
+        setValue("record", recordValue)
+        setValue("summary_prompt", summaryPromptValue)
+        setValue("noise_cancellation", noiseCancellationValue)
+        setValue("ignore_button_press", ignoreButtonPressValue)
+      } catch (err) {
+        console.error("❌ [MANAGE-NUMBER] Failed to load inbound settings:", err)
+        const errorMessage = err instanceof Error ? err.message : "Failed to load inbound settings"
+        toast.error(errorMessage)
+      }
+    }
+
+    fetchInboundSettings()
+  }, [phoneNumber, setValue])
+
+  const selectedVoiceId = watch("voice")
+  const selectedVoice = useMemo(() => {
+    if (!selectedVoiceId) return null
+    return voices.find((voice) => voice.voiceId === selectedVoiceId) || null
+  }, [voices, selectedVoiceId])
+
+  const getGenderEmoji = (gender?: string | null) => {
+    const normalizedGender = String(gender ?? "").trim().toLowerCase()
+    if (normalizedGender === "female") {
+      return { emoji: "👩", label: "Female voice" }
+    }
+    if (normalizedGender === "male") {
+      return { emoji: "👨", label: "Male voice" }
+    }
+    if (normalizedGender === "neutral") {
+      return { emoji: "🧑", label: "Neutral voice" }
+    }
+    return null
+  }
+
+  useEffect(() => {
+    if (!selectedVoiceId) return
+    if (voices.some((voice) => voice.voiceId === selectedVoiceId)) return
+    if (missingVoiceIdsRef.current.has(selectedVoiceId)) return
+
+    missingVoiceIdsRef.current.add(selectedVoiceId)
+
+    const fetchMissingVoice = async () => {
+      try {
+        const response = await fetch(`/api/voices?voice_id=${encodeURIComponent(selectedVoiceId)}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+        })
+
+        const data = await response.json()
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to load voice")
+        }
+
+        if (data.voice) {
+          setVoices((prev) => {
+            if (prev.some((voice) => voice.voiceId === data.voice.voiceId)) {
+              return prev
+            }
+            return [...prev, data.voice]
+          })
+        }
+      } catch (err) {
+        console.error("❌ [MANAGE-NUMBER] Failed to load missing voice:", err)
+      }
+    }
+
+    fetchMissingVoice()
+  }, [voices, selectedVoiceId])
+
+  const stopVoiceSample = () => {
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current = null
+    }
+    setPlayingVoiceId(null)
+    setLoadingVoiceId(null)
+  }
+
+  const playVoiceSample = async (voiceId: string, voiceName: string) => {
+    try {
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current = null
+      }
+
+      setPlayingVoiceId(null)
+      setLoadingVoiceId(voiceId)
+
+      const response = await fetch(`/api/bland-ai/voices/${voiceId}/sample`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: "Hey this is Hustle AI, can you hear me alright?"
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || "Failed to generate voice sample")
+      }
+
+      const contentType = response.headers.get("content-type")
+      let audioSource: string | null = null
+
+      if (contentType && contentType.includes("audio")) {
+        const audioBlob = await response.blob()
+        audioSource = URL.createObjectURL(audioBlob)
+      } else {
+        const data = await response.json()
+        audioSource = data.audio_url || null
+      }
+
+      if (!audioSource) {
+        throw new Error("No audio data received")
+      }
+
+      const audio = new Audio(audioSource)
+      audioRef.current = audio
+
+      audio.oncanplaythrough = () => {
+        setLoadingVoiceId(null)
+        setPlayingVoiceId(voiceId)
+        audio.play().catch(() => {
+          setPlayingVoiceId(null)
+          setLoadingVoiceId(null)
+        })
+      }
+
+      audio.onended = () => {
+        setPlayingVoiceId(null)
+        setLoadingVoiceId(null)
+        if (audioSource?.startsWith("blob:")) {
+          URL.revokeObjectURL(audioSource)
+        }
+      }
+
+      audio.onerror = () => {
+        setPlayingVoiceId(null)
+        setLoadingVoiceId(null)
+      }
+
+      audio.load()
+
+      console.log("🎵 [VOICE PREVIEW] Playing sample:", voiceName)
+    } catch (err) {
+      console.error("Error playing voice sample:", err)
+      setPlayingVoiceId(null)
+      setLoadingVoiceId(null)
+      toast.error("Failed to play voice preview")
+    }
+  }
 
   // Help content for each section
   const getHelpContent = (section: string) => {
@@ -308,12 +545,16 @@ export default function ManageNumberPage({ params }: ManageNumberPageProps) {
       }
       if (data.summary_prompt) {
         requestBody.summary_prompt = data.summary_prompt
+      } else {
+        requestBody.summary_prompt = null
       }
       requestBody.block_interruptions = data.block_interruptions
       requestBody.interruption_threshold = data.interruption_threshold
       requestBody.model = data.model
       requestBody.language = data.language
       requestBody.record = data.record
+      requestBody.noise_cancellation = data.noise_cancellation
+      requestBody.ignore_button_press = data.ignore_button_press
 
       console.log("📤 [MANAGE-NUMBER] Sending update request:", requestBody)
 
@@ -400,82 +641,6 @@ export default function ManageNumberPage({ params }: ManageNumberPageProps) {
 
       <form onSubmit={handleSubmit(onSubmit)}>
         <div className="space-y-6 pb-4">
-          {/* Basic Settings */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                Basic Settings
-                <button
-                  onClick={(e) => {
-                    e.preventDefault()
-                    setHelpModalOpen('basic')
-                  }}
-                  className="text-muted-foreground hover:text-foreground transition-colors"
-                  aria-label="Help"
-                >
-                  <HelpCircle className="h-4 w-4" />
-                </button>
-              </CardTitle>
-              <CardDescription>
-                Configure the core behavior of your inbound phone number
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="prompt">Prompt *</Label>
-                <Textarea
-                  id="prompt"
-                  {...register('prompt', { required: !watch('pathway_id') })}
-                  placeholder="Provide instructions, relevant information, and examples of the ideal conversation flow..."
-                  rows={6}
-                  className="font-mono text-sm"
-                />
-                {errors.prompt && (
-                  <p className="text-sm text-red-600">{errors.prompt.message}</p>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  Required unless Pathway ID is set. Keep it under 2,000 characters for best results.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="pathway_id">Pathway ID (Optional)</Label>
-                  <Input
-                    id="pathway_id"
-                    {...register('pathway_id')}
-                    placeholder="Leave empty to use prompt"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Setting a pathway will override the prompt field
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="pathway_version">Pathway Version</Label>
-                  <Input
-                    id="pathway_version"
-                    type="number"
-                    {...register('pathway_version', { valueAsNumber: true })}
-                    placeholder="Default: production version"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="first_sentence">First Sentence</Label>
-                <Input
-                  id="first_sentence"
-                  {...register('first_sentence')}
-                  placeholder="e.g., 'Hello, this is Sarah. How can I help you today?'"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Makes your agent say a specific phrase for its first response
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Agent Parameters */}
           <Card>
             <CardHeader>
@@ -500,14 +665,65 @@ export default function ManageNumberPage({ params }: ManageNumberPageProps) {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="voice">Voice</Label>
-                  <Input
-                    id="voice"
-                    {...register('voice')}
-                    placeholder="e.g., maya, james"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Check available voices in the API documentation
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <Select
+                      value={watch('voice')}
+                      onValueChange={(value) => setValue('voice', value)}
+                      disabled={voicesLoading || !!voicesError}
+                    >
+                      <SelectTrigger id="voice">
+                        <SelectValue placeholder={voicesLoading ? "Loading voices..." : "Select a voice"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {voices.map((voice) => {
+                          const genderEmoji = getGenderEmoji(voice.gender)
+
+                          return (
+                            <SelectItem key={voice.voiceId} value={voice.voiceId}>
+                              <span className="flex items-center gap-2">
+                                <span>{voice.name}</span>
+                                {genderEmoji ? (
+                                  <span role="img" aria-label={genderEmoji.label}>
+                                    {genderEmoji.emoji}
+                                  </span>
+                                ) : null}
+                              </span>
+                            </SelectItem>
+                          )
+                        })}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      disabled={!selectedVoice || loadingVoiceId === selectedVoice?.voiceId}
+                      onClick={() => {
+                        if (!selectedVoice) return
+                        if (playingVoiceId === selectedVoice.voiceId) {
+                          stopVoiceSample()
+                        } else {
+                          playVoiceSample(selectedVoice.voiceId, selectedVoice.name)
+                        }
+                      }}
+                      title={selectedVoice ? "Preview voice" : "Select a voice to preview"}
+                    >
+                      {loadingVoiceId === selectedVoice?.voiceId ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : playingVoiceId === selectedVoice?.voiceId ? (
+                        <Pause className="h-4 w-4" />
+                      ) : (
+                        <Play className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                  {voicesError ? (
+                    <p className="text-xs text-destructive">{voicesError}</p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Select a voice and preview before saving.
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -619,6 +835,34 @@ export default function ManageNumberPage({ params }: ManageNumberPageProps) {
                   id="record"
                   checked={watch('record')}
                   onCheckedChange={(checked) => setValue('record', checked)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="noise_cancellation">Noise Cancellation</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Enable noise cancellation to reduce background noise during the call
+                  </p>
+                </div>
+                <Switch
+                  id="noise_cancellation"
+                  checked={watch('noise_cancellation')}
+                  onCheckedChange={(checked) => setValue('noise_cancellation', checked)}
+                />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="ignore_button_press">Ignore Button Press</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Ignore button presses during the call (does not apply to Amazon Connect nodes)
+                  </p>
+                </div>
+                <Switch
+                  id="ignore_button_press"
+                  checked={watch('ignore_button_press')}
+                  onCheckedChange={(checked) => setValue('ignore_button_press', checked)}
                 />
               </div>
 
