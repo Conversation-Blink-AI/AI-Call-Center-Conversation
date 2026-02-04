@@ -106,20 +106,15 @@ export async function GET(request: NextRequest) {
           call_id,
           user_id,
           from_number,
-          from_number_enc,
           to_number,
-          to_number_enc,
           duration_seconds,
           status,
           cost_cents,
           created_at,
           updated_at,
           recording_url,
-          recording_url_enc,
           transcript,
-          transcript_enc,
           summary,
-          summary_enc,
           pathway_id,
           ended_reason,
           start_time,
@@ -128,18 +123,14 @@ export async function GET(request: NextRequest) {
           latency_ms,
           interruptions,
           phone_number_id,
-          phone_number,
-          phone_number_enc,
-          other_party_number,
-          other_party_number_enc,
           country,
           state,
           city,
-          zip,
+          zip_code,
+          other_party_number,
           short_from,
           short_to,
-          call_timezone,
-          call_time_utc
+          call_timestamp
         FROM call_logs
         WHERE user_id = $1
         ORDER BY created_at DESC
@@ -151,16 +142,16 @@ export async function GET(request: NextRequest) {
         id: row.id,
         call_id: row.call_id,
         user_id: row.user_id,
-        from_number: decryptMaybe(row.from_number, row.from_number_enc),
-        to_number: decryptMaybe(row.to_number, row.to_number_enc),
+        from_number: row.from_number,
+        to_number: row.to_number,
         duration_seconds: row.duration_seconds,
         status: row.status,
         cost_cents: row.cost_cents ? parseInt(row.cost_cents) : null,
         created_at: row.created_at,
         updated_at: row.updated_at,
-        recording_url: decryptMaybe(row.recording_url, row.recording_url_enc),
-        transcript: decryptMaybe(row.transcript, row.transcript_enc),
-        summary: decryptMaybe(row.summary, row.summary_enc),
+        recording_url: row.recording_url,
+        transcript: row.transcript,
+        summary: row.summary,
         pathway_id: row.pathway_id,
         ended_reason: row.ended_reason,
         start_time: row.start_time,
@@ -169,16 +160,14 @@ export async function GET(request: NextRequest) {
         latency_ms: row.latency_ms,
         interruptions: row.interruptions,
         phone_number_id: row.phone_number_id,
-        phone_number: decryptMaybe(row.phone_number, row.phone_number_enc),
-        other_party_number: decryptMaybe(row.other_party_number, row.other_party_number_enc),
+        other_party_number: row.other_party_number,
         country: row.country,
         state: row.state,
         city: row.city,
-        zip: row.zip,
+        zip_code: row.zip_code,
         short_from: row.short_from,
         short_to: row.short_to,
-        call_timezone: row.call_timezone,
-        call_time_utc: row.call_time_utc
+        call_timestamp: row.call_timestamp
       }))
 
       console.log(`[GET-CALL-HISTORY] Found ${callLogs.length} call logs for user ${user.id}`)
@@ -210,7 +199,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       {
         success: false,
-        message
+        message,
+        ...(process.env.NODE_ENV === "development" && error?.message ? { error: error.message } : {})
       },
       { status: 500, headers: CORS_HEADERS }
     )
