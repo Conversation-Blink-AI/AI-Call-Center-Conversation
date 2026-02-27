@@ -11,6 +11,7 @@ interface FacebookPixelNodeProps {
     eventName?: string
     configId?: string
     configNickname?: string
+    testEventCode?: string
     url?: string
     method?: string
     headers?: any[]
@@ -59,6 +60,11 @@ export function FacebookPixelNode({ data, selected }: FacebookPixelNodeProps) {
           {data.eventName && (
             <div className="text-[12px] opacity-80 text-gray-600 dark:text-gray-300 mt-0.5">
               <span className="font-mono bg-blue-50 dark:bg-blue-900 px-0.5 py-0.5 rounded text-[7px]">{data.eventName}</span>
+            </div>
+          )}
+          {data.testEventCode && (
+            <div className="text-[11px] opacity-80 text-gray-600 dark:text-gray-300 mt-0.5">
+              Test: {data.testEventCode}
             </div>
           )}
 

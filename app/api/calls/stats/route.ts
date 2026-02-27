@@ -36,8 +36,17 @@ export async function GET(request: NextRequest) {
     const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
     const lastMonthEnd = new Date(thisMonthStart.getTime() - 1)
 
-    // Get basic stats
-    const basicStats = await CallDatabaseService.getCallStats(userId)
+    const isAllTime = timeframe === 'all'
+    const timeframeDays = isAllTime ? NaN : parseInt(timeframe.replace('d', ''), 10)
+    const timeframeStart = isNaN(timeframeDays)
+      ? null
+      : new Date(now.getTime() - (timeframeDays * 24 * 60 * 60 * 1000))
+
+    // Get basic stats (scoped to timeframe)
+    const basicStats = await CallDatabaseService.getCallStatsForRange(userId, {
+      startDate: timeframeStart ? timeframeStart.toISOString() : undefined,
+      endDate: isAllTime ? undefined : now.toISOString()
+    })
 
     // Get enhanced stats with timeframe filtering
     const enhancedStats = await getEnhancedStats(userId, {
@@ -48,7 +57,19 @@ export async function GET(request: NextRequest) {
       lastWeekEnd,
       thisMonthStart,
       lastMonthStart,
-      lastMonthEnd
+      lastMonthEnd,
+      rangeStart: timeframeStart,
+      rangeEnd: isAllTime ? null : now
+    })
+
+    const volumeSeries = await getCallVolumeSeries(userId, {
+      rangeStart: timeframeStart,
+      rangeEnd: isAllTime ? null : now
+    })
+
+    const qualifiedLeadsSeries = await getQualifiedLeadsSeries(userId, {
+      rangeStart: timeframeStart,
+      rangeEnd: isAllTime ? null : now
     })
 
     // Calculate derived metrics
@@ -58,6 +79,10 @@ export async function GET(request: NextRequest) {
 
     const successRate = basicStats.totalCalls > 0 
       ? (basicStats.completedCalls / basicStats.totalCalls) * 100
+      : 0
+
+    const qualifiedLeadsRate = basicStats.totalCalls > 0
+      ? (basicStats.transferredCalls / basicStats.totalCalls) * 100
       : 0
 
     const averageCostPerCall = basicStats.totalCalls > 0 
@@ -70,11 +95,14 @@ export async function GET(request: NextRequest) {
         ...basicStats,
         averageDuration,
         successRate,
+        qualifiedLeadsRate,
         averageCostPerCall,
         callsThisWeek: enhancedStats.callsThisWeek,
         callsThisMonth: enhancedStats.callsThisMonth,
         costThisWeek: enhancedStats.costThisWeek,
-        costThisMonth: enhancedStats.costThisMonth
+        costThisMonth: enhancedStats.costThisMonth,
+        volumeSeries,
+        qualifiedLeadsSeries
       },
       timeframeCounts: {
         today: enhancedStats.callsToday,
@@ -124,6 +152,9 @@ export async function GET(request: NextRequest) {
 async function getEnhancedStats(userId: string, dates: any) {
   const { db } = await import('@/lib/db')
 
+  const rangeStart = dates.rangeStart ? new Date(dates.rangeStart).toISOString() : null
+  const rangeEnd = dates.rangeEnd ? new Date(dates.rangeEnd).toISOString() : null
+
   // Get calls by timeframe
   // Note: cost_cents column doesn't exist in call_logs table, so cost is set to 0
   const queries = await Promise.all([
@@ -131,43 +162,64 @@ async function getEnhancedStats(userId: string, dates: any) {
     db.query(`
       SELECT COUNT(*) as count, 0 as cost 
       FROM call_logs 
-      WHERE user_id = $1 AND created_at >= $2
-    `, [userId, dates.today.toISOString()]),
+      WHERE user_id = $1 
+        AND created_at >= $2
+        AND ($3::timestamptz IS NULL OR created_at >= $3::timestamptz)
+        AND ($4::timestamptz IS NULL OR created_at <= $4::timestamptz)
+    `, [userId, dates.today.toISOString(), rangeStart, rangeEnd]),
 
     // Yesterday
     db.query(`
       SELECT COUNT(*) as count, 0 as cost 
       FROM call_logs 
-      WHERE user_id = $1 AND created_at >= $2 AND created_at < $3
-    `, [userId, dates.yesterday.toISOString(), dates.today.toISOString()]),
+      WHERE user_id = $1 
+        AND created_at >= $2 
+        AND created_at < $3
+        AND ($4::timestamptz IS NULL OR created_at >= $4::timestamptz)
+        AND ($5::timestamptz IS NULL OR created_at <= $5::timestamptz)
+    `, [userId, dates.yesterday.toISOString(), dates.today.toISOString(), rangeStart, rangeEnd]),
 
     // This week
     db.query(`
       SELECT COUNT(*) as count, 0 as cost 
       FROM call_logs 
-      WHERE user_id = $1 AND created_at >= $2
-    `, [userId, dates.thisWeekStart.toISOString()]),
+      WHERE user_id = $1 
+        AND created_at >= $2
+        AND ($3::timestamptz IS NULL OR created_at >= $3::timestamptz)
+        AND ($4::timestamptz IS NULL OR created_at <= $4::timestamptz)
+    `, [userId, dates.thisWeekStart.toISOString(), rangeStart, rangeEnd]),
 
     // Last week
     db.query(`
       SELECT COUNT(*) as count, 0 as cost 
       FROM call_logs 
-      WHERE user_id = $1 AND created_at >= $2 AND created_at <= $3
-    `, [userId, dates.lastWeekStart.toISOString(), dates.lastWeekEnd.toISOString()]),
+      WHERE user_id = $1 
+        AND created_at >= $2 
+        AND created_at <= $3
+        AND ($4::timestamptz IS NULL OR created_at >= $4::timestamptz)
+        AND ($5::timestamptz IS NULL OR created_at <= $5::timestamptz)
+    `, [userId, dates.lastWeekStart.toISOString(), dates.lastWeekEnd.toISOString(), rangeStart, rangeEnd]),
 
     // This month
     db.query(`
       SELECT COUNT(*) as count, 0 as cost 
       FROM call_logs 
-      WHERE user_id = $1 AND created_at >= $2
-    `, [userId, dates.thisMonthStart.toISOString()]),
+      WHERE user_id = $1 
+        AND created_at >= $2
+        AND ($3::timestamptz IS NULL OR created_at >= $3::timestamptz)
+        AND ($4::timestamptz IS NULL OR created_at <= $4::timestamptz)
+    `, [userId, dates.thisMonthStart.toISOString(), rangeStart, rangeEnd]),
 
     // Last month
     db.query(`
       SELECT COUNT(*) as count, 0 as cost 
       FROM call_logs 
-      WHERE user_id = $1 AND created_at >= $2 AND created_at <= $3
-    `, [userId, dates.lastMonthStart.toISOString(), dates.lastMonthEnd.toISOString()])
+      WHERE user_id = $1 
+        AND created_at >= $2 
+        AND created_at <= $3
+        AND ($4::timestamptz IS NULL OR created_at >= $4::timestamptz)
+        AND ($5::timestamptz IS NULL OR created_at <= $5::timestamptz)
+    `, [userId, dates.lastMonthStart.toISOString(), dates.lastMonthEnd.toISOString(), rangeStart, rangeEnd])
   ])
 
   return {
@@ -184,4 +236,69 @@ async function getEnhancedStats(userId: string, dates: any) {
     callsLastMonth: parseInt(queries[5].rows[0].count),
     costLastMonth: parseInt(queries[5].rows[0].cost)
   }
+}
+
+async function getCallVolumeSeries(
+  userId: string,
+  dates: { rangeStart: Date | null; rangeEnd: Date | null }
+) {
+  const { db } = await import('@/lib/db')
+
+  const rangeStart = dates.rangeStart ? dates.rangeStart.toISOString() : null
+  const rangeEnd = dates.rangeEnd ? dates.rangeEnd.toISOString() : null
+
+  const result = await db.query(
+    `
+      SELECT 
+        DATE_TRUNC('day', created_at) AS day,
+        COUNT(*) AS count
+      FROM call_logs
+      WHERE user_id = $1
+        AND ($2::timestamptz IS NULL OR created_at >= $2::timestamptz)
+        AND ($3::timestamptz IS NULL OR created_at <= $3::timestamptz)
+      GROUP BY day
+      ORDER BY day ASC
+    `,
+    [userId, rangeStart, rangeEnd]
+  )
+
+  return result.rows.map((row: any) => ({
+    date: row.day,
+    count: parseInt(row.count)
+  }))
+}
+
+async function getQualifiedLeadsSeries(
+  userId: string,
+  dates: { rangeStart: Date | null; rangeEnd: Date | null }
+) {
+  const { db } = await import('@/lib/db')
+
+  const rangeStart = dates.rangeStart ? dates.rangeStart.toISOString() : null
+  const rangeEnd = dates.rangeEnd ? dates.rangeEnd.toISOString() : null
+
+  const result = await db.query(
+    `
+      SELECT 
+        DATE_TRUNC('day', created_at) AS day,
+        COUNT(*) AS count
+      FROM call_logs
+      WHERE user_id = $1
+        AND (
+          ended_reason ILIKE '%transfer%' 
+          OR ended_reason ILIKE '%transferred%'
+          OR ended_reason ILIKE '%transfered%'
+        )
+        AND ($2::timestamptz IS NULL OR created_at >= $2::timestamptz)
+        AND ($3::timestamptz IS NULL OR created_at <= $3::timestamptz)
+      GROUP BY day
+      ORDER BY day ASC
+    `,
+    [userId, rangeStart, rangeEnd]
+  )
+
+  return result.rows.map((row: any) => ({
+    date: row.day,
+    count: parseInt(row.count)
+  }))
 }

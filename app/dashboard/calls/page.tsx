@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Fragment, useMemo } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -25,26 +25,34 @@ import {
   Calendar,
   CreditCard,
   CheckCircle,
-  X
+  X,
+  ChevronDown,
+  ChevronRight
 } from "lucide-react"
 import { toast } from "sonner"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import Link from "next/link"
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { LineChart, Line, XAxis, YAxis, CartesianGrid } from "recharts"
 
 interface CallStats {
   totalCalls: number
   completedCalls: number
   failedCalls: number
+  transferredCalls: number
   totalDuration: number
   totalCost: number
   averageDuration: number
   successRate: number
+  qualifiedLeadsRate: number
   averageCostPerCall: number
   callsThisWeek: number
   callsThisMonth: number
   costThisWeek: number
   costThisMonth: number
+  volumeSeries: { date: string; count: number }[]
+  qualifiedLeadsSeries: { date: string; count: number }[]
 }
 
 interface DatabaseCall {
@@ -65,6 +73,31 @@ interface DatabaseCall {
   created_at: string
   updated_at: string
   phone_number_detail?: string
+}
+
+interface PhoneNumberItem {
+  id: string
+  number: string
+  location?: string
+  status?: string
+}
+
+interface MetaCapiEvent {
+  id: string
+  call_id: string
+  config_id: string
+  event_name: string
+  request_payload: any
+  response_payload: any
+  response_status?: number
+  duration_ms?: number
+  created_at: string
+}
+
+interface MetaCapiState {
+  loading: boolean
+  error: string | null
+  events: MetaCapiEvent[]
 }
 
 interface TimeframeCounts {
@@ -93,9 +126,26 @@ export default function CallsPage() {
   const [syncing, setSyncing] = useState(false)
   // Removed billing state and related functions
   const [timeframe, setTimeframe] = useState("7d")
+  const [chartMetric, setChartMetric] = useState("volume")
   const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [error, setError] = useState<string | null>(null)
+  const [expandedCallId, setExpandedCallId] = useState<string | null>(null)
+  const [metaCapiLogs, setMetaCapiLogs] = useState<Record<string, MetaCapiState>>({})
+  const [showMetaCapiPanel, setShowMetaCapiPanel] = useState(false)
+  const [metaPhoneNumbers, setMetaPhoneNumbers] = useState<PhoneNumberItem[]>([])
+  const [selectedMetaNumber, setSelectedMetaNumber] = useState<string>("")
+  const [metaAnalyticsLoading, setMetaAnalyticsLoading] = useState(false)
+  const [metaAnalyticsError, setMetaAnalyticsError] = useState<string | null>(null)
+  const [metaAnalyticsSeries, setMetaAnalyticsSeries] = useState<Array<{
+    day: string
+    config_id: string
+    count: number
+  }>>([])
+  const [metaAnalyticsConfigs, setMetaAnalyticsConfigs] = useState<Array<{
+    id: string
+    nickname: string
+  }>>([])
 
   // Wallet balance state
   const [walletBalance, setWalletBalance] = useState<string>("$0.00")
@@ -135,7 +185,7 @@ export default function CallsPage() {
     try {
       setError(null)
       // Fetch calls from database
-      const callsResponse = await fetch(`/api/calls/database?userId=${user.id}&limit=50&offset=${(page - 1) * 50}`, {
+      const callsResponse = await fetch(`/api/calls/database?userId=${user.id}&limit=50&offset=${(page - 1) * 50}&timeframe=${timeframe}`, {
         credentials: 'include'
       })
       
@@ -170,6 +220,100 @@ export default function CallsPage() {
         setCalls([])
         setTotalPages(1)
       }
+    }
+  }
+
+  const fetchMetaCapiEvents = async (callId: string) => {
+    setMetaCapiLogs((prev) => ({
+      ...prev,
+      [callId]: { loading: true, error: null, events: prev[callId]?.events || [] }
+    }))
+
+    try {
+      const response = await fetch(`/api/meta-capi/events?call_id=${encodeURIComponent(callId)}`, {
+        credentials: "include"
+      })
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result?.error || "Failed to fetch Meta CAPI events")
+      }
+
+      setMetaCapiLogs((prev) => ({
+        ...prev,
+        [callId]: { loading: false, error: null, events: result.events || [] }
+      }))
+    } catch (fetchError: any) {
+      setMetaCapiLogs((prev) => ({
+        ...prev,
+        [callId]: { loading: false, error: fetchError.message || "Failed to fetch Meta CAPI events", events: [] }
+      }))
+    }
+  }
+
+  const handleToggleMetaCapi = (callId: string) => {
+    const nextExpanded = expandedCallId === callId ? null : callId
+    setExpandedCallId(nextExpanded)
+    if (nextExpanded && !metaCapiLogs[callId]) {
+      fetchMetaCapiEvents(callId)
+    }
+  }
+
+  const fetchMetaPhoneNumbers = async () => {
+    try {
+      const response = await fetch("/api/user/phone-numbers", {
+        credentials: "include"
+      })
+      const result = await response.json()
+      if (!response.ok || !result.success) {
+        throw new Error(result?.message || "Failed to load phone numbers")
+      }
+      const numbers = result.phoneNumbers || []
+      setMetaPhoneNumbers(numbers)
+      if (!selectedMetaNumber && numbers.length > 0) {
+        setSelectedMetaNumber(numbers[0].number)
+      }
+    } catch (fetchError: any) {
+      setMetaAnalyticsError(fetchError.message || "Failed to load phone numbers")
+    }
+  }
+
+  const getTimeframeRange = () => {
+    if (timeframe === "all") {
+      return { start: undefined, end: undefined }
+    }
+    const days = parseInt(timeframe.replace("d", ""), 10)
+    if (Number.isNaN(days)) {
+      return { start: undefined, end: undefined }
+    }
+    const now = new Date()
+    const start = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
+    return { start: start.toISOString(), end: now.toISOString() }
+  }
+
+  const fetchMetaAnalytics = async (phoneNumber: string) => {
+    if (!phoneNumber) return
+    setMetaAnalyticsLoading(true)
+    setMetaAnalyticsError(null)
+    try {
+      const { start, end } = getTimeframeRange()
+      const params = new URLSearchParams({ phone_number: phoneNumber })
+      if (start) params.set("start", start)
+      if (end) params.set("end", end)
+      const response = await fetch(`/api/meta-capi/analytics?${params.toString()}`, {
+        credentials: "include"
+      })
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result?.error || "Failed to load Meta CAPI analytics")
+      }
+      setMetaAnalyticsSeries(result.series || [])
+      setMetaAnalyticsConfigs(result.configs || [])
+    } catch (fetchError: any) {
+      setMetaAnalyticsError(fetchError.message || "Failed to load Meta CAPI analytics")
+      setMetaAnalyticsSeries([])
+      setMetaAnalyticsConfigs([])
+    } finally {
+      setMetaAnalyticsLoading(false)
     }
   }
 
@@ -305,6 +449,18 @@ export default function CallsPage() {
     }
   }, [user?.id, timeframe, page]) // Added page dependency
 
+  useEffect(() => {
+    if (showMetaCapiPanel) {
+      if (metaPhoneNumbers.length === 0) {
+        fetchMetaPhoneNumbers()
+      }
+      if (selectedMetaNumber) {
+        fetchMetaAnalytics(selectedMetaNumber)
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showMetaCapiPanel, selectedMetaNumber, timeframe])
+
 
   const formatDuration = (seconds: number) => {
     if (!seconds) return 'N/A'
@@ -333,6 +489,71 @@ export default function CallsPage() {
     if (previous === 0) return current > 0 ? 100 : 0
     return ((current - previous) / previous) * 100
   }
+
+  const volumeData = callStats?.volumeSeries?.map((item) => ({
+    date: item.date,
+    label: new Date(item.date).toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric"
+    }),
+    count: item.count
+  })) || []
+
+  const qualifiedLeadsData = callStats?.qualifiedLeadsSeries?.map((item) => ({
+    date: item.date,
+    label: new Date(item.date).toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric"
+    }),
+    count: item.count
+  })) || []
+
+  const chartData = chartMetric === "qualified" ? qualifiedLeadsData : volumeData
+  const chartTitle = chartMetric === "qualified" ? "Qualified Leads" : "Call Volume"
+
+  const metaChartConfig = useMemo(() => {
+    const config: Record<string, { label: string; color: string }> = {}
+    metaAnalyticsConfigs.forEach((item, index) => {
+      const key = `pixel_${index + 1}`
+      config[key] = {
+        label: item.nickname || `Pixel ${index + 1}`,
+        color: `hsl(var(--chart-${(index % 5) + 1}))`
+      }
+    })
+    return config
+  }, [metaAnalyticsConfigs])
+
+  const metaChartData = useMemo(() => {
+    if (metaAnalyticsSeries.length === 0) return []
+    const configKeyMap = new Map<string, string>()
+    metaAnalyticsConfigs.forEach((item, index) => {
+      configKeyMap.set(item.id, `pixel_${index + 1}`)
+    })
+
+    const dayMap = new Map<string, any>()
+    metaAnalyticsSeries.forEach((row) => {
+      const key = configKeyMap.get(row.config_id)
+      if (!key) return
+      if (!dayMap.has(row.day)) {
+        dayMap.set(row.day, {
+          date: row.day,
+          label: new Date(row.day).toLocaleDateString(undefined, { month: "short", day: "numeric" })
+        })
+      }
+      dayMap.get(row.day)[key] = row.count
+    })
+
+    const data = Array.from(dayMap.values()).sort((a, b) => a.date.localeCompare(b.date))
+    // Ensure missing keys are zeroed for consistent lines
+    data.forEach((item) => {
+      Object.keys(metaChartConfig).forEach((key) => {
+        if (item[key] === undefined) {
+          item[key] = 0
+        }
+      })
+    })
+    return data
+  }, [metaAnalyticsSeries, metaAnalyticsConfigs, metaChartConfig])
 
   if (loading) {
     return (
@@ -367,7 +588,7 @@ export default function CallsPage() {
               <SelectItem value="1d">Last day</SelectItem>
               <SelectItem value="7d">Last 7 days</SelectItem>
               <SelectItem value="30d">Last 30 days</SelectItem>
-              <SelectItem value="90d">Last 90 days</SelectItem>
+            <SelectItem value="all">All</SelectItem>
             </SelectContent>
           </Select>
           <Button onClick={() => syncCalls(true)} disabled={syncing} variant="outline">
@@ -394,16 +615,16 @@ export default function CallsPage() {
 
       {/* Analytics Cards */}
       {callStats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Calls</CardTitle>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+          <Card className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 py-2 px-4">
+              <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total Calls</CardTitle>
               <Phone className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{callStats.totalCalls}</div>
+            <CardContent className="px-4 pb-3 pt-0">
+              <div className="text-xl font-semibold">{callStats.totalCalls}</div>
               {timeframeCounts && (
-                <div className="flex items-center text-xs text-muted-foreground">
+                <div className="flex items-center text-[11px] text-muted-foreground">
                   <span>This week: {timeframeCounts.thisWeek}</span>
                   {timeframeCounts.lastWeek > 0 && (
                     <>
@@ -421,40 +642,58 @@ export default function CallsPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
+          <Card className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 py-2 px-4">
+              <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Qualified Leads</CardTitle>
               <Activity className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{callStats.successRate.toFixed(1)}%</div>
-              <div className="text-xs text-muted-foreground">
-                {callStats.completedCalls} completed, {callStats.failedCalls} failed
+            <CardContent className="px-4 pb-3 pt-0">
+              <div className="text-xl font-semibold">{callStats.qualifiedLeadsRate.toFixed(1)}%</div>
+              <div className="text-[11px] text-muted-foreground">
+                {callStats.transferredCalls} transferred, {callStats.totalCalls} total
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Duration</CardTitle>
+          <Card
+            className="shadow-sm cursor-pointer hover:border-primary/40 transition"
+            onClick={() => setShowMetaCapiPanel((prev) => !prev)}
+            role="button"
+            aria-pressed={showMetaCapiPanel}
+          >
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 py-2 px-4">
+              <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Meta CAPI</CardTitle>
+              <Timer className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent className="px-4 pb-3 pt-0">
+              <div className="text-xl font-semibold">{showMetaCapiPanel ? "Open" : "View"}</div>
+              <div className="text-[11px] text-muted-foreground">
+                Click to {showMetaCapiPanel ? "hide" : "show"} logs
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 py-2 px-4">
+              <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total Duration</CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatDuration(callStats.totalDuration)}</div>
-              <div className="text-xs text-muted-foreground">
+            <CardContent className="px-4 pb-3 pt-0">
+              <div className="text-xl font-semibold">{formatDuration(callStats.totalDuration)}</div>
+              <div className="text-[11px] text-muted-foreground">
                 Avg: {formatDuration(callStats.averageDuration)}
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Cost</CardTitle>
+          <Card className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 py-2 px-4">
+              <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total Cost</CardTitle>
               <DollarSign className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatCost(callStats.totalCost)}</div>
-              <div className="text-xs text-muted-foreground">
+            <CardContent className="px-4 pb-3 pt-0">
+              <div className="text-xl font-semibold">{formatCost(callStats.totalCost)}</div>
+              <div className="text-[11px] text-muted-foreground">
                 Avg: {formatCost(callStats.averageCostPerCall)} per call
               </div>
             </CardContent>
@@ -462,43 +701,189 @@ export default function CallsPage() {
         </div>
       )}
 
+      {showMetaCapiPanel && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Meta CAPI Logs</CardTitle>
+            <CardDescription>Expand a call to view Meta response details.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="min-w-[220px]">
+                <Select value={selectedMetaNumber} onValueChange={setSelectedMetaNumber}>
+                  <SelectTrigger className="h-8">
+                    <SelectValue placeholder="Select number" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {metaPhoneNumbers.map((number) => (
+                      <SelectItem key={number.id} value={number.number}>
+                        {number.number}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (selectedMetaNumber) {
+                    fetchMetaAnalytics(selectedMetaNumber)
+                  }
+                }}
+              >
+                Refresh Graph
+              </Button>
+            </div>
+
+            {metaAnalyticsError && (
+              <Alert variant="destructive">
+                <AlertDescription>{metaAnalyticsError}</AlertDescription>
+              </Alert>
+            )}
+
+            <div className="rounded-md border p-3">
+              {metaAnalyticsLoading ? (
+                <div className="text-xs text-muted-foreground">Loading Meta CAPI analytics...</div>
+              ) : metaChartData.length === 0 ? (
+                <div className="text-xs text-muted-foreground">No Meta CAPI events for this number yet.</div>
+              ) : (
+                <ChartContainer config={metaChartConfig} className="h-[180px] w-full aspect-auto">
+                  <LineChart data={metaChartData} margin={{ left: 0, right: 12, top: 8, bottom: 0 }}>
+                    <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                    <XAxis
+                      dataKey="label"
+                      tickLine={false}
+                      axisLine={false}
+                      interval="preserveStartEnd"
+                    />
+                    <YAxis
+                      tickLine={false}
+                      axisLine={false}
+                      width={24}
+                      allowDecimals={false}
+                    />
+                    <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
+                    {Object.keys(metaChartConfig).map((key) => (
+                      <Line
+                        key={key}
+                        type="monotone"
+                        dataKey={key}
+                        stroke={`var(--color-${key})`}
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                    ))}
+                  </LineChart>
+                </ChartContainer>
+              )}
+            </div>
+
+            {calls.length === 0 && (
+              <div className="text-sm text-muted-foreground">No calls available yet.</div>
+            )}
+            {calls.slice(0, 10).map((call) => (
+              <div key={call.id} className="rounded-md border p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-medium">{call.call_id}</div>
+                    <div className="text-xs text-muted-foreground">{formatDate(call.created_at)}</div>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => handleToggleMetaCapi(call.call_id)}>
+                    {expandedCallId === call.call_id ? "Hide" : "Expand"}
+                  </Button>
+                </div>
+                {expandedCallId === call.call_id && (
+                  <div className="mt-3 space-y-3 text-sm">
+                    {metaCapiLogs[call.call_id]?.loading && (
+                      <div className="text-muted-foreground">Loading Meta CAPI logs...</div>
+                    )}
+
+                    {metaCapiLogs[call.call_id]?.error && (
+                      <Alert variant="destructive">
+                        <AlertDescription>{metaCapiLogs[call.call_id]?.error}</AlertDescription>
+                      </Alert>
+                    )}
+
+                    {!metaCapiLogs[call.call_id]?.loading &&
+                      metaCapiLogs[call.call_id]?.events?.length === 0 && (
+                        <div className="text-muted-foreground">No Meta CAPI logs for this call yet.</div>
+                      )}
+
+                    {(metaCapiLogs[call.call_id]?.events || []).map((event) => (
+                      <div key={event.id} className="rounded-md border bg-muted/20 p-3 space-y-2">
+                        <div className="flex flex-wrap items-center gap-3">
+                          <Badge variant={event.response_status && event.response_status < 300 ? "default" : "destructive"}>
+                            {event.response_status ? `Status ${event.response_status}` : "No response"}
+                          </Badge>
+                          <span className="text-muted-foreground">Event: {event.event_name}</span>
+                          {event.duration_ms !== undefined && (
+                            <span className="text-muted-foreground">Time: {event.duration_ms} ms</span>
+                          )}
+                          <span className="text-muted-foreground">{formatDate(event.created_at)}</span>
+                        </div>
+                        {event.response_payload?.events_received !== undefined && (
+                          <div>Events received: {event.response_payload.events_received}</div>
+                        )}
+                        <details>
+                          <summary className="cursor-pointer text-muted-foreground">Request payload</summary>
+                          <pre className="mt-2 text-xs bg-muted/60 p-2 rounded overflow-auto">
+                            {JSON.stringify(event.request_payload, null, 2)}
+                          </pre>
+                        </details>
+                        <details>
+                          <summary className="cursor-pointer text-muted-foreground">Response payload</summary>
+                          <pre className="mt-2 text-xs bg-muted/60 p-2 rounded overflow-auto">
+                            {JSON.stringify(event.response_payload, null, 2)}
+                          </pre>
+                        </details>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Additional Analytics Row */}
       {callStats && timeframeCounts && (
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">This Month</CardTitle>
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-3">
+          <Card className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 py-2 px-4">
+              <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">This Month</CardTitle>
               <Calendar className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{timeframeCounts.thisMonth}</div>
-              <div className="text-xs text-muted-foreground">
+            <CardContent className="px-4 pb-3 pt-0">
+              <div className="text-xl font-semibold">{timeframeCounts.thisMonth}</div>
+              <div className="text-[11px] text-muted-foreground">
                 Cost: {formatCost(callStats.costThisMonth)}
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">This Week</CardTitle>
+          <Card className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 py-2 px-4">
+              <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">This Week</CardTitle>
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{timeframeCounts.thisWeek}</div>
-              <div className="text-xs text-muted-foreground">
+            <CardContent className="px-4 pb-3 pt-0">
+              <div className="text-xl font-semibold">{timeframeCounts.thisWeek}</div>
+              <div className="text-[11px] text-muted-foreground">
                 Cost: {formatCost(callStats.costThisWeek)}
               </div>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Today vs Yesterday</CardTitle>
+          <Card className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 py-2 px-4">
+              <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Today vs Yesterday</CardTitle>
               <TrendingUp className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{timeframeCounts.today}</div>
-              <div className="text-xs text-muted-foreground">
+            <CardContent className="px-4 pb-3 pt-0">
+              <div className="text-xl font-semibold">{timeframeCounts.today}</div>
+              <div className="text-[11px] text-muted-foreground">
                 Yesterday: {timeframeCounts.yesterday}
                 {timeframeCounts.yesterday > 0 && (
                   <span className="ml-1">
@@ -510,53 +895,28 @@ export default function CallsPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Rate per Minute</CardTitle>
-              <Wallet className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">$0.11</div>
-              <div className="text-xs text-muted-foreground">
-                Standard rate
-              </div>
-            </CardContent>
-          </Card>
+          
         </div>
       )}
 
       {/* Billing Stats Row - Replaced with Auto Billing and Wallet Balance */}
       {user && ( // Ensure user object is available
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Replaced Unbilled Calls Card */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Auto Billing</CardTitle>
-              <CheckCircle className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">Active</div>
-              <p className="text-xs text-muted-foreground">
-                Calls billed automatically
-              </p>
-            </CardContent>
-          </Card>
-
           {/* Replaced Actions Card */}
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Wallet Balance</CardTitle>
+          <Card className="shadow-sm">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 py-2 px-4">
+              <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Wallet Balance</CardTitle>
               <Wallet className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-4 pb-3 pt-0">
               {walletLoading ? (
                 <div className="flex items-center justify-center">
                   <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
                 </div>
               ) : (
-                <div className="text-2xl font-bold">{walletBalance}</div>
+                <div className="text-xl font-semibold">{walletBalance}</div>
               )}
-              <p className="text-xs text-muted-foreground">
+              <p className="text-[11px] text-muted-foreground">
                 <Link href="/dashboard/billing" className="text-blue-600 hover:underline">
                   Add funds
                 </Link>
@@ -564,6 +924,67 @@ export default function CallsPage() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {callStats && (
+        <Card className="shadow-sm">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 py-2 px-4">
+            <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{chartTitle}</CardTitle>
+            <Select value={chartMetric} onValueChange={setChartMetric}>
+              <SelectTrigger className="h-7 w-[170px] text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="volume">Call Volume</SelectItem>
+                <SelectItem value="qualified">Qualified Leads</SelectItem>
+              </SelectContent>
+            </Select>
+          </CardHeader>
+          <CardContent className="px-4 pb-4 pt-0">
+            {chartData.length === 0 ? (
+              <div className="h-[180px] flex items-center justify-center text-xs text-muted-foreground">
+                No data available for this range.
+              </div>
+            ) : (
+              <ChartContainer
+                config={{
+                  calls: {
+                    label: chartTitle,
+                    color: "hsl(var(--primary))"
+                  }
+                }}
+                className="h-[180px] w-full aspect-auto"
+              >
+                <LineChart data={chartData} margin={{ left: 0, right: 12, top: 8, bottom: 0 }}>
+                  <CartesianGrid vertical={false} strokeDasharray="3 3" />
+                  <XAxis
+                    dataKey="label"
+                    tickLine={false}
+                    axisLine={false}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis
+                    tickLine={false}
+                    axisLine={false}
+                    width={24}
+                    allowDecimals={false}
+                  />
+                  <ChartTooltip
+                    cursor={false}
+                    content={<ChartTooltipContent indicator="line" />}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="count"
+                    stroke="var(--color-calls)"
+                    strokeWidth={2}
+                    dot={false}
+                  />
+                </LineChart>
+              </ChartContainer>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {/* Recent Calls Table */}
@@ -587,6 +1008,7 @@ export default function CallsPage() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-[120px]">Meta CAPI</TableHead>
                     <TableHead>Date</TableHead>
                     <TableHead>To Number</TableHead>
                     <TableHead>From Number</TableHead>
@@ -598,31 +1020,111 @@ export default function CallsPage() {
                 </TableHeader>
                 <TableBody>
                   {calls.map((call) => (
-                    <TableRow key={call.id}>
-                      <TableCell>
-                        <div className="text-sm">
-                          {formatDate(call.created_at)}
-                        </div>
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">
-                        {call.to_number}
-                      </TableCell>
-                      <TableCell className="font-mono text-sm">
-                        {call.from_number}
-                      </TableCell>
-                      <TableCell>
-                        {getStatusBadge(call.status)}
-                      </TableCell>
-                      <TableCell>
-                        {formatDuration(call.duration_seconds)}
-                      </TableCell>
-                      <TableCell>
-                        {formatCost(0)}
-                      </TableCell>
-                      <TableCell className="text-muted-foreground text-sm">
-                        {call.ended_reason || 'unknown'}
-                      </TableCell>
-                    </TableRow>
+                    <Fragment key={call.id}>
+                      <TableRow>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="gap-1"
+                            onClick={() => handleToggleMetaCapi(call.call_id)}
+                          >
+                            {expandedCallId === call.call_id ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                            Meta
+                          </Button>
+                        </TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            {formatDate(call.created_at)}
+                          </div>
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {call.to_number}
+                        </TableCell>
+                        <TableCell className="font-mono text-sm">
+                          {call.from_number}
+                        </TableCell>
+                        <TableCell>
+                          {getStatusBadge(call.status)}
+                        </TableCell>
+                        <TableCell>
+                          {formatDuration(call.duration_seconds)}
+                        </TableCell>
+                        <TableCell>
+                          {formatCost(0)}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground text-sm">
+                          {call.ended_reason || 'unknown'}
+                        </TableCell>
+                      </TableRow>
+                      {expandedCallId === call.call_id && (
+                        <TableRow>
+                          <TableCell colSpan={8} className="bg-muted/40">
+                            <div className="space-y-3 text-sm">
+                              <div className="flex items-center justify-between">
+                                <div className="font-medium">Meta CAPI Events</div>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => fetchMetaCapiEvents(call.call_id)}
+                                >
+                                  Refresh
+                                </Button>
+                              </div>
+
+                              {metaCapiLogs[call.call_id]?.loading && (
+                                <div className="text-muted-foreground">Loading Meta CAPI logs...</div>
+                              )}
+
+                              {metaCapiLogs[call.call_id]?.error && (
+                                <Alert variant="destructive">
+                                  <AlertDescription>{metaCapiLogs[call.call_id]?.error}</AlertDescription>
+                                </Alert>
+                              )}
+
+                              {!metaCapiLogs[call.call_id]?.loading &&
+                                metaCapiLogs[call.call_id]?.events?.length === 0 && (
+                                  <div className="text-muted-foreground">No Meta CAPI logs for this call yet.</div>
+                                )}
+
+                              {(metaCapiLogs[call.call_id]?.events || []).map((event) => (
+                                <div key={event.id} className="rounded-md border bg-background p-3 space-y-2">
+                                  <div className="flex flex-wrap items-center gap-3">
+                                    <Badge variant={event.response_status && event.response_status < 300 ? "default" : "destructive"}>
+                                      {event.response_status ? `Status ${event.response_status}` : "No response"}
+                                    </Badge>
+                                    <span className="text-muted-foreground">Event: {event.event_name}</span>
+                                    {event.duration_ms !== undefined && (
+                                      <span className="text-muted-foreground">Time: {event.duration_ms} ms</span>
+                                    )}
+                                    <span className="text-muted-foreground">{formatDate(event.created_at)}</span>
+                                  </div>
+                                  {event.response_payload?.events_received !== undefined && (
+                                    <div>Events received: {event.response_payload.events_received}</div>
+                                  )}
+                                  <details>
+                                    <summary className="cursor-pointer text-muted-foreground">Request payload</summary>
+                                    <pre className="mt-2 text-xs bg-muted/60 p-2 rounded overflow-auto">
+                                      {JSON.stringify(event.request_payload, null, 2)}
+                                    </pre>
+                                  </details>
+                                  <details>
+                                    <summary className="cursor-pointer text-muted-foreground">Response payload</summary>
+                                    <pre className="mt-2 text-xs bg-muted/60 p-2 rounded overflow-auto">
+                                      {JSON.stringify(event.response_payload, null, 2)}
+                                    </pre>
+                                  </details>
+                                </div>
+                              ))}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </Fragment>
                   ))}
                 </TableBody>
               </Table>

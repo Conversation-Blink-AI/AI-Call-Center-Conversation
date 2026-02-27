@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Trash2, Send, Lock, FileText, Code } from 'lucide-react'
+import { Plus, Trash2, Send, Lock, FileText, Code, HelpCircle } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 
@@ -39,6 +39,7 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
   
   // Static text toggle state for question nodes
   const [useStaticText, setUseStaticText] = React.useState(true);
+  const [showStaticTextHelp, setShowStaticTextHelp] = React.useState(false);
   const previousNodeIdRef = React.useRef<string | null>(null);
   
   // Sync static text toggle with node data - only on node change, not on data updates
@@ -104,9 +105,15 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
 
   const handleMetaConfigSelect = (configId: string) => {
     const selectedConfig = metaConfigs.find((config) => config.id === configId)
-    handleFieldChange('configId', configId)
-    handleFieldChange('configNickname', selectedConfig?.nickname || '')
-    handleFieldChange('eventName', selectedConfig?.event_name || selectedNode?.data?.eventName || '')
+    const updates = {
+      data: {
+        ...selectedNode.data,
+        configId,
+        configNickname: selectedConfig?.nickname || '',
+        eventName: selectedConfig?.event_name || selectedNode?.data?.eventName || ''
+      }
+    }
+    onUpdateNode(selectedNode.id, updates)
   }
 
   const handleExtractVarAdd = () => {
@@ -207,12 +214,28 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
             {/* Static Text Toggle */}
             <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/50">
               <div className="flex-1">
-                <Label htmlFor="static-text-toggle" className="text-base font-semibold">
-                  Static Text
-                </Label>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="static-text-toggle" className="text-base font-semibold">
+                    Static Text
+                  </Label>
+                  <button
+                    type="button"
+                    onClick={() => setShowStaticTextHelp((prev) => !prev)}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    aria-label="Static Text help"
+                  >
+                    <HelpCircle className="h-4 w-4" />
+                  </button>
+                </div>
                 <p className="text-sm text-muted-foreground mt-1">
                   When you want the agent to say a specific dialogue. Uncheck to use AI generated text
                 </p>
+                {showStaticTextHelp && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Use Static Text when you need exact wording for compliance or consistency. Turn it off to let the AI
+                    generate responses based on the prompt and context.
+                  </p>
+                )}
               </div>
               <Switch
                 id="static-text-toggle"
@@ -417,6 +440,17 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
                     {selectedNode.data.eventName && <p>Event: {selectedNode.data.eventName}</p>}
                   </div>
                 )}
+
+                <div>
+                  <Label htmlFor="testEventCode">Test Event Code (optional)</Label>
+                  <Input
+                    id="testEventCode"
+                    value={selectedNode.data.testEventCode || ''}
+                    onChange={(e) => handleFieldChange('testEventCode', e.target.value)}
+                    placeholder="TEST28924"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Only used for Meta Test Events.</p>
+                </div>
 
                 <div className="bg-card p-2 rounded border border-border">
                   <p className="text-xs text-primary font-medium">Pre-configured Settings:</p>
@@ -810,6 +844,7 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
 
       setIsTestingAPI(true);
       setTestResult(null);
+      let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
       try {
         // Prepare headers
@@ -844,7 +879,7 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
         // Prepare request options with timeout support
         const timeout = (selectedNode.data.timeout || 10) * 1000
         const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), timeout)
+        timeoutId = setTimeout(() => controller.abort(), timeout)
         
         const requestOptions: RequestInit = {
           method: selectedNode.data.method || 'GET',
@@ -861,7 +896,9 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
         console.log('?? Request options:', requestOptions);
 
         const response = await fetch(selectedNode.data.url, requestOptions);
-        clearTimeout(timeoutId);
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
         
         let responseData: any;
         const contentType = response.headers.get('content-type');
@@ -882,7 +919,9 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
         });
 
       } catch (error: any) {
-        clearTimeout(timeoutId);
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
         console.error('? API Test failed:', error);
         setTestResult({
           success: false,

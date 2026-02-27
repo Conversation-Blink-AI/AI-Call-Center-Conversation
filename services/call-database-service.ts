@@ -348,27 +348,77 @@ export class CallDatabaseService {
     totalCalls: number
     completedCalls: number
     failedCalls: number
+    transferredCalls: number
     totalDuration: number
     totalCost: number
   }> {
+    return this.getCallStatsForRange(userId)
+  }
+
+  /**
+   * Get call statistics for a user within a date range
+   */
+  static async getCallStatsForRange(
+    userId: string,
+    options?: {
+      startDate?: string
+      endDate?: string
+    }
+  ): Promise<{
+    totalCalls: number
+    completedCalls: number
+    failedCalls: number
+    transferredCalls: number
+    totalDuration: number
+    totalCost: number
+  }> {
+    const { startDate, endDate } = options || {}
+
+    const whereConditions = ['user_id = $1']
+    const values: any[] = [userId]
+    let paramCount = 1
+
+    if (startDate) {
+      paramCount++
+      whereConditions.push(`created_at >= $${paramCount}`)
+      values.push(startDate)
+    }
+
+    if (endDate) {
+      paramCount++
+      whereConditions.push(`created_at <= $${paramCount}`)
+      values.push(endDate)
+    }
+
+    const whereClause = whereConditions.join(' AND ')
+
     const query = `
       SELECT 
         COUNT(*) as total_calls,
         COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed_calls,
         COUNT(CASE WHEN status = 'failed' OR status = 'error' THEN 1 END) as failed_calls,
+        COUNT(
+          CASE 
+            WHEN ended_reason ILIKE '%transfer%' 
+              OR ended_reason ILIKE '%transferred%'
+              OR ended_reason ILIKE '%transfered%'
+            THEN 1 
+          END
+        ) as transferred_calls,
         COALESCE(SUM(duration_seconds), 0) as total_duration,
         0 as total_cost
       FROM call_logs 
-      WHERE user_id = $1
+      WHERE ${whereClause}
     `
 
-    const result = await db.query(query, [userId])
+    const result = await db.query(query, values)
     const stats = result.rows[0]
 
     return {
       totalCalls: parseInt(stats.total_calls),
       completedCalls: parseInt(stats.completed_calls),
       failedCalls: parseInt(stats.failed_calls),
+      transferredCalls: parseInt(stats.transferred_calls),
       totalDuration: parseInt(stats.total_duration),
       totalCost: parseInt(stats.total_cost)
     }

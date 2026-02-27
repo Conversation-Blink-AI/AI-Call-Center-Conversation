@@ -678,6 +678,14 @@ export default function CallHistoryPage() {
                     <p className="text-muted-foreground">Inbound</p>
                     <p>{typeof detailsData.inbound === "boolean" ? (detailsData.inbound ? "Yes" : "No") : "—"}</p>
                   </div>
+                  <div>
+                    <p className="text-muted-foreground">Transferred To</p>
+                    <p className="font-mono break-all">{detailsData.transferred_to || "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Transferred At</p>
+                    <p>{formatDateTime(detailsData.transferred_at)}</p>
+                  </div>
                 </div>
 
                 <Tabs defaultValue="summary">
@@ -686,6 +694,7 @@ export default function CallHistoryPage() {
                     <TabsTrigger value="request">Request Data</TabsTrigger>
                     <TabsTrigger value="variables">Variables</TabsTrigger>
                     <TabsTrigger value="transcripts">Transcripts</TabsTrigger>
+                    <TabsTrigger value="meta-capi">Meta CAPI Event</TabsTrigger>
                   </TabsList>
 
                   <TabsContent value="summary">
@@ -721,6 +730,27 @@ export default function CallHistoryPage() {
                     ) : (
                       <p className="text-sm text-muted-foreground">No transcripts available.</p>
                     )}
+                  </TabsContent>
+
+                  <TabsContent value="meta-capi">
+                    <div className="rounded-md border border-border p-4 text-sm space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Event Triggered</span>
+                        <Badge variant="outline">
+                          {typeof detailsData.meta_capi_event_triggered === "boolean"
+                            ? detailsData.meta_capi_event_triggered ? "Yes" : "No"
+                            : "—"}
+                        </Badge>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Event Name</p>
+                        <p className="font-mono break-all">{detailsData.meta_capi_event_name || "—"}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Event ID</p>
+                        <p className="font-mono break-all">{detailsData.meta_capi_event_id || "—"}</p>
+                      </div>
+                    </div>
                   </TabsContent>
                 </Tabs>
               </div>

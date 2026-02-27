@@ -50,16 +50,21 @@ export function convertReactFlowToBland(reactFlowData: ReactFlowData): BlandFlow
       const configId = cleanData.configId || ''
       const configNickname = cleanData.configNickname || ''
       const eventName = cleanData.eventName || 'CallLead'
-      const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '')
+      const testEventCode = cleanData.testEventCode || ''
+      const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://dev.conversation.blinklab.in').replace(/\/$/, '')
       const url = configId ? `${baseUrl}/api/integrations/meta-capi/${configId}` : ''
 
-      const body = JSON.stringify({
+      const bodyPayload: Record<string, string> = {
         call_id: '{{call_id}}',
         from: '{{from}}',
         to: '{{to}}',
         ip: '{{ip}}',
         user_agent: '{{user_agent}}'
-      })
+      }
+      if (testEventCode) {
+        bodyPayload.test_event_code = testEventCode
+      }
+      const body = JSON.stringify(bodyPayload)
       
       return {
         id: node.id,
@@ -79,6 +84,7 @@ export function convertReactFlowToBland(reactFlowData: ReactFlowData): BlandFlow
           configId,
           configNickname,
           eventName,
+          testEventCode,
           __reactFlowType: 'facebookPixelNode'
         }
       }

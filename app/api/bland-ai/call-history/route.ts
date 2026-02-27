@@ -60,7 +60,7 @@ export async function GET(request: Request) {
     const userPhoneNumber = phoneResult.rows[0]?.phone_number || null
 
     // Get call statistics
-    const stats = await CallDatabaseService.getCallStats(user.value.id)
+    const stats = await CallDatabaseService.getCallStatsForRange(user.value.id)
 
     return NextResponse.json({ 
       success: true, 
