@@ -909,11 +909,15 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
           responseData = await response.text();
         }
 
+        const headerEntries = response.headers?.entries
+          ? Array.from(response.headers.entries())
+          : Object.entries((response as any).headers || {})
+
         setTestResult({
           success: true,
           status: response.status,
           statusText: response.statusText,
-          headers: Object.fromEntries(response.headers.entries()),
+          headers: Object.fromEntries(headerEntries),
           data: responseData,
           timestamp: new Date().toISOString()
         });
