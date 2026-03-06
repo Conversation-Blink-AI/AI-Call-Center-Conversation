@@ -41,8 +41,7 @@ export async function POST(request: Request) {
 
     const externalLoginData = {
       email: normalizedEmail,
-      password,
-      platform: "AI Call"
+      password
     }
 
     console.log("[AUTH/LOGIN] Calling external API:", apiEndpoint)

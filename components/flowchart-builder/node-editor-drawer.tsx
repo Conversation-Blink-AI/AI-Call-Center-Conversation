@@ -77,6 +77,26 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
     loadMetaConfigs()
   }, [selectedNode?.id, selectedNode?.type])
 
+  // Normalize headers to array format for webhook nodes when node is selected
+  React.useEffect(() => {
+    if (selectedNode && selectedNode.type === 'webhookNode' && selectedNode.data.headers) {
+      // If headers is not an array, convert it to array format
+      if (!Array.isArray(selectedNode.data.headers)) {
+        const headersArray = Object.entries(selectedNode.data.headers).map(([key, val]) => ({ 
+          key, 
+          value: typeof val === 'string' ? val : String(val) 
+        }))
+        // Only update if headers actually changed format
+        if (headersArray.length > 0 || Object.keys(selectedNode.data.headers).length > 0) {
+          handleFieldChange('headers', headersArray)
+        }
+      }
+    } else if (selectedNode && selectedNode.type === 'webhookNode' && !selectedNode.data.headers) {
+      // Initialize headers as empty array if it doesn't exist
+      handleFieldChange('headers', [])
+    }
+  }, [selectedNode?.id])
+
   if (!selectedNode) return null
 
   const handleFieldChange = (field: string, value: any) => {
@@ -816,21 +836,50 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
   )
 
   const handleHeaderAdd = () => {
-    const currentHeaders = selectedNode.data.headers || []
+    // Ensure headers is always an array
+    let currentHeaders = selectedNode.data.headers || []
+    
+    // If headers is not an array (e.g., it's an object), convert it to an array
+    if (!Array.isArray(currentHeaders)) {
+      currentHeaders = Object.entries(currentHeaders).map(([key, val]) => ({ key, value: val }))
+    }
+    
     const newHeader = { key: '', value: '' }
     handleFieldChange('headers', [...currentHeaders, newHeader])
   }
 
   const handleHeaderUpdate = (index: number, field: string, value: string) => {
-    const currentHeaders = [...(selectedNode.data.headers || [])]
-    currentHeaders[index][field] = value
-    handleFieldChange('headers', currentHeaders)
+    // Ensure headers is always an array
+    let currentHeaders = selectedNode.data.headers || []
+    
+    // If headers is not an array (e.g., it's an object), convert it to an array
+    if (!Array.isArray(currentHeaders)) {
+      currentHeaders = Object.entries(currentHeaders).map(([key, val]) => ({ key, value: val }))
+    }
+    
+    // Create a new array with updated header
+    const updatedHeaders = [...currentHeaders]
+    if (updatedHeaders[index]) {
+      updatedHeaders[index] = {
+        ...updatedHeaders[index],
+        [field]: value
+      }
+      handleFieldChange('headers', updatedHeaders)
+    }
   }
 
   const handleHeaderRemove = (index: number) => {
-    const currentHeaders = [...(selectedNode.data.headers || [])]
-    currentHeaders.splice(index, 1)
-    handleFieldChange('headers', currentHeaders)
+    // Ensure headers is always an array
+    let currentHeaders = selectedNode.data.headers || []
+    
+    // If headers is not an array (e.g., it's an object), convert it to an array
+    if (!Array.isArray(currentHeaders)) {
+      currentHeaders = Object.entries(currentHeaders).map(([key, val]) => ({ key, value: val }))
+    }
+    
+    const updatedHeaders = [...currentHeaders]
+    updatedHeaders.splice(index, 1)
+    handleFieldChange('headers', updatedHeaders)
   }
 
   const renderWebhookSettings = () => {
@@ -852,10 +901,16 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
           'Content-Type': selectedNode.data.contentType || 'application/json'
         };
 
-        // Add custom headers
-        if (selectedNode.data.headers && selectedNode.data.headers.length > 0) {
-          selectedNode.data.headers.forEach((header: any) => {
-            if (header.key && header.value) {
+        // Add custom headers - ensure it's an array
+        let customHeaders = selectedNode.data.headers || []
+        if (!Array.isArray(customHeaders)) {
+          // If headers is an object, convert to array format
+          customHeaders = Object.entries(customHeaders).map(([key, val]) => ({ key, value: val }))
+        }
+        
+        if (customHeaders.length > 0) {
+          customHeaders.forEach((header: any) => {
+            if (header && header.key && header.value) {
               headers[header.key] = header.value;
             }
           });
@@ -909,15 +964,26 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
           responseData = await response.text();
         }
 
-        const headerEntries = response.headers?.entries
-          ? Array.from(response.headers.entries())
-          : Object.entries((response as any).headers || {})
+        const responseHeaders: Record<string, string> = {}
+        try {
+          if (response?.headers && typeof response.headers.forEach === "function") {
+            response.headers.forEach((value, key) => {
+              responseHeaders[key] = value
+            })
+          } else if ((response as any)?.headers) {
+            Object.entries((response as any).headers).forEach(([key, value]) => {
+              responseHeaders[key] = String(value)
+            })
+          }
+        } catch (headerError) {
+          console.warn("⚠️ Failed to read response headers:", headerError)
+        }
 
         setTestResult({
           success: true,
           status: response.status,
           statusText: response.statusText,
-          headers: Object.fromEntries(headerEntries),
+          headers: responseHeaders,
           data: responseData,
           timestamp: new Date().toISOString()
         });
@@ -1053,7 +1119,14 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
                 </Button>
               </div>
 
-              {(selectedNode.data.headers || []).map((header: any, index: number) => (
+              {(() => {
+                // Ensure headers is always an array for rendering
+                let headers = selectedNode.data.headers || []
+                if (!Array.isArray(headers)) {
+                  headers = Object.entries(headers).map(([key, val]) => ({ key, value: val }))
+                }
+                return headers
+              })().map((header: any, index: number) => (
                 <div key={index} className="flex items-center space-x-2">
                   <Input
                     value={header.key || ''}
@@ -1078,7 +1151,14 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
                 </div>
               ))}
 
-              {(selectedNode.data.headers || []).length === 0 && (
+              {(() => {
+                // Ensure headers is always an array for length check
+                let headers = selectedNode.data.headers || []
+                if (!Array.isArray(headers)) {
+                  headers = Object.entries(headers).map(([key, val]) => ({ key, value: val }))
+                }
+                return headers.length === 0
+              })() && (
                 <div className="text-sm text-gray-500 text-center py-4">
                   No headers configured. Click "Add Header" to start.
                 </div>
