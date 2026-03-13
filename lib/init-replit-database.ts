@@ -1,5 +1,8 @@
 import { Client } from 'pg'
 import { getSSLConfig } from './db-client'
+import { encryptString, hashEmail, hashPhoneNumber, phoneLast4 } from './encryption'
+import { normalizeEmail } from './utils'
+import { toE164Format } from '@/utils/phone-utils'
 
 // PostgreSQL client setup
 function createPgClient() {
@@ -25,10 +28,13 @@ export async function createUser(userData: {
   try {
     await client.connect()
 
+    const normalizedEmail = normalizeEmail(userData.email)
+    const normalizedPhone = userData.phoneNumber ? toE164Format(userData.phoneNumber) : ""
+
     // Check if user exists
     const existingUser = await client.query(
-      'SELECT id FROM users WHERE email = $1',
-      [userData.email]
+      'SELECT id FROM users WHERE email_hash = $1 OR email = $2',
+      [hashEmail(normalizedEmail), normalizedEmail]
     )
 
     if (existingUser.rows.length > 0) {
@@ -37,15 +43,32 @@ export async function createUser(userData: {
 
     // Create new user
     const result = await client.query(
-      `INSERT INTO users (email, name, company, role, phone_number, password_hash)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO users (
+        email,
+        email_enc,
+        email_hash,
+        name,
+        company,
+        role,
+        phone_number,
+        phone_number_enc,
+        phone_number_hash,
+        phone_number_last4,
+        password_hash
+      )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING *`,
       [
-        userData.email,
+        normalizedEmail,
+        encryptString(normalizedEmail),
+        hashEmail(normalizedEmail),
         userData.name || null,
         userData.company || null,
         'user',
-        userData.phoneNumber || null,
+        normalizedPhone || null,
+        normalizedPhone ? encryptString(normalizedPhone) : null,
+        normalizedPhone ? hashPhoneNumber(normalizedPhone) : null,
+        normalizedPhone ? phoneLast4(normalizedPhone) : null,
         userData.password // Should be hashed before calling this function
       ]
     )
@@ -61,9 +84,11 @@ export async function getUserByEmail(email: string) {
 
   try {
     await client.connect()
+    const normalizedEmail = normalizeEmail(email)
+    const emailHash = hashEmail(normalizedEmail)
     const result = await client.query(
-      'SELECT * FROM users WHERE email = $1',
-      [email]
+      'SELECT * FROM users WHERE email_hash = $1 OR email = $2',
+      [emailHash, normalizedEmail]
     )
 
     return result.rows[0] || null
@@ -312,8 +337,15 @@ export async function updateUserRecord(userId: string, updates: {
       values.push(updates.role)
     }
     if (updates.phone_number !== undefined) {
+      const normalizedPhone = updates.phone_number ? toE164Format(updates.phone_number) : ""
       setClauses.push(`phone_number = $${paramIndex++}`)
-      values.push(updates.phone_number)
+      values.push(normalizedPhone || null)
+      setClauses.push(`phone_number_enc = $${paramIndex++}`)
+      values.push(normalizedPhone ? encryptString(normalizedPhone) : null)
+      setClauses.push(`phone_number_hash = $${paramIndex++}`)
+      values.push(normalizedPhone ? hashPhoneNumber(normalizedPhone) : null)
+      setClauses.push(`phone_number_last4 = $${paramIndex++}`)
+      values.push(normalizedPhone ? phoneLast4(normalizedPhone) : null)
     }
 
     if (setClauses.length === 0) {
@@ -505,19 +537,39 @@ export async function createPhoneNumberRecord(phoneData: {
   const client = createPgClient()
   try {
     await client.connect()
+    const normalizedPhone = phoneData.phone_number ? toE164Format(phoneData.phone_number) : ""
     const result = await client.query(
-      `INSERT INTO phone_numbers (phone_number, user_id, location, type, status, pathway_id, purchased_at, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW(), NOW())
+      `INSERT INTO phone_numbers (
+        phone_number,
+        phone_number_enc,
+        phone_number_hash,
+        phone_number_last4,
+        user_id,
+        location,
+        type,
+        status,
+        pathway_id,
+        purchased_at,
+        created_at,
+        updated_at
+      )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW(), NOW())
        ON CONFLICT (phone_number) DO UPDATE SET
          user_id = EXCLUDED.user_id,
          location = EXCLUDED.location,
          type = EXCLUDED.type,
          status = EXCLUDED.status,
          pathway_id = EXCLUDED.pathway_id,
+         phone_number_enc = EXCLUDED.phone_number_enc,
+         phone_number_hash = EXCLUDED.phone_number_hash,
+         phone_number_last4 = EXCLUDED.phone_number_last4,
          updated_at = NOW()
        RETURNING *`,
       [
-        phoneData.phone_number,
+        normalizedPhone,
+        normalizedPhone ? encryptString(normalizedPhone) : null,
+        normalizedPhone ? hashPhoneNumber(normalizedPhone) : null,
+        normalizedPhone ? phoneLast4(normalizedPhone) : null,
         phoneData.user_id,
         phoneData.location || 'Unknown',
         phoneData.type || 'Local',

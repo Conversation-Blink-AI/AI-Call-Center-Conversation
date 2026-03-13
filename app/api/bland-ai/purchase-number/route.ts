@@ -2,6 +2,8 @@
 import { NextResponse } from "next/server"
 import { getServerSession } from "next-auth/next"
 import { getSSLConfig } from "@/lib/db-client"
+import { encryptString, hashPhoneNumber, phoneLast4 } from "@/lib/encryption"
+import { toE164Format } from "@/utils/phone-utils"
 
 export async function POST(request: Request) {
   try {
@@ -64,12 +66,28 @@ export async function POST(request: Request) {
         const extractedAreaCode = phoneNumber.replace(/\D/g, "").slice(1, 4) // Remove country code and get area code
         const location = getLocationFromAreaCode(extractedAreaCode)
         
+        const normalizedPhone = toE164Format(phoneNumber)
         const result = await client.query(
-          `INSERT INTO phone_numbers (phone_number, user_id, location, type, status, purchased_at, area_code, country_code)
-           VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7)
+          `INSERT INTO phone_numbers (
+            phone_number,
+            phone_number_enc,
+            phone_number_hash,
+            phone_number_last4,
+            user_id,
+            location,
+            type,
+            status,
+            purchased_at,
+            area_code,
+            country_code
+          )
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9, $10)
            RETURNING *`,
           [
-            phoneNumber,
+            normalizedPhone,
+            encryptString(normalizedPhone),
+            hashPhoneNumber(normalizedPhone),
+            phoneLast4(normalizedPhone),
             "current-user-id", // You'll need to get the actual user ID from session
             location,
             "Local",

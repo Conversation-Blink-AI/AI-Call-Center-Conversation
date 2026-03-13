@@ -1,5 +1,6 @@
 import { executeQuery } from './db-utils'
 import { toE164Format } from '@/utils/phone-utils'
+import { hashPhoneNumber } from '@/lib/encryption'
 
 export interface PhoneNumberLookupResult {
   user_id: string
@@ -59,15 +60,18 @@ export async function findUserByPhoneNumber(
     // Try from_number first (typically the user's purchased number)
     if (fromNumber) {
       const fromVariations = normalizePhoneForLookup(fromNumber)
-      
-      // Build query with all variations
-      const placeholders = fromVariations.map((_, i) => `$${i + 1}`).join(', ')
+      const normalizedFrom = toE164Format(fromNumber)
+      const fromHash = hashPhoneNumber(normalizedFrom)
+
+      // Build query with hash + legacy plaintext variations
+      const placeholders = fromVariations.map((_, i) => `$${i + 2}`).join(', ')
       const result = await executeQuery(
         `SELECT user_id, id as phone_number_id 
          FROM phone_numbers 
-         WHERE phone_number IN (${placeholders})
+         WHERE phone_number_hash = $1
+            OR phone_number IN (${placeholders})
          LIMIT 1`,
-        fromVariations
+        [fromHash, ...fromVariations]
       )
       
       if (result.length > 0) {
@@ -81,15 +85,18 @@ export async function findUserByPhoneNumber(
     // Fall back to to_number if from_number lookup failed
     if (toNumber) {
       const toVariations = normalizePhoneForLookup(toNumber)
-      
-      // Build query with all variations
-      const placeholders = toVariations.map((_, i) => `$${i + 1}`).join(', ')
+      const normalizedTo = toE164Format(toNumber)
+      const toHash = hashPhoneNumber(normalizedTo)
+
+      // Build query with hash + legacy plaintext variations
+      const placeholders = toVariations.map((_, i) => `$${i + 2}`).join(', ')
       const result = await executeQuery(
         `SELECT user_id, id as phone_number_id 
          FROM phone_numbers 
-         WHERE phone_number IN (${placeholders})
+         WHERE phone_number_hash = $1
+            OR phone_number IN (${placeholders})
          LIMIT 1`,
-        toVariations
+        [toHash, ...toVariations]
       )
       
       if (result.length > 0) {

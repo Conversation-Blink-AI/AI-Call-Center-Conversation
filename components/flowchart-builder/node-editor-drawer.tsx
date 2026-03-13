@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Trash2, Send, Lock, FileText, Code } from 'lucide-react'
+import { Plus, Trash2, Send, Lock, FileText, Code, HelpCircle } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 
@@ -39,6 +39,7 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
   
   // Static text toggle state for question nodes
   const [useStaticText, setUseStaticText] = React.useState(true);
+  const [showStaticTextHelp, setShowStaticTextHelp] = React.useState(false);
   const previousNodeIdRef = React.useRef<string | null>(null);
   
   // Sync static text toggle with node data - only on node change, not on data updates
@@ -76,6 +77,26 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
     loadMetaConfigs()
   }, [selectedNode?.id, selectedNode?.type])
 
+  // Normalize headers to array format for webhook nodes when node is selected
+  React.useEffect(() => {
+    if (selectedNode && selectedNode.type === 'webhookNode' && selectedNode.data.headers) {
+      // If headers is not an array, convert it to array format
+      if (!Array.isArray(selectedNode.data.headers)) {
+        const headersArray = Object.entries(selectedNode.data.headers).map(([key, val]) => ({ 
+          key, 
+          value: typeof val === 'string' ? val : String(val) 
+        }))
+        // Only update if headers actually changed format
+        if (headersArray.length > 0 || Object.keys(selectedNode.data.headers).length > 0) {
+          handleFieldChange('headers', headersArray)
+        }
+      }
+    } else if (selectedNode && selectedNode.type === 'webhookNode' && !selectedNode.data.headers) {
+      // Initialize headers as empty array if it doesn't exist
+      handleFieldChange('headers', [])
+    }
+  }, [selectedNode?.id])
+
   if (!selectedNode) return null
 
   const handleFieldChange = (field: string, value: any) => {
@@ -104,9 +125,15 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
 
   const handleMetaConfigSelect = (configId: string) => {
     const selectedConfig = metaConfigs.find((config) => config.id === configId)
-    handleFieldChange('configId', configId)
-    handleFieldChange('configNickname', selectedConfig?.nickname || '')
-    handleFieldChange('eventName', selectedConfig?.event_name || selectedNode?.data?.eventName || '')
+    const updates = {
+      data: {
+        ...selectedNode.data,
+        configId,
+        configNickname: selectedConfig?.nickname || '',
+        eventName: selectedConfig?.event_name || selectedNode?.data?.eventName || ''
+      }
+    }
+    onUpdateNode(selectedNode.id, updates)
   }
 
   const handleExtractVarAdd = () => {
@@ -207,12 +234,28 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
             {/* Static Text Toggle */}
             <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/50">
               <div className="flex-1">
-                <Label htmlFor="static-text-toggle" className="text-base font-semibold">
-                  Static Text
-                </Label>
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="static-text-toggle" className="text-base font-semibold">
+                    Static Text
+                  </Label>
+                  <button
+                    type="button"
+                    onClick={() => setShowStaticTextHelp((prev) => !prev)}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    aria-label="Static Text help"
+                  >
+                    <HelpCircle className="h-4 w-4" />
+                  </button>
+                </div>
                 <p className="text-sm text-muted-foreground mt-1">
                   When you want the agent to say a specific dialogue. Uncheck to use AI generated text
                 </p>
+                {showStaticTextHelp && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Use Static Text when you need exact wording for compliance or consistency. Turn it off to let the AI
+                    generate responses based on the prompt and context.
+                  </p>
+                )}
               </div>
               <Switch
                 id="static-text-toggle"
@@ -417,6 +460,17 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
                     {selectedNode.data.eventName && <p>Event: {selectedNode.data.eventName}</p>}
                   </div>
                 )}
+
+                <div>
+                  <Label htmlFor="testEventCode">Test Event Code (optional)</Label>
+                  <Input
+                    id="testEventCode"
+                    value={selectedNode.data.testEventCode || ''}
+                    onChange={(e) => handleFieldChange('testEventCode', e.target.value)}
+                    placeholder="TEST28924"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">Only used for Meta Test Events.</p>
+                </div>
 
                 <div className="bg-card p-2 rounded border border-border">
                   <p className="text-xs text-primary font-medium">Pre-configured Settings:</p>
@@ -782,21 +836,50 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
   )
 
   const handleHeaderAdd = () => {
-    const currentHeaders = selectedNode.data.headers || []
+    // Ensure headers is always an array
+    let currentHeaders = selectedNode.data.headers || []
+    
+    // If headers is not an array (e.g., it's an object), convert it to an array
+    if (!Array.isArray(currentHeaders)) {
+      currentHeaders = Object.entries(currentHeaders).map(([key, val]) => ({ key, value: val }))
+    }
+    
     const newHeader = { key: '', value: '' }
     handleFieldChange('headers', [...currentHeaders, newHeader])
   }
 
   const handleHeaderUpdate = (index: number, field: string, value: string) => {
-    const currentHeaders = [...(selectedNode.data.headers || [])]
-    currentHeaders[index][field] = value
-    handleFieldChange('headers', currentHeaders)
+    // Ensure headers is always an array
+    let currentHeaders = selectedNode.data.headers || []
+    
+    // If headers is not an array (e.g., it's an object), convert it to an array
+    if (!Array.isArray(currentHeaders)) {
+      currentHeaders = Object.entries(currentHeaders).map(([key, val]) => ({ key, value: val }))
+    }
+    
+    // Create a new array with updated header
+    const updatedHeaders = [...currentHeaders]
+    if (updatedHeaders[index]) {
+      updatedHeaders[index] = {
+        ...updatedHeaders[index],
+        [field]: value
+      }
+      handleFieldChange('headers', updatedHeaders)
+    }
   }
 
   const handleHeaderRemove = (index: number) => {
-    const currentHeaders = [...(selectedNode.data.headers || [])]
-    currentHeaders.splice(index, 1)
-    handleFieldChange('headers', currentHeaders)
+    // Ensure headers is always an array
+    let currentHeaders = selectedNode.data.headers || []
+    
+    // If headers is not an array (e.g., it's an object), convert it to an array
+    if (!Array.isArray(currentHeaders)) {
+      currentHeaders = Object.entries(currentHeaders).map(([key, val]) => ({ key, value: val }))
+    }
+    
+    const updatedHeaders = [...currentHeaders]
+    updatedHeaders.splice(index, 1)
+    handleFieldChange('headers', updatedHeaders)
   }
 
   const renderWebhookSettings = () => {
@@ -810,6 +893,7 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
 
       setIsTestingAPI(true);
       setTestResult(null);
+      let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
       try {
         // Prepare headers
@@ -817,10 +901,16 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
           'Content-Type': selectedNode.data.contentType || 'application/json'
         };
 
-        // Add custom headers
-        if (selectedNode.data.headers && selectedNode.data.headers.length > 0) {
-          selectedNode.data.headers.forEach((header: any) => {
-            if (header.key && header.value) {
+        // Add custom headers - ensure it's an array
+        let customHeaders = selectedNode.data.headers || []
+        if (!Array.isArray(customHeaders)) {
+          // If headers is an object, convert to array format
+          customHeaders = Object.entries(customHeaders).map(([key, val]) => ({ key, value: val }))
+        }
+        
+        if (customHeaders.length > 0) {
+          customHeaders.forEach((header: any) => {
+            if (header && header.key && header.value) {
               headers[header.key] = header.value;
             }
           });
@@ -844,7 +934,7 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
         // Prepare request options with timeout support
         const timeout = (selectedNode.data.timeout || 10) * 1000
         const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), timeout)
+        timeoutId = setTimeout(() => controller.abort(), timeout)
         
         const requestOptions: RequestInit = {
           method: selectedNode.data.method || 'GET',
@@ -861,7 +951,9 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
         console.log('?? Request options:', requestOptions);
 
         const response = await fetch(selectedNode.data.url, requestOptions);
-        clearTimeout(timeoutId);
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
         
         let responseData: any;
         const contentType = response.headers.get('content-type');
@@ -872,17 +964,34 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
           responseData = await response.text();
         }
 
+        const responseHeaders: Record<string, string> = {}
+        try {
+          if (response?.headers && typeof response.headers.forEach === "function") {
+            response.headers.forEach((value, key) => {
+              responseHeaders[key] = value
+            })
+          } else if ((response as any)?.headers) {
+            Object.entries((response as any).headers).forEach(([key, value]) => {
+              responseHeaders[key] = String(value)
+            })
+          }
+        } catch (headerError) {
+          console.warn("⚠️ Failed to read response headers:", headerError)
+        }
+
         setTestResult({
           success: true,
           status: response.status,
           statusText: response.statusText,
-          headers: Object.fromEntries(response.headers.entries()),
+          headers: responseHeaders,
           data: responseData,
           timestamp: new Date().toISOString()
         });
 
       } catch (error: any) {
-        clearTimeout(timeoutId);
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+        }
         console.error('? API Test failed:', error);
         setTestResult({
           success: false,
@@ -1010,7 +1119,14 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
                 </Button>
               </div>
 
-              {(selectedNode.data.headers || []).map((header: any, index: number) => (
+              {(() => {
+                // Ensure headers is always an array for rendering
+                let headers = selectedNode.data.headers || []
+                if (!Array.isArray(headers)) {
+                  headers = Object.entries(headers).map(([key, val]) => ({ key, value: val }))
+                }
+                return headers
+              })().map((header: any, index: number) => (
                 <div key={index} className="flex items-center space-x-2">
                   <Input
                     value={header.key || ''}
@@ -1035,7 +1151,14 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
                 </div>
               ))}
 
-              {(selectedNode.data.headers || []).length === 0 && (
+              {(() => {
+                // Ensure headers is always an array for length check
+                let headers = selectedNode.data.headers || []
+                if (!Array.isArray(headers)) {
+                  headers = Object.entries(headers).map(([key, val]) => ({ key, value: val }))
+                }
+                return headers.length === 0
+              })() && (
                 <div className="text-sm text-gray-500 text-center py-4">
                   No headers configured. Click "Add Header" to start.
                 </div>

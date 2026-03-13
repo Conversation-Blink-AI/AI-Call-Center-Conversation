@@ -5,6 +5,9 @@ import * as path from "path"
 import csv from "csv-parser"
 import * as bcrypt from "bcryptjs"
 import { getSSLConfig } from "@/lib/db-client"
+import { encryptString, hashEmail, hashPhoneNumber, phoneLast4 } from "@/lib/encryption"
+import { normalizeEmail } from "@/lib/utils"
+import { toE164Format } from "@/utils/phone-utils"
 
 export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) {
@@ -142,26 +145,53 @@ async function insertUser(pgClient: Client, row: any) {
   const firstName = row.first_name || (nameParts.length > 0 ? nameParts[0] : null)
   const lastName = row.last_name || (nameParts.length > 1 ? nameParts.slice(1).join(' ') : null)
 
+  const normalizedEmail = normalizeEmail(row.email || "")
+  const normalizedPhone = row.phone_number ? toE164Format(row.phone_number) : ""
   const query = `
-    INSERT INTO users (id, email, first_name, last_name, company, role, phone_number, password_hash, created_at, updated_at, last_login)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+    INSERT INTO users (
+      id,
+      email,
+      email_enc,
+      email_hash,
+      first_name,
+      last_name,
+      company,
+      role,
+      phone_number,
+      phone_number_enc,
+      phone_number_hash,
+      phone_number_last4,
+      password_hash,
+      created_at,
+      updated_at,
+      last_login
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
     ON CONFLICT (email) DO UPDATE SET
       first_name = EXCLUDED.first_name,
       last_name = EXCLUDED.last_name,
       company = EXCLUDED.company,
       role = EXCLUDED.role,
       phone_number = EXCLUDED.phone_number,
+      phone_number_enc = EXCLUDED.phone_number_enc,
+      phone_number_hash = EXCLUDED.phone_number_hash,
+      phone_number_last4 = EXCLUDED.phone_number_last4,
       updated_at = EXCLUDED.updated_at
   `
 
   const values = [
     row.id || generateUUID(),
-    row.email,
+    normalizedEmail,
+    normalizedEmail ? encryptString(normalizedEmail) : null,
+    normalizedEmail ? hashEmail(normalizedEmail) : null,
     firstName,
     lastName,
     row.company,
     row.role || 'user',
-    row.phone_number,
+    normalizedPhone || null,
+    normalizedPhone ? encryptString(normalizedPhone) : null,
+    normalizedPhone ? hashPhoneNumber(normalizedPhone) : null,
+    normalizedPhone ? phoneLast4(normalizedPhone) : null,
     passwordHash,
     row.created_at || new Date().toISOString(),
     row.updated_at || new Date().toISOString(),
@@ -232,9 +262,23 @@ async function insertPathway(pgClient: Client, row: any) {
 }
 
 async function insertPhoneNumber(pgClient: Client, row: any) {
+  const normalizedPhone = row.phone_number ? toE164Format(row.phone_number) : ""
   const query = `
-    INSERT INTO phone_numbers (id, phone_number, user_id, pathway_id, location, type, status, monthly_fee, assigned_to)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    INSERT INTO phone_numbers (
+      id,
+      phone_number,
+      phone_number_enc,
+      phone_number_hash,
+      phone_number_last4,
+      user_id,
+      pathway_id,
+      location,
+      type,
+      status,
+      monthly_fee,
+      assigned_to
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     ON CONFLICT (phone_number) DO UPDATE SET
       user_id = EXCLUDED.user_id,
       pathway_id = EXCLUDED.pathway_id,
@@ -242,12 +286,18 @@ async function insertPhoneNumber(pgClient: Client, row: any) {
       type = EXCLUDED.type,
       status = EXCLUDED.status,
       monthly_fee = EXCLUDED.monthly_fee,
-      assigned_to = EXCLUDED.assigned_to
+      assigned_to = EXCLUDED.assigned_to,
+      phone_number_enc = EXCLUDED.phone_number_enc,
+      phone_number_hash = EXCLUDED.phone_number_hash,
+      phone_number_last4 = EXCLUDED.phone_number_last4
   `
 
   const values = [
     row.id || generateUUID(),
-    row.phone_number,
+    normalizedPhone,
+    normalizedPhone ? encryptString(normalizedPhone) : null,
+    normalizedPhone ? hashPhoneNumber(normalizedPhone) : null,
+    normalizedPhone ? phoneLast4(normalizedPhone) : null,
     row.user_id,
     row.pathway_id,
     row.location,

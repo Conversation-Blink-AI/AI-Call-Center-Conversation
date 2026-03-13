@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
         try {
           userResult = await client.query(
             `SELECT id, email, first_name, last_name, company, role, phone_number, 
-                    created_at, updated_at, last_login, is_admin
+                    created_at, updated_at, last_login, is_admin, external_token
              FROM users WHERE id = $1`,
             [userId]
           )
@@ -156,7 +156,9 @@ export async function GET(req: NextRequest) {
             createdAt: user.created_at,
             updatedAt: user.updated_at,
             lastLogin: user.last_login,
-            isAdmin: user.is_admin || false
+            isAdmin: user.is_admin || false,
+            hustleToken: user.external_token || null,
+            hasHustleToken: Boolean(user.external_token)
           },
           numbers: numbersResult.rows.map(row => ({
             id: row.id,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { Client } from "pg"
 import { getUserFromRequest } from "@/lib/auth-utils"
 import { getSSLConfig } from "@/lib/db-client"
+import { encryptString } from "@/lib/encryption"
 
 export const dynamic = "force-dynamic"
 
@@ -87,11 +88,26 @@ export async function POST(request: NextRequest) {
     try {
       const result = await client.query(
         `
-        INSERT INTO meta_capi_configs (user_id, nickname, pixel_id, access_token, event_name, created_at)
-        VALUES ($1, $2, $3, $4, $5, NOW())
+        INSERT INTO meta_capi_configs (
+          user_id,
+          nickname,
+          pixel_id,
+          access_token,
+          access_token_enc,
+          event_name,
+          created_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, NOW())
         RETURNING id, nickname, pixel_id, event_name, created_at
         `,
-        [user.id, validation.nickname, validation.pixelId, validation.accessToken, validation.eventName]
+        [
+          user.id,
+          validation.nickname,
+          validation.pixelId,
+          validation.accessToken,
+          encryptString(validation.accessToken),
+          validation.eventName
+        ]
       )
 
       return NextResponse.json({ config: result.rows[0] }, { status: 201 })

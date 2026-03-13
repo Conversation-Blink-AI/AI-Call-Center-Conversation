@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { Client } from "pg"
 import { getUserFromRequest } from "@/lib/auth-utils"
 import { getSSLConfig } from "@/lib/db-client"
+import { encryptString } from "@/lib/encryption"
 
 export const dynamic = "force-dynamic"
 
@@ -35,7 +36,9 @@ export async function PATCH(request: NextRequest, context: { params: { configId:
       updateFields.event_name = body.event_name.trim()
     }
     if (typeof body.access_token === "string" && body.access_token.trim()) {
-      updateFields.access_token = body.access_token.trim()
+      const accessToken = body.access_token.trim()
+      updateFields.access_token = accessToken
+      updateFields.access_token_enc = encryptString(accessToken)
     }
 
     if (Object.keys(updateFields).length === 0) {

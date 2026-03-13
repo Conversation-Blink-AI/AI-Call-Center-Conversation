@@ -5,6 +5,8 @@ import * as jwt from "jsonwebtoken"
 import { cookies } from "next/headers"
 import { getSSLConfig } from "@/lib/db-client"
 import { normalizeEmail } from "@/lib/utils"
+import { encryptString, hashEmail, hashPhoneNumber, phoneLast4 } from "@/lib/encryption"
+import { toE164Format } from "@/utils/phone-utils"
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
 
@@ -21,6 +23,12 @@ export async function POST(request: Request) {
 
     // Normalize email to lowercase to prevent case-sensitivity issues
     const normalizedEmail = normalizeEmail(email)
+    const normalizedPhone = phoneNumber ? toE164Format(phoneNumber) : ""
+    const emailEnc = encryptString(normalizedEmail)
+    const emailHash = hashEmail(normalizedEmail)
+    const phoneEnc = normalizedPhone ? encryptString(normalizedPhone) : null
+    const phoneHash = normalizedPhone ? hashPhoneNumber(normalizedPhone) : null
+    const phoneLast = normalizedPhone ? phoneLast4(normalizedPhone) : null
 
     console.log("[AUTH/SIGNUP] Attempting external signup for:", normalizedEmail)
 
@@ -109,8 +117,8 @@ export async function POST(request: Request) {
 
       // Check if user already exists in local database AFTER external API success (case-insensitive lookup)
       const existingUser = await client.query(
-        'SELECT * FROM users WHERE LOWER(email) = LOWER($1)',
-        [normalizedEmail]
+        'SELECT * FROM users WHERE email_hash = $1 OR LOWER(email) = LOWER($2)',
+        [emailHash, normalizedEmail]
       )
 
       if (existingUser.rows.length > 0) {
@@ -123,24 +131,31 @@ export async function POST(request: Request) {
            last_name = $2,
            company = $3,
            phone_number = $4,
-           external_id = $5,
-           external_token = $6,
-           is_verified = $7,
-           platform = $8,
-           password_hash = $9,
+           phone_number_enc = $5,
+           phone_number_hash = $6,
+           phone_number_last4 = $7,
+           external_id = $8,
+           external_token = $9,
+           is_verified = $10,
+           platform = $11,
+           password_hash = $12,
            updated_at = NOW()
-           WHERE email = $10
+           WHERE email_hash = $13 OR email = $14
            RETURNING *`,
           [
             firstName,
             lastName,
             company || '',
-            phoneNumber || '',
+            normalizedPhone || '',
+            phoneEnc,
+            phoneHash,
+            phoneLast,
             externalResult.data?._id || externalResult.data?.id || null,
             externalResult.data?.token || null,
             true, // Set as verified since external API succeeded
             'AI Call',
             password,
+            emailHash,
             normalizedEmail
           ]
         )
@@ -179,15 +194,37 @@ export async function POST(request: Request) {
 
       // Create new local user record since external API succeeded
       const insertResult = await client.query(
-        `INSERT INTO users (email, first_name, last_name, company, phone_number, role, external_id, external_token, is_verified, platform, password_hash)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+        `INSERT INTO users (
+          email,
+          email_enc,
+          email_hash,
+          first_name,
+          last_name,
+          company,
+          phone_number,
+          phone_number_enc,
+          phone_number_hash,
+          phone_number_last4,
+          role,
+          external_id,
+          external_token,
+          is_verified,
+          platform,
+          password_hash
+        )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
          RETURNING *`,
         [
           normalizedEmail, // Store normalized email
+          emailEnc,
+          emailHash,
           firstName,
           lastName,
           company || '',
-          phoneNumber || '',
+          normalizedPhone || '',
+          phoneEnc,
+          phoneHash,
+          phoneLast,
           'user',
           externalResult.data?._id || externalResult.data?.id || null,
           externalResult.data?.token || null,

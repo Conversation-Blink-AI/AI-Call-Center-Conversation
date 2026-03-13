@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { paypalClient } from '../../../../lib/paypalClient'
 import paypal from '@paypal/checkout-server-sdk'
 import { PhoneBlockService } from '@/services/phone-block-service'
+import { encryptString } from '@/lib/encryption'
 
 // Force dynamic rendering to prevent build-time execution
 export const dynamic = 'force-dynamic'
@@ -60,6 +61,7 @@ export async function POST(req) {
           data: {
             gateway: 'paypal',
             gateway_payment_id: orderID,
+            gateway_payment_id_enc: encryptString(orderID),
             amount_cents: amountCents,
             status: 'succeeded',
             user_id: userId,

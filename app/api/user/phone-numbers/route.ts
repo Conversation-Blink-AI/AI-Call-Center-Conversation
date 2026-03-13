@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { validateAuthToken } from "@/lib/auth-utils"
 import { Client } from "pg"
 import { getSSLConfig } from "@/lib/db-client"
+import { encryptString, hashPhoneNumber, phoneLast4 } from "@/lib/encryption"
+import { toE164Format } from "@/utils/phone-utils"
 
 export async function GET(request: Request) {
   try {
@@ -123,17 +125,37 @@ export async function POST(request: NextRequest) {
 
     try {
       await client.connect()
+      const normalizedPhone = toE164Format(phoneNumber)
+      const phoneEnc = encryptString(normalizedPhone)
+      const phoneHash = hashPhoneNumber(normalizedPhone)
+      const phoneLast = phoneLast4(normalizedPhone)
       const result = await client.query(
-        `INSERT INTO phone_numbers (phone_number, user_id, location, type, assigned_to, purchased_at)
-         VALUES ($1, $2, $3, $4, $5, NOW())
+        `INSERT INTO phone_numbers (
+          phone_number,
+          phone_number_enc,
+          phone_number_hash,
+          phone_number_last4,
+          user_id,
+          location,
+          type,
+          assigned_to,
+          purchased_at
+        )
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
          ON CONFLICT (phone_number) DO UPDATE SET
            user_id = EXCLUDED.user_id,
            location = EXCLUDED.location,
            type = EXCLUDED.type,
-           assigned_to = EXCLUDED.assigned_to
+           assigned_to = EXCLUDED.assigned_to,
+           phone_number_enc = EXCLUDED.phone_number_enc,
+           phone_number_hash = EXCLUDED.phone_number_hash,
+           phone_number_last4 = EXCLUDED.phone_number_last4
          RETURNING *`,
         [
-          phoneNumber,
+          normalizedPhone,
+          phoneEnc,
+          phoneHash,
+          phoneLast,
           userId,
           location || 'Unknown',
           type || 'Local',

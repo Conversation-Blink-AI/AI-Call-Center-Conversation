@@ -4,6 +4,8 @@ import * as jwt from "jsonwebtoken"
 import { cookies } from "next/headers"
 import { getSSLConfig } from "@/lib/db-client"
 import { normalizeEmail } from "@/lib/utils"
+import { encryptString, hashEmail, hashPhoneNumber, phoneLast4 } from "@/lib/encryption"
+import { toE164Format } from "@/utils/phone-utils"
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
 
@@ -39,8 +41,7 @@ export async function POST(request: Request) {
 
     const externalLoginData = {
       email: normalizedEmail,
-      password,
-      platform: "AI Call"
+      password
     }
 
     console.log("[AUTH/LOGIN] Calling external API:", apiEndpoint)
@@ -71,6 +72,18 @@ export async function POST(request: Request) {
       }, { status: 500 })
     }
 
+    // Handle 2FA required responses
+    if (externalResult.status === "pending_2fa") {
+      console.log("[AUTH/LOGIN] 2FA required for:", normalizedEmail)
+      return NextResponse.json({
+        success: false,
+        requires2FA: true,
+        message: externalResult.message || "Please check your email for the verification code",
+        pending2FAToken: externalResult.data?.pending2FAToken,
+        email: externalResult.data?.email || normalizedEmail
+      }, { status: 200 })
+    }
+
     // Check if external authentication failed
     if (!externalResponse.ok || externalResult.status !== "success") {
       console.log("[AUTH/LOGIN] External authentication failed:", externalResult.message)
@@ -82,6 +95,12 @@ export async function POST(request: Request) {
 
     console.log("[AUTH/LOGIN] External authentication successful")
     const externalUserData = externalResult.data
+    const normalizedPhone = externalUserData?.phoneNumber ? toE164Format(externalUserData.phoneNumber) : ""
+    const emailEnc = encryptString(normalizedEmail)
+    const emailHash = hashEmail(normalizedEmail)
+    const phoneEnc = normalizedPhone ? encryptString(normalizedPhone) : null
+    const phoneHash = normalizedPhone ? hashPhoneNumber(normalizedPhone) : null
+    const phoneLast = normalizedPhone ? phoneLast4(normalizedPhone) : null
 
     // Validate DATABASE_URL
     if (!process.env.DATABASE_URL) {
@@ -107,8 +126,8 @@ export async function POST(request: Request) {
 
       // Check if user exists in local database (case-insensitive lookup)
       const existingUserResult = await client.query(
-        'SELECT * FROM users WHERE LOWER(email) = LOWER($1)',
-        [normalizedEmail]
+        'SELECT * FROM users WHERE email_hash = $1 OR LOWER(email) = LOWER($2)',
+        [emailHash, normalizedEmail]
       )
 
       if (existingUserResult.rows.length > 0) {
@@ -118,24 +137,31 @@ export async function POST(request: Request) {
            first_name = $1,
            last_name = $2,
            phone_number = $3,
-           role = $4,
-           external_id = $5,
-           external_token = $6,
-           is_verified = $7,
-           platform = $8,
+           phone_number_enc = $4,
+           phone_number_hash = $5,
+           phone_number_last4 = $6,
+           role = $7,
+           external_id = $8,
+           external_token = $9,
+           is_verified = $10,
+           platform = $11,
            last_login = NOW(),
            updated_at = NOW()
-           WHERE email = $9
+           WHERE email_hash = $12 OR email = $13
            RETURNING *`,
           [
             externalUserData.firstName,
             externalUserData.lastName,
-            externalUserData.phoneNumber,
+            normalizedPhone || null,
+            phoneEnc,
+            phoneHash,
+            phoneLast,
             externalUserData.role || 'client',
             externalUserData._id,
             externalUserData.token,
             Boolean(externalUserData.verified), // Ensure boolean conversion
             'AI Call', // Corrected platform
+            emailHash,
             normalizedEmail
           ]
         )
@@ -145,16 +171,36 @@ export async function POST(request: Request) {
         // Create new local user record
         const insertResult = await client.query(
           `INSERT INTO users (
-            email, first_name, last_name, phone_number, role,
-            external_id, external_token, is_verified, platform,
-            password_hash, created_at, updated_at, last_login
-          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW(), NOW(), NOW())
+            email,
+            email_enc,
+            email_hash,
+            first_name,
+            last_name,
+            phone_number,
+            phone_number_enc,
+            phone_number_hash,
+            phone_number_last4,
+            role,
+            external_id,
+            external_token,
+            is_verified,
+            platform,
+            password_hash,
+            created_at,
+            updated_at,
+            last_login
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW(), NOW())
           RETURNING *`,
           [
             normalizedEmail, // Store normalized email
+            emailEnc,
+            emailHash,
             externalUserData.firstName,
             externalUserData.lastName,
-            externalUserData.phoneNumber,
+            normalizedPhone || null,
+            phoneEnc,
+            phoneHash,
+            phoneLast,
             externalUserData.role || 'client',
             externalUserData._id,
             externalUserData.token,

@@ -151,6 +151,23 @@ CREATE TABLE meta_capi_configs (
 );
 ```
 
+### `meta_capi_events` Table Structure
+Stores Meta CAPI request/response logs per call.
+
+```sql
+CREATE TABLE meta_capi_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    call_id TEXT NOT NULL,
+    config_id UUID NOT NULL REFERENCES meta_capi_configs(id) ON DELETE CASCADE,
+    event_name TEXT NOT NULL,
+    request_payload JSONB NOT NULL,
+    response_payload JSONB,
+    response_status INTEGER,
+    duration_ms INTEGER,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+```
+
 ---
 
 ## Why "Internal Server Error" is Happening

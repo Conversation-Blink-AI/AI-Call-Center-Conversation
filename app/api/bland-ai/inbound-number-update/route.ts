@@ -63,6 +63,8 @@ export async function POST(request: NextRequest) {
 
     // Recording
     if (typeof body.record === 'boolean') updateData.record = body.record
+    if (typeof body.noise_cancellation === 'boolean') updateData.noise_cancellation = body.noise_cancellation
+    if (typeof body.ignore_button_press === 'boolean') updateData.ignore_button_press = body.ignore_button_press
 
     // Citation schemas
     if (body.citation_schema_ids && Array.isArray(body.citation_schema_ids)) {

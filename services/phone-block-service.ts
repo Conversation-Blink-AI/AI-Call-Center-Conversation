@@ -1,5 +1,6 @@
 import { db } from "@/lib/db"
 import { toE164Format } from "@/utils/phone-utils"
+import { decryptString, hashPhoneNumber } from "@/lib/encryption"
 
 export interface BlockResult {
   success: boolean
@@ -35,10 +36,13 @@ export class PhoneBlockService {
   private static async getUserPhoneNumbers(userId: string): Promise<Array<{ phone_number: string; bland_block_id: number | null }>> {
     try {
       const result = await db.query(
-        'SELECT phone_number, bland_block_id FROM phone_numbers WHERE user_id = $1',
+        'SELECT phone_number, phone_number_enc, bland_block_id FROM phone_numbers WHERE user_id = $1',
         [userId]
       )
-      return result.rows || []
+      return (result.rows || []).map((row: any) => ({
+        phone_number: row.phone_number_enc ? decryptString(row.phone_number_enc) : row.phone_number,
+        bland_block_id: row.bland_block_id
+      }))
     } catch (error) {
       console.error(`❌ [PHONE-BLOCK] Error fetching phone numbers for user ${userId}:`, error)
       throw error
@@ -120,9 +124,11 @@ export class PhoneBlockService {
    */
   private static async updateBlockId(phoneNumber: string, userId: string, blockId: number): Promise<void> {
     try {
+      const normalizedPhone = toE164Format(phoneNumber)
+      const phoneHash = hashPhoneNumber(normalizedPhone)
       await db.query(
-        'UPDATE phone_numbers SET bland_block_id = $1 WHERE phone_number = $2 AND user_id = $3',
-        [blockId, phoneNumber, userId]
+        'UPDATE phone_numbers SET bland_block_id = $1 WHERE user_id = $2 AND (phone_number_hash = $3 OR phone_number = $4)',
+        [blockId, userId, phoneHash, normalizedPhone]
       )
       console.log(`✅ [PHONE-BLOCK] Updated block ID ${blockId} for ${phoneNumber}`)
     } catch (error) {
@@ -136,9 +142,11 @@ export class PhoneBlockService {
    */
   private static async clearBlockId(phoneNumber: string, userId: string): Promise<void> {
     try {
+      const normalizedPhone = toE164Format(phoneNumber)
+      const phoneHash = hashPhoneNumber(normalizedPhone)
       await db.query(
-        'UPDATE phone_numbers SET bland_block_id = NULL WHERE phone_number = $1 AND user_id = $2',
-        [phoneNumber, userId]
+        'UPDATE phone_numbers SET bland_block_id = NULL WHERE user_id = $1 AND (phone_number_hash = $2 OR phone_number = $3)',
+        [userId, phoneHash, normalizedPhone]
       )
       console.log(`✅ [PHONE-BLOCK] Cleared block ID for ${phoneNumber}`)
     } catch (error) {

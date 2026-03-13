@@ -5,6 +5,8 @@ import { createDatabaseClient, getSSLConfig } from '../../../../lib/db-client'
 import type StripeType from 'stripe'
 import { Client } from 'pg'
 import { Twilio } from 'twilio'
+import { encryptString, hashPhoneNumber, phoneLast4 } from '../../../../lib/encryption'
+import { toE164Format } from '../../../../utils/phone-utils'
 
 export const runtime = 'nodejs'
 
@@ -246,6 +248,11 @@ async function handlePhoneNumberPurchase(
 
   console.log('✅ [WEBHOOK] All credentials validated (Twilio + Bland.ai)')
 
+  const normalizedPhone = toE164Format(phoneNumber)
+  const phoneEnc = encryptString(normalizedPhone)
+  const phoneHash = hashPhoneNumber(normalizedPhone)
+  const phoneLast = phoneLast4(normalizedPhone)
+
   try {
     // Initialize Twilio client
     const twilioClient = new Twilio(accountSid, authToken)
@@ -294,7 +301,7 @@ async function handlePhoneNumberPurchase(
     }
 
     // Extract area code and location from phone number (needed for database save)
-    const extractedAreaCode = phoneNumber.replace(/\D/g, '').slice(1, 4) // Remove country code and get area code
+    const extractedAreaCode = normalizedPhone.replace(/\D/g, '').slice(1, 4) // Remove country code and get area code
     const location = getLocationFromAreaCode(extractedAreaCode)
 
     // Phase 4: Register number with Bland.ai (optional - continue on error)
@@ -302,7 +309,7 @@ async function handlePhoneNumberPurchase(
     if (!isAccountRestricted) {
       console.log('📨 [WEBHOOK] Registering number with Bland.ai...')
       try {
-        await registerNumbersWithBland([phoneNumber])
+        await registerNumbersWithBland([normalizedPhone])
         console.log('✅ [WEBHOOK] Phone number registered with Bland.ai')
       } catch (blandRegError) {
         console.warn('⚠️ [WEBHOOK] Bland.ai registration failed (continuing anyway):', blandRegError)
@@ -317,7 +324,7 @@ async function handlePhoneNumberPurchase(
     console.log('🛤️ [WEBHOOK] Creating Bland.ai pathway for new number...')
     let blandPathwayId: string | null = null
     try {
-      blandPathwayId = await createBlandPathway(phoneNumber)
+      blandPathwayId = await createBlandPathway(normalizedPhone)
       console.log('✅ [WEBHOOK] Bland.ai pathway created:', blandPathwayId)
     } catch (blandPathwayError) {
       if (isAccountRestricted) {
@@ -360,8 +367,8 @@ async function handlePhoneNumberPurchase(
       try {
         // Check if number already exists for this user
         const existingNumber = await client.query(
-          'SELECT id FROM phone_numbers WHERE phone_number = $1 AND user_id = $2',
-          [phoneNumber, userId],
+          'SELECT id FROM phone_numbers WHERE user_id = $1 AND (phone_number_hash = $2 OR phone_number = $3)',
+          [userId, phoneHash, normalizedPhone],
         )
 
         let savedPhoneId: string
@@ -374,11 +381,26 @@ async function handlePhoneNumberPurchase(
           const updateResult = await client.query(
             `
             UPDATE phone_numbers 
-            SET status = $3, pathwayid = $4, stripe_subscription_id = $5
-            WHERE phone_number = $1 AND user_id = $2
+            SET status = $3,
+                pathwayid = $4,
+                stripe_subscription_id = $5,
+                phone_number_enc = $6,
+                phone_number_hash = $7,
+                phone_number_last4 = $8
+            WHERE user_id = $2 AND (phone_number_hash = $9 OR phone_number = $10)
             RETURNING *
           `,
-            [phoneNumber, userId, phoneStatus, blandPathwayId || null, subscriptionId || null],
+            [
+              userId,
+              phoneStatus,
+              blandPathwayId || null,
+              subscriptionId || null,
+              phoneEnc,
+              phoneHash,
+              phoneLast,
+              phoneHash,
+              normalizedPhone
+            ],
           )
           
           savedPhoneId = updateResult.rows[0].id
@@ -386,11 +408,28 @@ async function handlePhoneNumberPurchase(
         } else {
           // Insert new phone number
           const result = await client.query(
-            `INSERT INTO phone_numbers (phone_number, user_id, location, type, status, purchased_at, area_code, country_code, pathwayid, stripe_subscription_id)
-             VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8, $9)
+            `INSERT INTO phone_numbers (
+              phone_number,
+              phone_number_enc,
+              phone_number_hash,
+              phone_number_last4,
+              user_id,
+              location,
+              type,
+              status,
+              purchased_at,
+              area_code,
+              country_code,
+              pathwayid,
+              stripe_subscription_id
+            )
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9, $10, $11, $12)
              RETURNING *`,
             [
-              phoneNumber,
+              normalizedPhone,
+              phoneEnc,
+              phoneHash,
+              phoneLast,
               userId,
               location,
               'Local',
@@ -428,8 +467,8 @@ async function handlePhoneNumberPurchase(
           if (existingPathway.rows.length === 0) {
             // Create local pathway entry in pathways table
             console.log('💾 [WEBHOOK] Creating local pathway entry in pathways table...')
-            const pathwayName = `Pathway for ${phoneNumber}`
-            const pathwayDescription = `Default pathway for ${phoneNumber}`
+            const pathwayName = `Pathway for ${normalizedPhone}`
+            const pathwayDescription = `Default pathway for ${normalizedPhone}`
             
             const pathwayResult = await client.query(
               `INSERT INTO pathways (name, description, creator_id, phone_number, phone_id, bland_id, created_at, updated_at)
@@ -439,7 +478,7 @@ async function handlePhoneNumberPurchase(
                 pathwayName,
                 pathwayDescription,
                 userId,
-                phoneNumber,
+                normalizedPhone,
                 savedPhoneId,
                 blandPathwayId,
               ],
@@ -515,29 +554,59 @@ async function handlePhoneNumberPurchase(
           ssl: getSSLConfig(),
         })
         await client.connect()
-        const extractedAreaCode = phoneNumber.replace(/\D/g, '').slice(1, 4)
+          const extractedAreaCode = normalizedPhone.replace(/\D/g, '').slice(1, 4)
         const location = getLocationFromAreaCode(extractedAreaCode)
         
         // Check if number already exists
-        const existingCheck = await client.query(
-          'SELECT id FROM phone_numbers WHERE phone_number = $1',
-          [phoneNumber]
-        )
+          const existingCheck = await client.query(
+            'SELECT id FROM phone_numbers WHERE phone_number_hash = $1 OR phone_number = $2',
+            [phoneHash, normalizedPhone]
+          )
         
         if (existingCheck.rows.length > 0) {
           // Update existing number
           await client.query(
             `UPDATE phone_numbers 
-             SET status = $1, stripe_subscription_id = $2, user_id = $3
-             WHERE phone_number = $4`,
-            ['restricted', subscriptionId || null, userId, phoneNumber]
+             SET status = $1,
+                 stripe_subscription_id = $2,
+                 user_id = $3,
+                 phone_number_enc = $4,
+                 phone_number_hash = $5,
+                 phone_number_last4 = $6
+             WHERE phone_number_hash = $7 OR phone_number = $8`,
+            ['restricted', subscriptionId || null, userId, phoneEnc, phoneHash, phoneLast, phoneHash, normalizedPhone]
           )
         } else {
           // Insert new number
           await client.query(
-            `INSERT INTO phone_numbers (phone_number, user_id, location, type, status, purchased_at, area_code, country_code, stripe_subscription_id)
-             VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7, $8)`,
-            [phoneNumber, userId, location, 'Local', 'restricted', extractedAreaCode, countryCode, subscriptionId || null]
+            `INSERT INTO phone_numbers (
+              phone_number,
+              phone_number_enc,
+              phone_number_hash,
+              phone_number_last4,
+              user_id,
+              location,
+              type,
+              status,
+              purchased_at,
+              area_code,
+              country_code,
+              stripe_subscription_id
+            )
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9, $10, $11)`,
+            [
+              normalizedPhone,
+              phoneEnc,
+              phoneHash,
+              phoneLast,
+              userId,
+              location,
+              'Local',
+              'restricted',
+              extractedAreaCode,
+              countryCode,
+              subscriptionId || null
+            ]
           )
         }
         await client.end()
@@ -883,12 +952,22 @@ export async function POST(req: Request) {
           // Insert payment record
           console.log('🔔 [WEBHOOK] Creating payment record...')
           const paymentResult = await client.query(`
-            INSERT INTO payments (gateway, gateway_payment_id, amount_cents, status, user_id, created_at, updated_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7)
+            INSERT INTO payments (
+              gateway,
+              gateway_payment_id,
+              gateway_payment_id_enc,
+              amount_cents,
+              status,
+              user_id,
+              created_at,
+              updated_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING id
           `, [
             'stripe',
             session.id,
+            encryptString(session.id),
             amount,
             'succeeded',
             userId,
@@ -1014,6 +1093,8 @@ export async function POST(req: Request) {
           const userIdFromMetadata = subscriptionMetadata?.user_id
           
           if (phoneNumberFromMetadata && userIdFromMetadata) {
+            const normalizedPhone = toE164Format(phoneNumberFromMetadata)
+            const phoneHash = hashPhoneNumber(normalizedPhone)
             console.log('🔔 [WEBHOOK] Found phone number in subscription metadata, updating subscription_id')
             
             // Update phone number with subscription ID if not already set
@@ -1028,10 +1109,10 @@ export async function POST(req: Request) {
               const updateResult = await client.query(
                 `UPDATE phone_numbers 
                  SET stripe_subscription_id = $1
-                 WHERE phone_number = $2 
-                   AND user_id = $3 
+                 WHERE user_id = $2
+                   AND (phone_number_hash = $3 OR phone_number = $4)
                    AND (stripe_subscription_id IS NULL OR stripe_subscription_id != $1)`,
-                [invoiceSubscriptionId, phoneNumberFromMetadata, userIdFromMetadata],
+                [invoiceSubscriptionId, userIdFromMetadata, phoneHash, normalizedPhone],
               )
               
               if (updateResult.rowCount && updateResult.rowCount > 0) {

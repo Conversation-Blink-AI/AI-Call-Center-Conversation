@@ -17,12 +17,30 @@ export default function AdminUserDetailPage() {
   const userId = params.id as string
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [accessingAccount, setAccessingAccount] = useState(false)
+  const [accessError, setAccessError] = useState<string | null>(null)
+  const [userAppUrl, setUserAppUrl] = useState<string>("")
 
   useEffect(() => {
     if (userId) {
       fetchUserDetail()
     }
   }, [userId])
+
+  useEffect(() => {
+    const configuredUrl = process.env.NEXT_PUBLIC_USER_APP_URL
+    if (configuredUrl) {
+      setUserAppUrl(configuredUrl.replace(/\/$/, ""))
+      return
+    }
+
+    if (typeof window === "undefined") return
+
+    const { protocol, hostname, port } = window.location
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
+      setUserAppUrl(`${protocol}//app.lvh.me${port ? `:${port}` : ""}`)
+    }
+  }, [])
 
   const fetchUserDetail = async () => {
     try {
@@ -55,6 +73,70 @@ export default function AdminUserDetailPage() {
   const formatCurrency = (cents: number) => {
     return `$${(cents / 100).toFixed(2)}`
   }
+
+  const handleAccessAccount = async () => {
+    if (!user?.user?.id) return
+
+    const hustleToken = user?.user?.hustleToken
+    if (!hustleToken) {
+      setAccessError("No token available")
+      return
+    }
+
+    const configuredUrl = process.env.NEXT_PUBLIC_USER_APP_URL
+    let userAppUrl = configuredUrl ? configuredUrl.replace(/\/$/, "") : ""
+    if (!userAppUrl && typeof window !== "undefined") {
+      const { protocol, hostname, port } = window.location
+      if (hostname === "localhost" || hostname === "127.0.0.1") {
+        userAppUrl = `${protocol}//app.lvh.me${port ? `:${port}` : ""}`
+      }
+    }
+
+    if (!userAppUrl) {
+      setAccessError("User app URL is not configured")
+      return
+    }
+
+    if (!userAppUrl) {
+      setAccessError("User app URL is not configured")
+      return
+    }
+
+    try {
+      setAccessingAccount(true)
+      setAccessError(null)
+
+      const response = await fetch("/api/admin/users/access-account", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        credentials: "include",
+        body: JSON.stringify({ userId: user.user.id })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.error || `HTTP ${response.status}: ${response.statusText}`
+        throw new Error(errorMessage)
+      }
+
+      const data = await response.json().catch(() => ({}))
+      if (!data.success) {
+        throw new Error(data.error || "Failed to access account")
+      }
+
+    } catch (err: any) {
+      console.error("Error accessing user account:", err)
+      setAccessError(err?.message || "Failed to access account")
+    } finally {
+      setAccessingAccount(false)
+    }
+  }
+
+  const accessUrl = user?.user?.hustleToken && userAppUrl
+    ? `${userAppUrl}/authenticateHustle?token=${encodeURIComponent(user.user.hustleToken)}`
+    : ""
 
   if (loading) {
     return (
@@ -101,8 +183,27 @@ export default function AdminUserDetailPage() {
 
       {/* User Profile */}
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
           <CardTitle>Profile</CardTitle>
+          <div className="flex flex-col items-end gap-2">
+            {accessUrl ? (
+              <Button asChild disabled={accessingAccount}>
+                <a
+                  href={accessUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={handleAccessAccount}
+                >
+                  {accessingAccount ? "Accessing..." : "Access Account"}
+                </a>
+              </Button>
+            ) : (
+              <Button onClick={handleAccessAccount} disabled={accessingAccount}>
+                {accessingAccount ? "Accessing..." : "Access Account"}
+              </Button>
+            )}
+            {accessError && <div className="text-sm text-destructive">{accessError}</div>}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-2">

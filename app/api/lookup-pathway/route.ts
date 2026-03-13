@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { getUserFromRequest } from "@/lib/auth-utils"
 import { Client } from "pg"
 import { getSSLConfig } from "@/lib/db-client"
+import { hashPhoneNumber } from "@/lib/encryption"
+import { toE164Format } from "@/utils/phone-utils"
 
 export async function GET(request: NextRequest) {
   try {
@@ -34,10 +36,8 @@ export async function GET(request: NextRequest) {
     await pgClient.connect()
 
     try {
-      // Format the phone number consistently (remove all non-digits first)
-      const cleanPhone = phone.replace(/\D/g, '')
-      // Only add +1 if it doesn't already start with 1
-      const formattedPhone = cleanPhone.startsWith('1') ? `+${cleanPhone}` : `+1${cleanPhone}`
+      const formattedPhone = toE164Format(phone)
+      const phoneHash = hashPhoneNumber(formattedPhone)
 
       console.log(`[LOOKUP-PATHWAY] Looking up pathway for phone: ${formattedPhone}`)
 
@@ -54,10 +54,10 @@ export async function GET(request: NextRequest) {
           p.updated_at as last_deployed_at
         FROM phone_numbers pn
         LEFT JOIN pathways p ON p.phone_id = pn.id
-        WHERE pn.phone_number = $1 AND pn.user_id = $2
+        WHERE pn.user_id = $2 AND (pn.phone_number_hash = $1 OR pn.phone_number = $3)
       `
 
-      const result = await pgClient.query(phoneQuery, [formattedPhone, user.id])
+      const result = await pgClient.query(phoneQuery, [phoneHash, user.id, formattedPhone])
 
       if (result.rows.length === 0) {
         console.log(`[LOOKUP-PATHWAY] No phone number found for ${formattedPhone}`)

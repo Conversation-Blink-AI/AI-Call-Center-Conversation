@@ -1,6 +1,7 @@
 import React from "react"
 import { HeroSection } from "@/components/hero-section"
 import { FeatureCards } from "@/components/feature-cards"
+import { PricingInfo } from "@/components/pricing-info"
 import { UseCases } from "@/components/use-cases"
 import { Testimonials } from "@/components/testimonials"
 import { StatsSection } from "@/components/stats-section"
@@ -22,6 +23,9 @@ export default function Home() {
 
       {/* Stats Section */}
       <StatsSection />
+
+      {/* Pricing Info */}
+      <PricingInfo />
 
       {/* Use Cases Section */}
       <UseCases />

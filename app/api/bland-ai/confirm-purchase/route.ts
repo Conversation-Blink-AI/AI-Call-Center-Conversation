@@ -2,6 +2,8 @@ import { NextResponse } from "next/server"
 import { getUserFromRequest } from "@/lib/auth-utils"
 import { Client } from "pg"
 import { getSSLConfig } from "@/lib/db-client"
+import { encryptString, hashPhoneNumber, phoneLast4 } from "@/lib/encryption"
+import { toE164Format } from "@/utils/phone-utils"
 
 export async function POST(request: Request) {
   try {
@@ -24,10 +26,27 @@ export async function POST(request: Request) {
     await client.connect()
 
     // Insert the purchased phone number
+    const normalizedPhone = toE164Format(phoneNumber)
     await client.query(`
-      INSERT INTO phone_numbers (phone_number, user_id, pathway_id, status, created_at)
-      VALUES ($1, $2, $3, 'active', NOW())
-    `, [phoneNumber, user.value.id, pathwayId])
+      INSERT INTO phone_numbers (
+        phone_number,
+        phone_number_enc,
+        phone_number_hash,
+        phone_number_last4,
+        user_id,
+        pathway_id,
+        status,
+        created_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, 'active', NOW())
+    `, [
+      normalizedPhone,
+      encryptString(normalizedPhone),
+      hashPhoneNumber(normalizedPhone),
+      phoneLast4(normalizedPhone),
+      user.value.id,
+      pathwayId
+    ])
 
     await client.end()
 

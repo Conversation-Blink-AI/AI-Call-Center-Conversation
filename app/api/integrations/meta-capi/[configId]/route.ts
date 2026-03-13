@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { Client } from "pg"
 import crypto from "crypto"
 import { getSSLConfig } from "@/lib/db-client"
+import { decryptString } from "@/lib/encryption"
 
 export const dynamic = "force-dynamic"
 
@@ -27,6 +28,7 @@ export async function POST(request: NextRequest, context: { params: { configId: 
     const callId = body?.call_id || body?.event_id || `call_${Date.now()}`
     const ip = body?.ip
     const userAgent = body?.user_agent
+    const testEventCode = body?.test_event_code
 
     if (!fromPhone) {
       return NextResponse.json(
@@ -45,7 +47,7 @@ export async function POST(request: NextRequest, context: { params: { configId: 
     try {
       const result = await client.query(
         `
-        SELECT pixel_id, access_token, event_name
+        SELECT pixel_id, access_token, access_token_enc, event_name
         FROM meta_capi_configs
         WHERE id = $1
         LIMIT 1
@@ -72,7 +74,7 @@ export async function POST(request: NextRequest, context: { params: { configId: 
       userData.client_user_agent = userAgent
     }
 
-    const payload = {
+    const payload: any = {
       data: [
         {
           event_name: config.event_name,
@@ -83,8 +85,15 @@ export async function POST(request: NextRequest, context: { params: { configId: 
         }
       ]
     }
+    if (testEventCode) {
+      payload.test_event_code = testEventCode
+    }
 
-    const metaUrl = `https://graph.facebook.com/v18.0/${config.pixel_id}/events?access_token=${config.access_token}`
+    const accessToken = config.access_token_enc
+      ? decryptString(config.access_token_enc)
+      : config.access_token
+    const metaUrl = `https://graph.facebook.com/v18.0/${config.pixel_id}/events?access_token=${accessToken}`
+    const startMs = Date.now()
     const metaResponse = await fetch(metaUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -92,6 +101,38 @@ export async function POST(request: NextRequest, context: { params: { configId: 
     })
 
     const metaJson = await metaResponse.json()
+    const durationMs = Date.now() - startMs
+
+    try {
+      const logClient = new Client({
+        connectionString: process.env.DATABASE_URL,
+        ssl: getSSLConfig()
+      })
+      await logClient.connect()
+      try {
+        await logClient.query(
+          `
+          INSERT INTO meta_capi_events (
+            call_id, config_id, event_name, request_payload, response_payload,
+            response_status, duration_ms, created_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+          `,
+          [
+            callId,
+            configId,
+            config.event_name,
+            payload,
+            metaJson,
+            metaResponse.status,
+            durationMs
+          ]
+        )
+      } finally {
+        await logClient.end()
+      }
+    } catch (logError: any) {
+      console.error("❌ [META-CAPI-CONFIG-WEBHOOK] Failed to log event:", logError)
+    }
 
     if (!metaResponse.ok) {
       return NextResponse.json(

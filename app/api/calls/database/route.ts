@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
     const phoneNumber = searchParams.get('phoneNumber') || undefined
     const startDate = searchParams.get('startDate') || undefined
     const endDate = searchParams.get('endDate') || undefined
+    const timeframe = searchParams.get('timeframe') || undefined
 
     // Verify the user ID matches the authenticated user
     if (userId !== user.id) {
@@ -31,14 +32,21 @@ export async function GET(request: NextRequest) {
       limit, offset, status, phoneNumber, startDate, endDate
     })
 
+    const now = new Date()
+    const isAllTime = timeframe === 'all'
+    const timeframeDays = timeframe && !isAllTime ? parseInt(timeframe.replace('d', ''), 10) : NaN
+    const timeframeStart = !isNaN(timeframeDays)
+      ? new Date(now.getTime() - (timeframeDays * 24 * 60 * 60 * 1000)).toISOString()
+      : undefined
+
     // Get calls from database
     const result = await CallDatabaseService.getCallsForUser(userId, {
       limit,
       offset,
       status,
       phoneNumber,
-      startDate,
-      endDate
+      startDate: startDate || timeframeStart,
+      endDate: endDate || (isAllTime ? undefined : now.toISOString())
     })
 
     console.log(`✅ [DATABASE-CALLS] Found ${result.calls.length} calls, total: ${result.total}`)

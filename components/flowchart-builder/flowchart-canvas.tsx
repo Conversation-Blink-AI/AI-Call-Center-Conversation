@@ -415,6 +415,7 @@ export function FlowchartCanvas({
           configId: '',
           configNickname: '',
           eventName: 'CallLead',
+          testEventCode: '',
           actionSource: 'phone_call',
           eventData: {},
         }

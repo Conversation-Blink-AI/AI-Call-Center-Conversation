@@ -8,6 +8,8 @@ import {
   getDatabaseStats
 } from "@/lib/init-replit-database"
 import { getSSLConfig } from "@/lib/db-client"
+import { encryptString, hashPhoneNumber, phoneLast4 } from "@/lib/encryption"
+import { toE164Format } from "@/utils/phone-utils"
 
 export async function GET(request: Request) {
   try {
@@ -88,12 +90,26 @@ export async function POST(request: Request) {
         // Set user context for RLS
         await client.query(`SET app.current_user_id = '${userId}'`)
         
-        const result = await client.query(
-          `INSERT INTO phone_numbers (phone_number, user_id, location, type, status, purchased_at)
-           VALUES ($1, $2, $3, $4, $5, NOW())
+      const normalizedPhone = toE164Format(phoneNumber)
+      const result = await client.query(
+          `INSERT INTO phone_numbers (
+            phone_number,
+            phone_number_enc,
+            phone_number_hash,
+            phone_number_last4,
+            user_id,
+            location,
+            type,
+            status,
+            purchased_at
+          )
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW())
            RETURNING *`,
           [
-            phoneNumber,
+            normalizedPhone,
+            encryptString(normalizedPhone),
+            hashPhoneNumber(normalizedPhone),
+            phoneLast4(normalizedPhone),
             userId,
             location || 'Unknown',
             type || 'Local',

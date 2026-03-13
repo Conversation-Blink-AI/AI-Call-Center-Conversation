@@ -4,6 +4,8 @@ import { cookies } from "next/headers"
 import { validateAuthToken } from "@/lib/auth-utils"
 import { Client } from "pg"
 import { getSSLConfig } from "@/lib/db-client"
+import { hashPhoneNumber } from "@/lib/encryption"
+import { toE164Format } from "@/utils/phone-utils"
 
 export async function GET(request: NextRequest) {
   try {
@@ -61,16 +63,16 @@ export async function GET(request: NextRequest) {
       } else if (phoneNumber) {
         // Load by phone number - find pathway via phone_id relationship
         console.log(`[LOAD-FLOWCHART] Loading by phone number: ${phoneNumber}`)
-        const formattedPhone = phoneNumber.replace(/\D/g, '').startsWith('1') 
-          ? `+${phoneNumber.replace(/\D/g, '')}` 
-          : `+1${phoneNumber.replace(/\D/g, '')}`
+        const formattedPhone = toE164Format(phoneNumber)
+        const phoneHash = hashPhoneNumber(formattedPhone)
         
         pathwayResult = await client.query(`
           SELECT p.id, p.name, p.description, p.data, p.phone_id, p.created_at, p.updated_at
           FROM pathways p
           JOIN phone_numbers pn ON p.phone_id = pn.id
-          WHERE pn.phone_number = $1 AND pn.user_id = $2 AND p.creator_id = $2
-        `, [formattedPhone, userId])
+          WHERE pn.user_id = $2 AND p.creator_id = $2
+            AND (pn.phone_number_hash = $1 OR pn.phone_number = $3)
+        `, [phoneHash, userId, formattedPhone])
       } else {
         await client.end()
         return NextResponse.json({ error: "Pathway ID or phone number is required" }, { status: 400 })

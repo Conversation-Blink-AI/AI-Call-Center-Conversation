@@ -1,6 +1,13 @@
 import { Client } from "pg"
 import { normalizeEmail } from "./utils"
 import { getSSLConfig } from "./db-client"
+import {
+  encryptString,
+  hashEmail,
+  hashPhoneNumber,
+  phoneLast4
+} from "./encryption"
+import { toE164Format } from "@/utils/phone-utils"
 
 export async function connectToDatabase() {
   if (!process.env.DATABASE_URL) {
@@ -35,9 +42,10 @@ export async function getUserById(id: string) {
 
 export async function getUserByEmail(email: string) {
   const normalizedEmail = normalizeEmail(email)
+  const emailHash = hashEmail(normalizedEmail)
   return executeQuery(
-    "SELECT * FROM users WHERE LOWER(email) = LOWER($1)",
-    [normalizedEmail]
+    "SELECT * FROM users WHERE email_hash = $1 OR LOWER(email) = LOWER($2)",
+    [emailHash, normalizedEmail]
   )
 }
 
@@ -50,16 +58,38 @@ export async function createUser(userData: {
   passwordHash: string
 }) {
   const normalizedEmail = normalizeEmail(userData.email)
+  const normalizedPhone = userData.phone_number ? toE164Format(userData.phone_number) : ""
   return executeQuery(`
-    INSERT INTO users (email, name, company, role, phone_number, password_hash, created_at, updated_at)
-    VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+    INSERT INTO users (
+      email,
+      email_enc,
+      email_hash,
+      name,
+      company,
+      role,
+      phone_number,
+      phone_number_enc,
+      phone_number_hash,
+      phone_number_last4,
+      password_hash,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), NOW()
+    )
     RETURNING id, email, name, company, role, phone_number, created_at, updated_at
   `, [
     normalizedEmail,
+    encryptString(normalizedEmail),
+    hashEmail(normalizedEmail),
     userData.name,
     userData.company || null,
     userData.role || 'user',
-    userData.phone_number || null,
+    normalizedPhone || null,
+    normalizedPhone ? encryptString(normalizedPhone) : null,
+    normalizedPhone ? hashPhoneNumber(normalizedPhone) : null,
+    normalizedPhone ? phoneLast4(normalizedPhone) : null,
     userData.passwordHash
   ])
 }
@@ -71,12 +101,30 @@ export async function updateUser(id: string, userData: Partial<{
   phone_number: string
   last_login: Date
 }>) {
-  const updates = Object.keys(userData).map((key, index) => `${key} = $${index + 2}`).join(', ')
-  const values = Object.values(userData)
+  const updates: string[] = []
+  const values: any[] = []
+
+  for (const [key, value] of Object.entries(userData)) {
+    if (key === "phone_number") {
+      const normalizedPhone = value ? toE164Format(String(value)) : ""
+      updates.push("phone_number = $" + (values.length + 2))
+      values.push(normalizedPhone || null)
+      updates.push("phone_number_enc = $" + (values.length + 2))
+      values.push(normalizedPhone ? encryptString(normalizedPhone) : null)
+      updates.push("phone_number_hash = $" + (values.length + 2))
+      values.push(normalizedPhone ? hashPhoneNumber(normalizedPhone) : null)
+      updates.push("phone_number_last4 = $" + (values.length + 2))
+      values.push(normalizedPhone ? phoneLast4(normalizedPhone) : null)
+      continue
+    }
+
+    updates.push(`${key} = $${values.length + 2}`)
+    values.push(value)
+  }
 
   return executeQuery(`
     UPDATE users 
-    SET ${updates}, updated_at = NOW()
+    SET ${updates.join(', ')}, updated_at = NOW()
     WHERE id = $1
     RETURNING id, email, name, company, role, phone_number, created_at, updated_at
   `, [id, ...values])
@@ -174,21 +222,29 @@ export async function createCall(callData: {
   ended_reason?: string
   phone_number_id?: string
 }) {
+  const toNumber = callData.to_number ? toE164Format(callData.to_number) : ""
+  const fromNumber = callData.from_number ? toE164Format(callData.from_number) : ""
   return executeQuery(`
     INSERT INTO call_logs (
-      call_id, user_id, to_number, from_number, duration_seconds, 
-      status, recording_url, transcript, summary, cost_cents, 
+      call_id, user_id, to_number, from_number,
+      to_number_enc, to_number_hash, from_number_enc, from_number_hash,
+      duration_seconds, status, recording_url, recording_url_enc,
+      transcript, transcript_enc, summary, summary_enc, cost_cents, 
       pathway_id, ended_reason, phone_number_id, created_at, updated_at
     ) VALUES (
-      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW()
+      $1, $2, $3, $4, $5, $6, $7, $8,
+      $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, NOW(), NOW()
     ) 
     ON CONFLICT (call_id) 
     DO UPDATE SET
       duration_seconds = EXCLUDED.duration_seconds,
       status = EXCLUDED.status,
       recording_url = EXCLUDED.recording_url,
+      recording_url_enc = EXCLUDED.recording_url_enc,
       transcript = EXCLUDED.transcript,
+      transcript_enc = EXCLUDED.transcript_enc,
       summary = EXCLUDED.summary,
+      summary_enc = EXCLUDED.summary_enc,
       cost_cents = EXCLUDED.cost_cents,
       ended_reason = EXCLUDED.ended_reason,
       updated_at = NOW()
@@ -196,13 +252,20 @@ export async function createCall(callData: {
   `, [
     callData.call_id,
     callData.user_id,
-    callData.to_number,
-    callData.from_number,
+    toNumber,
+    fromNumber,
+    toNumber ? encryptString(toNumber) : null,
+    toNumber ? hashPhoneNumber(toNumber) : null,
+    fromNumber ? encryptString(fromNumber) : null,
+    fromNumber ? hashPhoneNumber(fromNumber) : null,
     callData.duration_seconds || null,
     callData.status || null,
     callData.recording_url || null,
+    callData.recording_url ? encryptString(callData.recording_url) : null,
     callData.transcript || null,
+    callData.transcript ? encryptString(callData.transcript) : null,
     callData.summary || null,
+    callData.summary ? encryptString(callData.summary) : null,
     callData.cost_cents || null,
     callData.pathway_id || null,
     callData.ended_reason || null,
@@ -231,12 +294,36 @@ export async function getCallById(callId: string) {
 }
 
 export async function updateCall(callId: string, updateData: any) {
-  const updates = Object.keys(updateData).map((key, index) => `${key} = $${index + 2}`).join(', ')
-  const values = Object.values(updateData)
+  const updates: string[] = []
+  const values: any[] = []
+
+  for (const [key, value] of Object.entries(updateData)) {
+    if (key === "to_number" || key === "from_number") {
+      const normalized = value ? toE164Format(String(value)) : ""
+      updates.push(`${key} = $${values.length + 2}`)
+      values.push(normalized || null)
+      updates.push(`${key}_enc = $${values.length + 2}`)
+      values.push(normalized ? encryptString(normalized) : null)
+      updates.push(`${key}_hash = $${values.length + 2}`)
+      values.push(normalized ? hashPhoneNumber(normalized) : null)
+      continue
+    }
+
+    if (key === "recording_url" || key === "transcript" || key === "summary") {
+      updates.push(`${key} = $${values.length + 2}`)
+      values.push(value || null)
+      updates.push(`${key}_enc = $${values.length + 2}`)
+      values.push(value ? encryptString(String(value)) : null)
+      continue
+    }
+
+    updates.push(`${key} = $${values.length + 2}`)
+    values.push(value)
+  }
 
   return executeQuery(`
     UPDATE call_logs 
-    SET ${updates}, updated_at = NOW()
+    SET ${updates.join(', ')}, updated_at = NOW()
     WHERE call_id = $1
     RETURNING *
   `, [callId, ...values])
@@ -272,18 +359,25 @@ export async function createCallLog(callData: {
   call_timezone?: string
   call_time_utc?: string
 }) {
+  const toNumber = callData.to_number ? toE164Format(callData.to_number) : ""
+  const fromNumber = callData.from_number ? toE164Format(callData.from_number) : ""
+  const otherParty = callData.phone_number ? toE164Format(callData.phone_number) : ""
   return executeQuery(`
     INSERT INTO call_logs (
-      call_id, user_id, to_number, from_number, duration_seconds, 
-      status, recording_url, transcript, summary, 
+      call_id, user_id, to_number, from_number,
+      to_number_enc, to_number_hash, from_number_enc, from_number_hash,
+      duration_seconds, status, recording_url, recording_url_enc, transcript, transcript_enc, summary, summary_enc,
       pathway_id, ended_reason, start_time, end_time,
       queue_time, latency_ms, interruptions, phone_number_id,
-      phone_number, country, state, city, zip, short_from, short_to,
+      phone_number, phone_number_enc, phone_number_hash,
+      country, state, city, zip, short_from, short_to,
       call_timezone, call_time_utc,
       created_at, updated_at
     ) VALUES (
-      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
-      $18, $19, $20, $21, $22, $23, $24, $25, $26,
+      $1, $2, $3, $4, $5, $6, $7, $8,
+      $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
+      $20, $21, $22, $23, $24, $25, $26, $27, $28,
+      $29, $30,
       NOW(), NOW()
     ) 
     ON CONFLICT (call_id) 
@@ -291,14 +385,19 @@ export async function createCallLog(callData: {
       duration_seconds = EXCLUDED.duration_seconds,
       status = EXCLUDED.status,
       recording_url = EXCLUDED.recording_url,
+      recording_url_enc = EXCLUDED.recording_url_enc,
       transcript = EXCLUDED.transcript,
+      transcript_enc = EXCLUDED.transcript_enc,
       summary = EXCLUDED.summary,
+      summary_enc = EXCLUDED.summary_enc,
       ended_reason = EXCLUDED.ended_reason,
       end_time = EXCLUDED.end_time,
       queue_time = EXCLUDED.queue_time,
       latency_ms = EXCLUDED.latency_ms,
       interruptions = EXCLUDED.interruptions,
       phone_number = EXCLUDED.phone_number,
+      phone_number_enc = EXCLUDED.phone_number_enc,
+      phone_number_hash = EXCLUDED.phone_number_hash,
       country = EXCLUDED.country,
       state = EXCLUDED.state,
       city = EXCLUDED.city,
@@ -312,13 +411,20 @@ export async function createCallLog(callData: {
   `, [
     callData.call_id,
     callData.user_id,
-    callData.to_number,
-    callData.from_number,
+    toNumber,
+    fromNumber,
+    toNumber ? encryptString(toNumber) : null,
+    toNumber ? hashPhoneNumber(toNumber) : null,
+    fromNumber ? encryptString(fromNumber) : null,
+    fromNumber ? hashPhoneNumber(fromNumber) : null,
     callData.duration_seconds || null,
     callData.status || null,
     callData.recording_url || null,
+    callData.recording_url ? encryptString(callData.recording_url) : null,
     callData.transcript || null,
+    callData.transcript ? encryptString(callData.transcript) : null,
     callData.summary || null,
+    callData.summary ? encryptString(callData.summary) : null,
     callData.pathway_id || null,
     callData.ended_reason || null,
     callData.start_time || null,
@@ -327,7 +433,9 @@ export async function createCallLog(callData: {
     callData.latency_ms || null,
     callData.interruptions || null,
     callData.phone_number_id || null,
-    callData.phone_number || null,
+    otherParty || null,
+    otherParty ? encryptString(otherParty) : null,
+    otherParty ? hashPhoneNumber(otherParty) : null,
     callData.country || null,
     callData.state || null,
     callData.city || null,

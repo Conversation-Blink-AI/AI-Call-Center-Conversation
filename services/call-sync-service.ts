@@ -1,5 +1,7 @@
 
 import { executeQuery, createCall, updateCall } from '@/lib/db-utils'
+import { hashPhoneNumber } from '@/lib/encryption'
+import { toE164Format } from '@/utils/phone-utils'
 
 export interface BlandCallResponse {
   call_id: string
@@ -94,9 +96,11 @@ export class CallSyncService {
   async syncCallToDatabase(blandCall: BlandCallResponse, userId: string): Promise<any> {
     try {
       // Find phone number ID if it exists
+      const normalizedFrom = blandCall.from ? toE164Format(blandCall.from) : ""
+      const fromHash = normalizedFrom ? hashPhoneNumber(normalizedFrom) : ""
       const phoneNumberResult = await executeQuery(
-        'SELECT id FROM phone_numbers WHERE phone_number = $1 AND user_id = $2',
-        [blandCall.from, userId]
+        'SELECT id FROM phone_numbers WHERE user_id = $1 AND (phone_number_hash = $2 OR phone_number = $3)',
+        [userId, fromHash, normalizedFrom]
       )
 
       const phoneNumberId = phoneNumberResult.length > 0 ? phoneNumberResult[0].id : null
@@ -141,7 +145,7 @@ export class CallSyncService {
     try {
       // Get user's phone numbers to filter calls
       const userPhones = await executeQuery(
-        'SELECT phone_number FROM phone_numbers WHERE user_id = $1',
+        'SELECT phone_number_hash, phone_number FROM phone_numbers WHERE user_id = $1',
         [userId]
       )
 
@@ -155,7 +159,9 @@ export class CallSyncService {
       for (const call of calls) {
         try {
           // Only sync calls from user's phone numbers
-          const isUserCall = userPhones.some(phone => phone.phone_number === call.from)
+          const normalizedFrom = call.from ? toE164Format(call.from) : ""
+          const fromHash = normalizedFrom ? hashPhoneNumber(normalizedFrom) : ""
+          const isUserCall = userPhones.some(phone => phone.phone_number_hash === fromHash || phone.phone_number === normalizedFrom)
           
           if (isUserCall) {
             await this.syncCallToDatabase(call, userId)

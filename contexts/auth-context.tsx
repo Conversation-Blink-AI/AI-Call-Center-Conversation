@@ -127,11 +127,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Try to parse error message
         let errorMessage = "An error occurred during login"
         let requiresVerification = false
+        let requires2FA = false
+        let pending2FAToken = ""
         let email = ""
         try {
           const errorData = await response.json()
           errorMessage = errorData.message || errorMessage
           requiresVerification = errorData.requiresVerification || false
+          requires2FA = errorData.requires2FA || false
+          pending2FAToken = errorData.pending2FAToken || ""
           email = errorData.email || ""
         } catch {
           // If JSON parsing fails, use status text
@@ -139,6 +143,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
         console.error("❌ [AUTH-CONTEXT] Login error:", errorMessage)
         
+        // If 2FA is required, redirect to 2FA verification page
+        if (requires2FA && pending2FAToken) {
+          try {
+            sessionStorage.setItem('pending-2fa-token', pending2FAToken)
+            sessionStorage.setItem('pending-2fa-email', email)
+          } catch {}
+          router.push("/verify-2fa")
+          return { success: false, message: errorMessage }
+        }
+
         // If verification is required, redirect to verification page
         if (requiresVerification && email) {
           router.push(`/verification-pending?email=${encodeURIComponent(email)}`)
@@ -148,6 +162,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const result = await response.json()
+
+      if (result.requires2FA) {
+        try {
+          sessionStorage.setItem('pending-2fa-token', result.pending2FAToken || "")
+          sessionStorage.setItem('pending-2fa-email', result.email || email)
+        } catch {}
+        router.push("/verify-2fa")
+        return { success: false, message: result.message || "Please verify your login code" }
+      }
 
       if (!result.success) {
         console.error("❌ [AUTH-CONTEXT] Login error:", result.message)
