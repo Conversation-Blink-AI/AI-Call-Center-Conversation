@@ -72,6 +72,18 @@ export async function POST(request: Request) {
       }, { status: 500 })
     }
 
+    // Handle 2FA required responses
+    if (externalResult.status === "pending_2fa") {
+      console.log("[AUTH/LOGIN] 2FA required for:", normalizedEmail)
+      return NextResponse.json({
+        success: false,
+        requires2FA: true,
+        message: externalResult.message || "Please check your email for the verification code",
+        pending2FAToken: externalResult.data?.pending2FAToken,
+        email: externalResult.data?.email || normalizedEmail
+      }, { status: 200 })
+    }
+
     // Check if external authentication failed
     if (!externalResponse.ok || externalResult.status !== "success") {
       console.log("[AUTH/LOGIN] External authentication failed:", externalResult.message)
