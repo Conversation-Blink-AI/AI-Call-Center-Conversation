@@ -386,8 +386,9 @@ async function handlePhoneNumberPurchase(
                 stripe_subscription_id = $5,
                 phone_number_enc = $6,
                 phone_number_hash = $7,
-                phone_number_last4 = $8
-            WHERE user_id = $2 AND (phone_number_hash = $9 OR phone_number = $10)
+                phone_number_last4 = $8,
+                monthly_fee = $9
+            WHERE user_id = $2 AND (phone_number_hash = $10 OR phone_number = $11)
             RETURNING *
           `,
             [
@@ -398,6 +399,7 @@ async function handlePhoneNumberPurchase(
               phoneEnc,
               phoneHash,
               phoneLast,
+              15,
               phoneHash,
               normalizedPhone
             ],
@@ -421,9 +423,10 @@ async function handlePhoneNumberPurchase(
               area_code,
               country_code,
               pathwayid,
-              stripe_subscription_id
+              stripe_subscription_id,
+              monthly_fee
             )
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9, $10, $11, $12)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9, $10, $11, $12, $13)
              RETURNING *`,
             [
               normalizedPhone,
@@ -438,6 +441,7 @@ async function handlePhoneNumberPurchase(
               countryCode,
               blandPathwayId || null,
               subscriptionId || null,
+              15,
             ],
           )
 
@@ -572,9 +576,10 @@ async function handlePhoneNumberPurchase(
                  user_id = $3,
                  phone_number_enc = $4,
                  phone_number_hash = $5,
-                 phone_number_last4 = $6
-             WHERE phone_number_hash = $7 OR phone_number = $8`,
-            ['restricted', subscriptionId || null, userId, phoneEnc, phoneHash, phoneLast, phoneHash, normalizedPhone]
+                 phone_number_last4 = $6,
+                 monthly_fee = $7
+             WHERE phone_number_hash = $8 OR phone_number = $9`,
+            ['restricted', subscriptionId || null, userId, phoneEnc, phoneHash, phoneLast, 15, phoneHash, normalizedPhone]
           )
         } else {
           // Insert new number
@@ -591,9 +596,10 @@ async function handlePhoneNumberPurchase(
               purchased_at,
               area_code,
               country_code,
-              stripe_subscription_id
+              stripe_subscription_id,
+              monthly_fee
             )
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9, $10, $11)`,
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), $9, $10, $11, $12)`,
             [
               normalizedPhone,
               phoneEnc,
@@ -605,7 +611,8 @@ async function handlePhoneNumberPurchase(
               'restricted',
               extractedAreaCode,
               countryCode,
-              subscriptionId || null
+              subscriptionId || null,
+              15
             ]
           )
         }

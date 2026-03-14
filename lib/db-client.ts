@@ -1,5 +1,5 @@
 // Shared database client configuration
-import { Client } from "pg"
+import { Client, Pool } from "pg"
 
 // Helper function to get SSL config for DigitalOcean and other cloud databases
 export function getSSLConfig() {
@@ -52,5 +52,29 @@ export function createDatabaseClient() {
     connectionString: process.env.DATABASE_URL,
     ssl: getSSLConfig()
   })
+}
+
+// Cache pool on globalThis so it survives serverless invocations and hot reloads
+const globalForDb = globalThis as unknown as { dbPool: Pool | undefined }
+
+/**
+ * Returns a shared connection pool. Use this in API routes instead of
+ * new Client() + connect() to avoid ~5–10s connection overhead per request.
+ * Pool reuses connections; typical request uses an existing connection.
+ */
+export function getPool(): Pool {
+  if (!process.env.DATABASE_URL) {
+    throw new Error("DATABASE_URL is not set")
+  }
+  if (!globalForDb.dbPool) {
+    globalForDb.dbPool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: getSSLConfig(),
+      max: 10,
+      idleTimeoutMillis: 10000,
+      connectionTimeoutMillis: 8000,
+    })
+  }
+  return globalForDb.dbPool
 }
 

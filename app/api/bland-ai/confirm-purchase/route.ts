@@ -36,16 +36,18 @@ export async function POST(request: Request) {
         user_id,
         pathway_id,
         status,
-        created_at
+        created_at,
+        monthly_fee
       )
-      VALUES ($1, $2, $3, $4, $5, $6, 'active', NOW())
+      VALUES ($1, $2, $3, $4, $5, $6, 'active', NOW(), $7)
     `, [
       normalizedPhone,
       encryptString(normalizedPhone),
       hashPhoneNumber(normalizedPhone),
       phoneLast4(normalizedPhone),
       user.value.id,
-      pathwayId
+      pathwayId,
+      15
     ])
 
     await client.end()
