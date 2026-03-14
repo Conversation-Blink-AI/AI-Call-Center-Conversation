@@ -1,7 +1,5 @@
-
 import { NextRequest, NextResponse } from "next/server"
-import { Client } from "pg"
-import { getSSLConfig } from "@/lib/db-client"
+import { getPool } from "@/lib/db-client"
 
 // Add OPTIONS handler for CORS preflight requests
 export async function OPTIONS(request: NextRequest) {
@@ -41,7 +39,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({
         success: false,
         message: "Database configuration error"
-      }, { 
+      }, {
         status: 500,
         headers: {
           'Access-Control-Allow-Origin': '*',
@@ -51,79 +49,37 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    const client = new Client({
-      connectionString: process.env.DATABASE_URL,
-      ssl: getSSLConfig()
-    })
+    const pool = getPool()
+    // Single query: user + phone numbers via LEFT JOIN (one round-trip, no new connection if pool warm)
+    const result = await pool.query(
+      `SELECT
+        u.id as user_id,
+        u.first_name,
+        u.last_name,
+        pn.id as pn_id,
+        pn.phone_number as number,
+        pn.location,
+        pn.purchased_at,
+        pn.user_id as pn_user_id,
+        pn.monthly_fee,
+        pn.status,
+        pn.type
+       FROM users u
+       LEFT JOIN phone_numbers pn ON pn.user_id = u.id
+       WHERE LOWER(u.email) = LOWER($1)
+       ORDER BY pn.purchased_at DESC NULLS LAST`,
+      [email.trim()]
+    )
 
-    try {
-      await client.connect()
-
-      // First, find the user by email
-      const userResult = await client.query(
-        'SELECT id, email, first_name, last_name FROM users WHERE email = $1',
-        [email]
-      )
-
-      if (userResult.rows.length === 0) {
-        console.log(`[GET-PURCHASE-NUMBER] User not found for email: ${email}`)
-        return NextResponse.json({
-          success: false,
-          message: "User not found",
-          email: email,
-          phoneNumbers: [],
-          count: 0
-        }, {
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-          }
-        })
-      }
-
-      const user = userResult.rows[0]
-      console.log(`[GET-PURCHASE-NUMBER] User found: ${user.id}`)
-
-      // Get all phone numbers for this user
-      // Simplified query - pathway info can be added via JOIN if needed
-      const phoneResult = await client.query(
-        `SELECT 
-          pn.id,
-          pn.phone_number as number,
-          pn.location,
-          pn.purchased_at,
-          pn.user_id,
-          pn.monthly_fee,
-          pn.status,
-          pn.type
-         FROM phone_numbers pn
-         WHERE pn.user_id = $1
-         ORDER BY pn.purchased_at DESC`,
-        [user.id]
-      )
-
-      const phoneNumbers = phoneResult.rows.map(row => ({
-        id: row.id,
-        number: row.number ? row.number.trim() : '',
-        status: row.status || 'active',
-        location: row.location || 'Unknown',
-        type: row.type || 'Local',
-        purchased_at: row.purchased_at,
-        user_id: row.user_id,
-        monthly_fee: row.monthly_fee ? parseFloat(row.monthly_fee) : 1.50,
-        pathway_id: null,
-        pathway_name: null
-      }))
-
-      console.log(`[GET-PURCHASE-NUMBER] Found ${phoneNumbers.length} phone numbers for user ${user.id}`)
-
+    const rows = result.rows
+    if (rows.length === 0 || rows[0].user_id == null) {
+      console.log(`[GET-PURCHASE-NUMBER] User not found for email: ${email}`)
       return NextResponse.json({
-        success: true,
+        success: false,
+        message: "User not found",
         email: email,
-        user_name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'User',
-        phoneNumbers: phoneNumbers,
-        count: phoneNumbers.length
+        phoneNumbers: [],
+        count: 0
       }, {
         headers: {
           'Access-Control-Allow-Origin': '*',
@@ -131,10 +87,39 @@ export async function GET(request: NextRequest) {
           'Access-Control-Allow-Headers': 'Content-Type, Authorization',
         }
       })
-
-    } finally {
-      await client.end()
     }
+
+    const user = rows[0]
+    const phoneNumbers = rows
+      .filter((row) => row.pn_id != null)
+      .map((row) => ({
+        id: row.pn_id,
+        number: row.number ? String(row.number).trim() : '',
+        status: row.status || 'active',
+        location: row.location || 'Unknown',
+        type: row.type || 'Local',
+        purchased_at: row.purchased_at,
+        user_id: row.pn_user_id,
+        monthly_fee: row.monthly_fee != null ? parseFloat(row.monthly_fee) : 1.5,
+        pathway_id: null,
+        pathway_name: null
+      }))
+
+    console.log(`[GET-PURCHASE-NUMBER] Found ${phoneNumbers.length} phone numbers for user ${user.user_id}`)
+
+    return NextResponse.json({
+      success: true,
+      email: email,
+      user_name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'User',
+      phoneNumbers,
+      count: phoneNumbers.length
+    }, {
+      headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      }
+    })
 
   } catch (error: any) {
     console.error("[GET-PURCHASE-NUMBER] Error:", error)

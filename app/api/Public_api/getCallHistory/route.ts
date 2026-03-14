@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { Client } from "pg"
-import { getSSLConfig } from "@/lib/db-client"
+import { getPool } from "@/lib/db-client"
 import { decryptString, hashEmail } from "@/lib/encryption"
 import { normalizeEmail } from "@/lib/utils"
 
@@ -54,53 +53,43 @@ export async function GET(request: NextRequest) {
 
     console.log(`[GET-CALL-HISTORY] Looking up call logs for email: ${normalizedEmail}`)
 
-    const client = new Client({
-      connectionString: process.env.DATABASE_URL,
-      ssl: getSSLConfig()
-    })
+    const pool = getPool()
 
-    try {
-      await client.connect()
+    // 1) Find user (required for id and decryption)
+    const userResult = await pool.query(
+      `SELECT id, email, email_enc, first_name, last_name
+       FROM users
+       WHERE email_hash = $1 OR LOWER(email) = LOWER($2)
+       LIMIT 1`,
+      [emailHash, normalizedEmail]
+    )
 
-      // Find the user by email hash or plaintext
-      const userResult = await client.query(
-        `SELECT id, email, email_enc, first_name, last_name
-         FROM users
-         WHERE email_hash = $1 OR LOWER(email) = LOWER($2)
-         LIMIT 1`,
-        [emailHash, normalizedEmail]
+    if (userResult.rows.length === 0) {
+      console.log(`[GET-CALL-HISTORY] User not found for email: ${normalizedEmail}`)
+      return NextResponse.json(
+        {
+          success: false,
+          message: "User not found",
+          email: normalizedEmail,
+          callLogs: [],
+          count: 0
+        },
+        { headers: CORS_HEADERS }
       )
+    }
 
-      if (userResult.rows.length === 0) {
-        console.log(`[GET-CALL-HISTORY] User not found for email: ${normalizedEmail}`)
-        return NextResponse.json(
-          {
-            success: false,
-            message: "User not found",
-            email: normalizedEmail,
-            callLogs: [],
-            count: 0
-          },
-          { headers: CORS_HEADERS }
-        )
-      }
+    const user = userResult.rows[0]
+    const userEmail = decryptMaybe(user.email, user.email_enc)
+    const userName =
+      `${user.first_name || ""} ${user.last_name || ""}`.trim() || "User"
 
-      const user = userResult.rows[0]
-      const userEmail = decryptMaybe(user.email, user.email_enc)
-      const userName =
-        `${user.first_name || ""} ${user.last_name || ""}`.trim() || "User"
-
-      // Get total count
-      const countResult = await client.query(
-        `SELECT COUNT(*) as total
-         FROM call_logs
-         WHERE user_id = $1`,
+    // 2) Run count and call logs in parallel (one less round-trip)
+    const [countResult, callLogsResult] = await Promise.all([
+      pool.query(
+        `SELECT COUNT(*) as total FROM call_logs WHERE user_id = $1`,
         [user.id]
-      )
-      const total = parseInt(countResult.rows[0].total)
-
-      // Get call logs for this user
-      const callLogsResult = await client.query(
+      ),
+      pool.query(
         `SELECT
           id,
           call_id,
@@ -137,8 +126,10 @@ export async function GET(request: NextRequest) {
         LIMIT $2 OFFSET $3`,
         [user.id, limit, offset]
       )
+    ])
 
-      const callLogs = callLogsResult.rows.map((row) => ({
+    const total = parseInt(countResult.rows[0].total)
+    const callLogs = callLogsResult.rows.map((row) => ({
         id: row.id,
         call_id: row.call_id,
         user_id: row.user_id,
@@ -186,9 +177,6 @@ export async function GET(request: NextRequest) {
         },
         { headers: CORS_HEADERS }
       )
-    } finally {
-      await client.end()
-    }
   } catch (error: any) {
     console.error("[GET-CALL-HISTORY] Error:", error)
     let message = "Internal server error"
