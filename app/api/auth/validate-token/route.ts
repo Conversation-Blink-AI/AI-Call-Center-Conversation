@@ -201,6 +201,24 @@ export async function POST(request: NextRequest) {
       user = result.rows[0]
       console.log("[VALIDATE-TOKEN] User synced:", user.email)
 
+      // Ensure wallet exists for this user (new or existing)
+      try {
+        const walletCheck = await client.query(
+          'SELECT id FROM wallets WHERE user_id = $1',
+          [user.id]
+        )
+        if (walletCheck.rows.length === 0) {
+          await client.query(
+            `INSERT INTO wallets (user_id, balance_cents, updated_at)
+             VALUES ($1, 0, NOW())`,
+            [user.id]
+          )
+          console.log("[VALIDATE-TOKEN] Created wallet for user:", user.id)
+        }
+      } catch (walletError) {
+        console.error("[VALIDATE-TOKEN] Failed to ensure wallet for user:", walletError)
+      }
+
     } finally {
       await client.end()
     }
