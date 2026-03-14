@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Plus, Trash2, Send, Lock, FileText, Code, HelpCircle } from 'lucide-react'
@@ -193,23 +194,21 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
 
             <div>
               <Label htmlFor="text">Greeting Message</Label>
-              <Textarea
+              <AutoResizeTextarea
                 id="text"
                 value={selectedNode.data.text || ''}
                 onChange={(e) => handleFieldChange('text', e.target.value)}
                 placeholder="Hey there, how are you doing today?"
-                rows={3}
               />
             </div>
 
             <div>
               <Label htmlFor="globalPrompt">Global Prompt (Optional)</Label>
-              <Textarea
+              <AutoResizeTextarea
                 id="globalPrompt"
                 value={selectedNode.data.globalPrompt || ''}
                 onChange={(e) => handleFieldChange('globalPrompt', e.target.value)}
                 placeholder="This is a phone call. Do not use exclamation marks..."
-                rows={3}
               />
             </div>
 
@@ -276,35 +275,32 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
             {useStaticText ? (
               <div>
                 <Label htmlFor="text">Text</Label>
-                <Textarea
+                <AutoResizeTextarea
                   id="text"
                   value={selectedNode.data.text || ''}
                   onChange={(e) => handleFieldChange('text', e.target.value)}
                   placeholder="Exact text to be spoken by the agent"
-                  rows={3}
                 />
               </div>
             ) : (
               <div>
                 <Label htmlFor="prompt">Prompt</Label>
-                <Textarea
+                <AutoResizeTextarea
                   id="prompt"
                   value={selectedNode.data.prompt || ''}
                   onChange={(e) => handleFieldChange('prompt', e.target.value)}
                   placeholder="Prompt for AI-generated dialogue"
-                  rows={3}
                 />
               </div>
             )}
 
             <div>
               <Label htmlFor="globalPrompt">Global Prompt (Optional)</Label>
-              <Textarea
+              <AutoResizeTextarea
                 id="globalPrompt"
                 value={selectedNode.data.globalPrompt || ''}
                 onChange={(e) => handleFieldChange('globalPrompt', e.target.value)}
                 placeholder="Additional context or instructions..."
-                rows={2}
               />
             </div>
 
@@ -416,16 +412,67 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
               />
             </div>
 
-            <div>
-              <Label htmlFor="text">Display Message</Label>
-              <Textarea
-                id="text"
-                value={selectedNode.data.text || ''}
-                onChange={(e) => handleFieldChange('text', e.target.value)}
-                placeholder="Tracking conversion event..."
-                rows={2}
+            {/* Static Text Toggle */}
+            <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/50">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="static-text-toggle-fb" className="text-base font-semibold">
+                    Static Text
+                  </Label>
+                  <button
+                    type="button"
+                    onClick={() => setShowStaticTextHelp((prev) => !prev)}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    aria-label="Static Text help"
+                  >
+                    <HelpCircle className="h-4 w-4" />
+                  </button>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  When you want the agent to say a specific dialogue. Uncheck to use AI generated text
+                </p>
+                {showStaticTextHelp && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Use Static Text when you need exact wording for compliance or consistency. Turn it off to let the AI
+                    generate responses based on the prompt and context.
+                  </p>
+                )}
+              </div>
+              <Switch
+                id="static-text-toggle-fb"
+                checked={useStaticText}
+                onCheckedChange={(checked) => {
+                  setUseStaticText(checked);
+                  if (checked) {
+                    handleFieldChange('prompt', '');
+                  } else {
+                    handleFieldChange('text', '');
+                  }
+                }}
               />
             </div>
+
+            {useStaticText ? (
+              <div>
+                <Label htmlFor="text">Display Message</Label>
+                <AutoResizeTextarea
+                  id="text"
+                  value={selectedNode.data.text || ''}
+                  onChange={(e) => handleFieldChange('text', e.target.value)}
+                  placeholder="Exact text to be spoken by the agent"
+                />
+              </div>
+            ) : (
+              <div>
+                <Label htmlFor="prompt">Prompt</Label>
+                <AutoResizeTextarea
+                  id="prompt"
+                  value={selectedNode.data.prompt || ''}
+                  onChange={(e) => handleFieldChange('prompt', e.target.value)}
+                  placeholder="Prompt for AI-generated dialogue"
+                />
+              </div>
+            )}
 
             <div className="bg-muted p-3 rounded-lg border border-border">
               <h4 className="text-sm font-semibold text-foreground mb-3">Facebook Pixel Configuration</h4>
@@ -501,16 +548,67 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
               />
             </div>
 
-            <div>
-              <Label htmlFor="text">Display Message</Label>
-              <Textarea
-                id="text"
-                value={selectedNode.data.text || ''}
-                onChange={(e) => handleFieldChange('text', e.target.value)}
-                placeholder="Please give me a moment as I check our system.."
-                rows={2}
+            {/* Static Text Toggle */}
+            <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/50">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="static-text-toggle-webhook" className="text-base font-semibold">
+                    Static Text
+                  </Label>
+                  <button
+                    type="button"
+                    onClick={() => setShowStaticTextHelp((prev) => !prev)}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    aria-label="Static Text help"
+                  >
+                    <HelpCircle className="h-4 w-4" />
+                  </button>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  When you want the agent to say a specific dialogue. Uncheck to use AI generated text
+                </p>
+                {showStaticTextHelp && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Use Static Text when you need exact wording for compliance or consistency. Turn it off to let the AI
+                    generate responses based on the prompt and context.
+                  </p>
+                )}
+              </div>
+              <Switch
+                id="static-text-toggle-webhook"
+                checked={useStaticText}
+                onCheckedChange={(checked) => {
+                  setUseStaticText(checked);
+                  if (checked) {
+                    handleFieldChange('prompt', '');
+                  } else {
+                    handleFieldChange('text', '');
+                  }
+                }}
               />
             </div>
+
+            {useStaticText ? (
+              <div>
+                <Label htmlFor="text">Display Message</Label>
+                <AutoResizeTextarea
+                  id="text"
+                  value={selectedNode.data.text || ''}
+                  onChange={(e) => handleFieldChange('text', e.target.value)}
+                  placeholder="Exact text to be spoken by the agent"
+                />
+              </div>
+            ) : (
+              <div>
+                <Label htmlFor="prompt">Prompt</Label>
+                <AutoResizeTextarea
+                  id="prompt"
+                  value={selectedNode.data.prompt || ''}
+                  onChange={(e) => handleFieldChange('prompt', e.target.value)}
+                  placeholder="Prompt for AI-generated dialogue"
+                />
+              </div>
+            )}
 
             <div>
               <Label htmlFor="method">HTTP Method</Label>
@@ -562,27 +660,67 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
               />
             </div>
 
-            <div>
-              <Label htmlFor="text">Transfer Message (Static Text)</Label>
-              <Textarea
-                id="text"
-                value={selectedNode.data.text || ''}
-                onChange={(e) => handleFieldChange('text', e.target.value)}
-                placeholder="Transferring the call now. Please hold.."
-                rows={2}
+            {/* Static Text Toggle */}
+            <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/50">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="static-text-toggle-transfer" className="text-base font-semibold">
+                    Static Text
+                  </Label>
+                  <button
+                    type="button"
+                    onClick={() => setShowStaticTextHelp((prev) => !prev)}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    aria-label="Static Text help"
+                  >
+                    <HelpCircle className="h-4 w-4" />
+                  </button>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  When you want the agent to say a specific dialogue. Uncheck to use AI generated text
+                </p>
+                {showStaticTextHelp && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Use Static Text when you need exact wording for compliance or consistency. Turn it off to let the AI
+                    generate responses based on the prompt and context.
+                  </p>
+                )}
+              </div>
+              <Switch
+                id="static-text-toggle-transfer"
+                checked={useStaticText}
+                onCheckedChange={(checked) => {
+                  setUseStaticText(checked);
+                  if (checked) {
+                    handleFieldChange('prompt', '');
+                  } else {
+                    handleFieldChange('text', '');
+                  }
+                }}
               />
             </div>
 
-            <div>
-              <Label htmlFor="prompt">Prompt (Dynamic Text - Alternative to Static Text)</Label>
-              <Textarea
-                id="prompt"
-                value={selectedNode.data.prompt || ''}
-                onChange={(e) => handleFieldChange('prompt', e.target.value)}
-                placeholder="Generate a dynamic transfer message based on context..."
-                rows={2}
-              />
-            </div>
+            {useStaticText ? (
+              <div>
+                <Label htmlFor="text">Transfer Message</Label>
+                <AutoResizeTextarea
+                  id="text"
+                  value={selectedNode.data.text || ''}
+                  onChange={(e) => handleFieldChange('text', e.target.value)}
+                  placeholder="Exact text to be spoken by the agent"
+                />
+              </div>
+            ) : (
+              <div>
+                <Label htmlFor="prompt">Prompt</Label>
+                <AutoResizeTextarea
+                  id="prompt"
+                  value={selectedNode.data.prompt || ''}
+                  onChange={(e) => handleFieldChange('prompt', e.target.value)}
+                  placeholder="Prompt for AI-generated dialogue"
+                />
+              </div>
+            )}
 
             <div>
               <Label htmlFor="transferNumber">Transfer Number</Label>
@@ -597,12 +735,11 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
 
             <div>
               <Label htmlFor="condition">Condition</Label>
-              <Textarea
+              <AutoResizeTextarea
                 id="condition"
                 value={selectedNode.data.condition || ''}
                 onChange={(e) => handleFieldChange('condition', e.target.value)}
                 placeholder="Condition that needs to be met to proceed from this node"
-                rows={2}
               />
             </div>
 
@@ -660,34 +797,31 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
                   <div className="space-y-3 pt-2">
                     <div>
                       <Label htmlFor="pathwayExamples" className="text-xs">Pathway Examples</Label>
-                      <Textarea
+                      <AutoResizeTextarea
                         id="pathwayExamples"
                         value={selectedNode.data.pathwayExamples || ''}
                         onChange={(e) => handleFieldChange('pathwayExamples', e.target.value)}
                         placeholder="Fine-tuning examples for the agent at this node for the pathways chosen"
-                        rows={3}
                         className="text-sm"
                       />
                     </div>
                     <div>
                       <Label htmlFor="conditionExamples" className="text-xs">Condition Examples</Label>
-                      <Textarea
+                      <AutoResizeTextarea
                         id="conditionExamples"
                         value={selectedNode.data.conditionExamples || ''}
                         onChange={(e) => handleFieldChange('conditionExamples', e.target.value)}
                         placeholder="Fine-tuning examples for the condition at this node"
-                        rows={3}
                         className="text-sm"
                       />
                     </div>
                     <div>
                       <Label htmlFor="dialogueExamples" className="text-xs">Dialogue Examples</Label>
-                      <Textarea
+                      <AutoResizeTextarea
                         id="dialogueExamples"
                         value={selectedNode.data.dialogueExamples || ''}
                         onChange={(e) => handleFieldChange('dialogueExamples', e.target.value)}
                         placeholder="Fine-tuning examples for the dialogue at this node"
-                        rows={3}
                         className="text-sm"
                       />
                     </div>
@@ -714,16 +848,67 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
               />
             </div>
 
-            <div>
-              <Label htmlFor="prompt">Goodbye Message</Label>
-              <Textarea
-                id="prompt"
-                value={selectedNode.data.prompt || selectedNode.data.text || ''}
-                onChange={(e) => handleFieldChange('prompt', e.target.value)}
-                placeholder="Say goodbye to the user"
-                rows={2}
+            {/* Static Text Toggle */}
+            <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/50">
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="static-text-toggle-endcall" className="text-base font-semibold">
+                    Static Text
+                  </Label>
+                  <button
+                    type="button"
+                    onClick={() => setShowStaticTextHelp((prev) => !prev)}
+                    className="text-muted-foreground hover:text-foreground transition-colors"
+                    aria-label="Static Text help"
+                  >
+                    <HelpCircle className="h-4 w-4" />
+                  </button>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  When you want the agent to say a specific dialogue. Uncheck to use AI generated text
+                </p>
+                {showStaticTextHelp && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Use Static Text when you need exact wording for compliance or consistency. Turn it off to let the AI
+                    generate responses based on the prompt and context.
+                  </p>
+                )}
+              </div>
+              <Switch
+                id="static-text-toggle-endcall"
+                checked={useStaticText}
+                onCheckedChange={(checked) => {
+                  setUseStaticText(checked);
+                  if (checked) {
+                    handleFieldChange('prompt', '');
+                  } else {
+                    handleFieldChange('text', '');
+                  }
+                }}
               />
             </div>
+
+            {useStaticText ? (
+              <div>
+                <Label htmlFor="text">Goodbye Message</Label>
+                <AutoResizeTextarea
+                  id="text"
+                  value={selectedNode.data.text || ''}
+                  onChange={(e) => handleFieldChange('text', e.target.value)}
+                  placeholder="Exact text to be spoken by the agent"
+                />
+              </div>
+            ) : (
+              <div>
+                <Label htmlFor="prompt">Prompt</Label>
+                <AutoResizeTextarea
+                  id="prompt"
+                  value={selectedNode.data.prompt || ''}
+                  onChange={(e) => handleFieldChange('prompt', e.target.value)}
+                  placeholder="Prompt for AI-generated goodbye message"
+                />
+              </div>
+            )}
           </div>
         )
 
@@ -1219,11 +1404,12 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
 
               <div>
                 <Label className="text-xs">Request Body</Label>
-                <Textarea
+                <AutoResizeTextarea
                   value={selectedNode.data.body || ''}
                   onChange={(e) => handleFieldChange('body', e.target.value)}
                   placeholder='{ "key": "value" }'
-                  className="h-24 font-mono text-sm"
+                  className="font-mono text-sm"
+                  minHeight={96}
                 />
               </div>
             </div>
