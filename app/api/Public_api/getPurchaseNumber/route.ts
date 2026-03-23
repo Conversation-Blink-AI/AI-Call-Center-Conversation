@@ -109,6 +109,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
+      userId: user.user_id,
       email: email,
       user_name: `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'User',
       phoneNumbers,
