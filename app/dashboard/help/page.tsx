@@ -1,13 +1,26 @@
 "use client"
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Phone, Workflow, Mic, BarChart3, CreditCard, History, FileText, Zap, Users } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { Phone, Workflow, Mic, BarChart3, CreditCard, History, FileText, Zap, Users, ExternalLink } from "lucide-react"
 import Link from "next/link"
 
 export default function HelpPage() {
   return (
     <div className="bg-background min-h-screen">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <div className="flex justify-end mb-4">
+          <Button variant="outline" size="default" className="font-semibold shadow-sm" asChild>
+            <a
+              href="https://forms.gle/1Dr8dJBa4B7QbtnG6"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Report Issue
+              <ExternalLink className="h-4 w-4 opacity-80" aria-hidden />
+            </a>
+          </Button>
+        </div>
         {/* Header */}
         <div className="mb-12 text-center">
           <h1 className="text-4xl font-bold text-foreground mb-4">Help Center</h1>
