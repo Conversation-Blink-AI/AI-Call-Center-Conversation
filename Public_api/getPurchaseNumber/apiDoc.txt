@@ -60,6 +60,7 @@ getPurchaseNumbers("user@example.com").then(console.log);
 ```json
 {
   "success": true,
+  "userId": "550e8400-e29b-41d4-a716-446655440000",
   "email": "user@example.com",
   "user_name": "John Doe",
   "phoneNumbers": [
@@ -113,6 +114,7 @@ getPurchaseNumbers("user@example.com").then(console.log);
 | Field        | Type    | Description                              |
 |--------------|---------|------------------------------------------|
 | `success`    | boolean | Indicates if the request was successful  |
+| `userId`     | string (UUID) | Internal user id (present when success=true) |
 | `email`      | string  | The email address that was queried       |
 | `user_name`  | string  | The name of the user (if found)          |
 | `message`    | string  | Error message (only when success=false)  |

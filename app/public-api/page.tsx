@@ -40,12 +40,14 @@ export default function PublicApiDocumentationPage() {
 
   const handleTestCallHistory = () => {
     const email = (document.getElementById('call-history-email') as HTMLInputElement).value;
+    const userId = (document.getElementById('call-history-userid') as HTMLInputElement).value.trim();
+    const phoneNumber = (document.getElementById('call-history-phone') as HTMLInputElement).value.trim();
     const page = (document.getElementById('call-history-page') as HTMLInputElement).value || "1";
     const limit = (document.getElementById('call-history-limit') as HTMLInputElement).value || "50";
     const resultDiv = document.getElementById('call-history-result');
 
-    if (!email) {
-      if (resultDiv) resultDiv.innerHTML = '<div style="color: #ef4444; padding: 15px; background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px;"><strong>Error:</strong> Please enter an email address</div>';
+    if (!email || !userId || !phoneNumber) {
+      if (resultDiv) resultDiv.innerHTML = '<div style="color: #ef4444; padding: 15px; background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px;"><strong>Error:</strong> Please enter email, userId (from getPurchaseNumber), and phoneNumber (purchased number)</div>';
       return;
     }
 
@@ -53,6 +55,8 @@ export default function PublicApiDocumentationPage() {
 
     const query = new URLSearchParams({
       email,
+      userId,
+      phoneNumber,
       page,
       limit
     });
@@ -259,15 +263,24 @@ export default function PublicApiDocumentationPage() {
           <div className="endpoint-info">
             <h2>getCallHistory Endpoint</h2>
             <p><span className="method">GET</span> <span className="url">/Public_api/getCallHistory</span></p>
-            <p>Retrieve call history for a specific user by providing their email address. This endpoint reads from the <code>call_logs</code> table and supports pagination.</p>
+            <p>
+              Retrieve call history from the <code>call_logs</code> table with pagination. <strong>Email alone is not accepted.</strong> You must call{' '}
+              <code>getPurchaseNumber</code> first, then pass <strong>email</strong>, <strong>userId</strong> (from that response), and <strong>phoneNumber</strong> (the purchased <code>number</code> from <code>phoneNumbers</code>) so the server can verify they all belong together.
+            </p>
           </div>
 
           <h2>🔧 Quick Start</h2>
           <p>Get started with a simple request:</p>
           <pre>{`curl -X GET "https://conversation.hustleapp.co/Public_api/getPurchaseNumber?email=user@example.com"`}</pre>
-          <pre>{`curl -X GET "https://conversation.hustleapp.co/Public_api/getCallHistory?email=user@example.com&page=1&limit=50"`}</pre>
+          <pre>{`curl -G "https://conversation.hustleapp.co/Public_api/getCallHistory" \\
+  --data-urlencode "email=user@example.com" \\
+  --data-urlencode "userId=550e8400-e29b-41d4-a716-446655440000" \\
+  --data-urlencode "phoneNumber=%2B1234567890" \\
+  --data-urlencode "page=1" \\
+  --data-urlencode "limit=50"`}</pre>
 
           <h2>📋 Parameters</h2>
+          <h3>getPurchaseNumber</h3>
           <table>
             <thead>
               <tr>
@@ -283,6 +296,50 @@ export default function PublicApiDocumentationPage() {
                 <td>string</td>
                 <td><span className="error-badge">Required</span></td>
                 <td>The email address of the user whose phone numbers you want to retrieve</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <h3>getCallHistory</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Parameter</th>
+                <th>Type</th>
+                <th>Required</th>
+                <th>Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>email</code></td>
+                <td>string</td>
+                <td><span className="error-badge">Required</span></td>
+                <td>Must match the account email (same as used for getPurchaseNumber)</td>
+              </tr>
+              <tr>
+                <td><code>userId</code></td>
+                <td>string (UUID)</td>
+                <td><span className="error-badge">Required</span></td>
+                <td><code>userId</code> from the successful getPurchaseNumber response</td>
+              </tr>
+              <tr>
+                <td><code>phoneNumber</code></td>
+                <td>string</td>
+                <td><span className="error-badge">Required</span></td>
+                <td>The purchased number: <code>number</code> from a phone object in getPurchaseNumber (alias: <code>purchasedNumber</code>)</td>
+              </tr>
+              <tr>
+                <td><code>page</code></td>
+                <td>number</td>
+                <td>Optional</td>
+                <td>Page number (default <code>1</code>)</td>
+              </tr>
+              <tr>
+                <td><code>limit</code></td>
+                <td>number</td>
+                <td>Optional</td>
+                <td>Page size (default <code>50</code>)</td>
               </tr>
             </tbody>
           </table>
@@ -303,12 +360,25 @@ if (data.success) {
   console.error('Error:', data.message);
 }`}</pre>
 
-          <pre>{`const email = "user@example.com";
+          <pre>{`// 1) getPurchaseNumber, then 2) getCallHistory with email + userId + purchased number
+const purchaseRes = await fetch(\`/api/Public_api/getPurchaseNumber?email=\${encodeURIComponent("user@example.com")}\`);
+const purchase = await purchaseRes.json();
+if (!purchase.success || !purchase.phoneNumbers?.length) throw new Error(purchase.message || "No numbers");
+
+const phoneNumber = purchase.phoneNumbers[0].number;
+const userId = purchase.userId;
+const email = purchase.email;
+
 const page = 1;
 const limit = 50;
-const response = await fetch(
-  \`/api/Public_api/getCallHistory?email=\${encodeURIComponent(email)}&page=\${page}&limit=\${limit}\`
-);
+const q = new URLSearchParams({
+  email,
+  userId,
+  phoneNumber,
+  page: String(page),
+  limit: String(limit)
+});
+const response = await fetch(\`/api/Public_api/getCallHistory?\${q.toString()}\`);
 const data = await response.json();
 
 if (data.success) {
@@ -336,12 +406,21 @@ else:
 
           <pre>{`import requests
 
-email = "user@example.com"
-page = 1
-limit = 50
-response = requests.get(
-    f"https://conversation.hustleapp.co/Public_api/getCallHistory?email={email}&page={page}&limit={limit}"
-)
+base = "https://conversation.hustleapp.co/Public_api"
+r = requests.get(f"{base}/getPurchaseNumber", params={"email": "user@example.com"})
+purchase = r.json()
+if not purchase.get("success") or not purchase.get("phoneNumbers"):
+    raise SystemExit(purchase.get("message", "No numbers"))
+
+phone = purchase["phoneNumbers"][0]
+params = {
+    "email": purchase["email"],
+    "userId": purchase["userId"],
+    "phoneNumber": phone["number"],
+    "page": 1,
+    "limit": 50,
+}
+response = requests.get(f"{base}/getCallHistory", params=params)
 data = response.json()
 
 if data['success']:
@@ -378,27 +457,24 @@ getPurchaseNumbers("user@example.com").then(numbers => {
 
           <pre>{`const fetch = require('node-fetch');
 
-async function getCallHistory(email, page = 1, limit = 50) {
-  try {
-    const response = await fetch(
-      \`https://conversation.hustleapp.co/Public_api/getCallHistory?email=\${email}&page=\${page}&limit=\${limit}\`
-    );
-    const data = await response.json();
-
-    if (data.success) {
-      console.log(\`Found \${data.count} calls\`);
-      return data.callLogs;
-    } else {
-      throw new Error(data.message);
-    }
-  } catch (error) {
-    console.error('API Error:', error.message);
-    return [];
-  }
+async function getCallHistory(email, userId, phoneNumber, page = 1, limit = 50) {
+  const q = new URLSearchParams({
+    email,
+    userId,
+    phoneNumber,
+    page: String(page),
+    limit: String(limit)
+  });
+  const response = await fetch(
+    \`https://conversation.hustleapp.co/Public_api/getCallHistory?\${q.toString()}\`
+  );
+  const data = await response.json();
+  if (!data.success) throw new Error(data.message);
+  return data.callLogs;
 }
 
-// Usage
-getCallHistory("user@example.com").then(calls => {
+// Usage: obtain userId + phoneNumber from getPurchaseNumber first
+getCallHistory("user@example.com", "uuid-from-purchase", "+1234567890").then(calls => {
   calls.forEach(call => console.log(call.call_id));
 });`}</pre>
 
@@ -408,6 +484,7 @@ getCallHistory("user@example.com").then(calls => {
           <div className="response-example">
             <pre>{`{
   "success": true,
+  "userId": "550e8400-e29b-41d4-a716-446655440000",
   "email": "user@example.com",
   "user_name": "John Doe",
   "phoneNumbers": [
@@ -432,6 +509,7 @@ getCallHistory("user@example.com").then(calls => {
           <div className="response-example">
             <pre>{`{
   "success": true,
+  "userId": "550e8400-e29b-41d4-a716-446655440000",
   "email": "user@example.com",
   "user_name": "John Doe",
   "callLogs": [
@@ -498,6 +576,11 @@ getCallHistory("user@example.com").then(calls => {
                 <td>Indicates if the request was successful</td>
               </tr>
               <tr>
+                <td><code>userId</code></td>
+                <td>string (UUID)</td>
+                <td>Internal user id — use for follow-up calls to avoid re-resolving by email</td>
+              </tr>
+              <tr>
                 <td><code>email</code></td>
                 <td>string</td>
                 <td>The email address that was queried</td>
@@ -535,6 +618,11 @@ getCallHistory("user@example.com").then(calls => {
               </tr>
             </thead>
             <tbody>
+              <tr>
+                <td><code>userId</code></td>
+                <td>string (UUID)</td>
+                <td>Internal user id — matches the user resolved from email</td>
+              </tr>
               <tr>
                 <td><code>callLogs</code></td>
                 <td>array</td>
@@ -697,6 +785,7 @@ getCallHistory("user@example.com").then(calls => {
               <li>Use <code>encodeURIComponent()</code> when passing email addresses with special characters</li>
               <li>The <code>count</code> field can be used for pagination or display purposes</li>
               <li>Store the <code>pathway_id</code> if you need to correlate numbers with specific call flows</li>
+              <li>For <code>getCallHistory</code>, call <code>getPurchaseNumber</code> first and pass <code>email</code>, <code>userId</code>, and <code>phoneNumber</code> together — email alone is not accepted</li>
             </ol>
           </div>
 
@@ -751,14 +840,44 @@ getCallHistory("user@example.com").then(calls => {
 
           <div className="endpoint-info">
             <h3>Try getCallHistory</h3>
-            <p>Enter an email address to test the getCallHistory endpoint:</p>
+            <p>Call <strong>getPurchaseNumber</strong> first, then enter the same email plus <strong>userId</strong> and a <strong>purchased phone number</strong> (<code>number</code> from <code>phoneNumbers</code>):</p>
 
             <div style={{marginTop: '20px'}}>
-              <label htmlFor="call-history-email" style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>Email Address:</label>
+              <label htmlFor="call-history-email" style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>Email:</label>
               <input
                 type="email"
                 id="call-history-email"
                 placeholder="user@example.com"
+                style={{
+                  width: '100%',
+                  maxWidth: '400px',
+                  padding: '12px',
+                  border: '2px solid #cbd5e1',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  marginBottom: '15px'
+                }}
+              />
+              <label htmlFor="call-history-userid" style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>userId (from getPurchaseNumber):</label>
+              <input
+                type="text"
+                id="call-history-userid"
+                placeholder="uuid from purchase response"
+                style={{
+                  width: '100%',
+                  maxWidth: '400px',
+                  padding: '12px',
+                  border: '2px solid #cbd5e1',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  marginBottom: '15px'
+                }}
+              />
+              <label htmlFor="call-history-phone" style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>phoneNumber (purchased number):</label>
+              <input
+                type="text"
+                id="call-history-phone"
+                placeholder="+1234567890"
                 style={{
                   width: '100%',
                   maxWidth: '400px',
