@@ -34,6 +34,7 @@ export async function middleware(req: NextRequest) {
     req.nextUrl.pathname.startsWith("/api/auth") ||
     req.nextUrl.pathname.startsWith("/api/debug") ||
     req.nextUrl.pathname.startsWith("/api/webhooks") || // Allow webhooks without auth
+    req.nextUrl.pathname.startsWith("/api/Public_api") || // Public API (getCallHistory, getPurchaseNumber) - no auth
     req.nextUrl.pathname.includes(".")
   ) {
     return res
