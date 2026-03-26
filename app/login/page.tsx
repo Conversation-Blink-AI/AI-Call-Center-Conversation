@@ -62,11 +62,10 @@ export default function LoginPage() {
         } else {
           setError(errorMessage)
         }
-        setIsLoading(false)
       }
-      // ✅ Don't set loading to false on success - let the redirect happen
     } catch (err) {
       setError(getAuthErrorMessage())
+    } finally {
       setIsLoading(false)
     }
   }

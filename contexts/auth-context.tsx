@@ -1,7 +1,7 @@
 "use client"
 
 import React, { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 
 export interface User {
   id: string
@@ -43,15 +43,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isInitialized, setIsInitialized] = useState(false)
   const [isAuthenticated, setIsAuthenticated] = useState(false) // Explicitly manage isAuthenticated state
   const initializedRef = useRef(false)
+  /** Cancels in-flight /api/auth/me so a stale 401 cannot run after a fresh login (classic long-session bug). */
+  const authCheckAbortRef = useRef<AbortController | null>(null)
   const router = useRouter()
-  const pathname = usePathname()
 
   const checkAuth = async () => {
+    authCheckAbortRef.current?.abort()
+    const controller = new AbortController()
+    authCheckAbortRef.current = controller
+    const signal = controller.signal
+
     console.log("🔄 [AUTH-CONTEXT] Checking authentication...")
     try {
       const response = await fetch("/api/auth/me", {
         credentials: "include",
-        cache: 'no-cache' // Added to ensure fresh data
+        cache: "no-cache",
+        signal,
       })
 
       if (response.ok) {
@@ -61,7 +68,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Expect direct user object or nested user object with a 'value' property
         const userData = data.user?.value || data.user
 
-        if (userData && typeof userData === 'object' && userData.id) {
+        if (userData && typeof userData === "object" && userData.id) {
           console.log("✅ [AUTH-CONTEXT] User authenticated:", userData.id, userData.email)
           setUser(userData)
           setIsAuthenticated(true) // Update isAuthenticated state
@@ -77,8 +84,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null)
         setIsAuthenticated(false) // Update isAuthenticated state
       }
-    } catch (error: any) {
-      console.error("❌ [AUTH-CONTEXT] Auth check error:", error.message)
+    } catch (error: unknown) {
+      const err = error as { name?: string; message?: string }
+      if (err?.name === "AbortError") {
+        console.log("🔄 [AUTH-CONTEXT] Auth check cancelled (login or newer check)")
+        return
+      }
+      console.error("❌ [AUTH-CONTEXT] Auth check error:", err?.message)
       setUser(null)
       setIsAuthenticated(false) // Update isAuthenticated state
     } finally {
@@ -106,6 +118,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const login = async (email: string, password: string) => {
     try {
       console.log("🔄 [AUTH-CONTEXT] Starting login for:", email)
+
+      // Drop any in-flight session check — it used the pre-login cookies and would 401 after success
+      authCheckAbortRef.current?.abort()
 
       // Clear any existing auth state before attempting login
       setUser(null)
@@ -157,7 +172,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (requiresVerification && email) {
           router.push(`/verification-pending?email=${encodeURIComponent(email)}`)
         }
-        
+
+        await checkAuth()
         return { success: false, message: errorMessage }
       }
 
@@ -174,6 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (!result.success) {
         console.error("❌ [AUTH-CONTEXT] Login error:", result.message)
+        await checkAuth()
         return { success: false, message: result.message || "Login failed" }
       }
 
@@ -190,13 +207,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(result.user)
       setIsAuthenticated(true)
 
-      // Redirect to dashboard
-      router.push("/dashboard")
+      // Replace avoids stacking /login → /dashboard so Back does not re-trigger loops
+      router.replace("/dashboard")
 
       return { success: true, message: result.message || "Login successful" }
     } catch (error: any) {
       console.error("❌ [AUTH-CONTEXT] Unexpected login error:", error)
       const errorMessage = error.message || "An unexpected error occurred. Please check your network connection and try again."
+      await checkAuth()
       return { success: false, message: errorMessage }
     }
   }
@@ -204,6 +222,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signup = async (data: SignupData) => {
     try {
       console.log("🔄 [AUTH-CONTEXT] Starting signup for:", data.email)
+
+      authCheckAbortRef.current?.abort()
 
       const response = await fetch("/api/auth/signup", {
         method: "POST",
@@ -245,7 +265,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     try {
       console.log("🚪 [AUTH-CONTEXT] Starting logout process...")
-      
+
+      authCheckAbortRef.current?.abort()
+
       // Clear localStorage token first
       localStorage.removeItem('auth-token')
       console.log("✅ [AUTH-CONTEXT] Token cleared from localStorage")
