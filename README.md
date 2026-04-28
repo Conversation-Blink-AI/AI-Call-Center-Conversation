@@ -29,6 +29,32 @@ Continue building your app on:
 3. Changes are automatically pushed to this repository
 4. Vercel deploys the latest version from this repository
 
+## Environment variables
+
+In addition to the existing keys (database URL, `BLAND_AI_API_KEY` used elsewhere
+for calls + pathway create, etc.), the local Knowledge Base feature requires:
+
+- **`OPENROUTER_API_KEY`** *(required)* — used to distill ingested content into
+  a compact pathway snippet and to power the "Test" chat dialog on each KB.
+  Get one from <https://openrouter.ai>.
+- **`OPENROUTER_KB_MODEL`** *(optional)* — model slug used for both distillation
+  and the Test chat. Defaults to `openai/gpt-4o-mini`. Any OpenRouter model
+  with `chat/completions` support works (e.g. `anthropic/claude-3.5-sonnet`,
+  `google/gemini-1.5-flash`).
+- **`OPENROUTER_HTTP_REFERER`** *(optional)* — overrides the `HTTP-Referer`
+  header sent to OpenRouter (used for usage attribution on their side).
+
+### Knowledge Base database migration
+
+Existing installs need to allow the locally-managed KB schema:
+
+```
+psql "$DATABASE_URL" -f scripts/alter-knowledge-bases-add-deleted-status.sql
+psql "$DATABASE_URL" -f scripts/alter-knowledge-bases-local-ingest.sql
+```
+
+Fresh installs can run `scripts/create-knowledge-bases-table.sql` instead.
+
 ## Development-only flags
 
 - **`ALLOW_UNAUTH_PATHWAY_GENERATION`** (implemented in `app/api/generate-pathway/route.ts`):

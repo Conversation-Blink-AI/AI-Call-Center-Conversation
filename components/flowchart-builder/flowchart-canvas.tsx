@@ -23,6 +23,7 @@ import { EndCallNode } from './nodes/end-call-node'
 import { TransferNode } from './nodes/transfer-node'
 import { WebhookNode } from './nodes/webhook-node'
 import { FacebookPixelNode } from './nodes/facebook-pixel-node'
+import { KnowledgeBaseNode } from './nodes/knowledge-base-node'
 import { NodeEditorDrawer } from './node-editor-drawer'
 import { CustomEdge } from './edges/custom-edge'
 import { EdgeEditorDrawer } from './edge-editor-drawer'
@@ -86,10 +87,12 @@ export function FlowchartCanvas({
       customerResponseNode: (props: any) => <CustomerResponseNode {...props} />,
       webhookNode: (props: any) => <WebhookNode {...props} />,
       facebookPixelNode: (props: any) => <FacebookPixelNode {...props} />,
+      knowledgeBaseNode: (props: any) => <KnowledgeBaseNode {...props} />,
       transferNode: (props: any) => <TransferNode {...props} />,
       endCallNode: (props: any) => <EndCallNode {...props} />,
       Default: (props: any) => <CustomerResponseNode {...props} />,
       'End Call': (props: any) => <EndCallNode {...props} />,
+      'Knowledge Base': (props: any) => <KnowledgeBaseNode {...props} />,
     }),
     [],
   )
@@ -228,7 +231,12 @@ export function FlowchartCanvas({
       })
 
       const newNode: Node = {
-        id: type === 'greetingNode' ? '1' : `${type}_${Date.now()}`,
+        id:
+          type === 'greetingNode'
+            ? '1'
+            : type === 'knowledgeBaseNode'
+              ? `randomnode_${Date.now()}`
+              : `${type}_${Date.now()}`,
         type: type === 'endCallNode' ? 'End Call' : type,
         position,
         data: getDefaultNodeData(type),
@@ -419,6 +427,14 @@ export function FlowchartCanvas({
           actionSource: 'phone_call',
           eventData: {},
         }
+      case 'knowledgeBaseNode':
+        return {
+          name: 'Knowledge Base',
+          prompt: 'Answer any questions the user may have by referring to the knowledge base.',
+          kb: '',
+          kbId: '',
+          kbName: '',
+        }
       default:
         return { name: 'Unknown Node' }
     }
@@ -500,9 +516,15 @@ export function FlowchartCanvas({
               wrapperRef={reactFlowWrapper}
               onEdit={() => {
                 // Normalize node type to ensure editor drawer recognizes it
+                const normalizedType =
+                  currentNode.type === 'Webhook'
+                    ? 'webhookNode'
+                    : currentNode.type === 'Knowledge Base'
+                      ? 'knowledgeBaseNode'
+                      : currentNode.type
                 const normalizedNode = {
                   ...currentNode,
-                  type: currentNode.type === 'Webhook' ? 'webhookNode' : currentNode.type
+                  type: normalizedType,
                 }
                 setSelectedNode(normalizedNode)
                 setIsEditorOpen(true)

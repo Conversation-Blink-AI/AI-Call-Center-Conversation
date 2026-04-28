@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Trash2, Send, Lock, FileText, Code, HelpCircle } from 'lucide-react'
+import { Plus, Trash2, Send, Lock, FileText, Code, HelpCircle, RefreshCw, Loader2 } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 
@@ -37,6 +37,22 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
   }>>([]);
   const [metaConfigsLoading, setMetaConfigsLoading] = React.useState(false);
   const [metaConfigsError, setMetaConfigsError] = React.useState<string>('');
+
+  // Knowledge base selection state (used by Knowledge Base node)
+  const [knowledgeBases, setKnowledgeBases] = React.useState<Array<{
+    id: string
+    bland_kb_id: string | null
+    name: string
+    description: string | null
+    status: string
+    type: string
+    kb_text: string | null
+  }>>([]);
+  const [knowledgeBasesLoading, setKnowledgeBasesLoading] = React.useState(false);
+  const [knowledgeBasesError, setKnowledgeBasesError] = React.useState<string>('');
+  const [kbResyncLoading, setKbResyncLoading] = React.useState(false);
+  const [kbResyncError, setKbResyncError] = React.useState<string>('');
+  const [kbResyncNotice, setKbResyncNotice] = React.useState<string>('');
   
   // Static text toggle state for question nodes
   const [useStaticText, setUseStaticText] = React.useState(true);
@@ -76,6 +92,28 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
     }
 
     loadMetaConfigs()
+  }, [selectedNode?.id, selectedNode?.type])
+
+  React.useEffect(() => {
+    const loadKnowledgeBases = async () => {
+      if (!selectedNode || selectedNode.type !== 'knowledgeBaseNode') return
+      setKnowledgeBasesLoading(true)
+      setKnowledgeBasesError('')
+      try {
+        const response = await fetch('/api/knowledge-bases', { cache: 'no-store', credentials: 'include' })
+        const result = await response.json()
+        if (!response.ok) {
+          throw new Error(result?.error || 'Failed to load knowledge bases')
+        }
+        setKnowledgeBases(result.knowledgeBases || [])
+      } catch (error: any) {
+        setKnowledgeBasesError(error?.message || 'Failed to load knowledge bases')
+      } finally {
+        setKnowledgeBasesLoading(false)
+      }
+    }
+
+    loadKnowledgeBases()
   }, [selectedNode?.id, selectedNode?.type])
 
   // Normalize headers to array format for webhook nodes when node is selected
@@ -122,6 +160,63 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
       }
     }
     onUpdateNode(selectedNode.id, updates)
+  }
+
+  const handleKnowledgeBaseSelect = (kbRowId: string) => {
+    const selectedKb = knowledgeBases.find((kb) => kb.id === kbRowId)
+    setKbResyncError('')
+    setKbResyncNotice('')
+    const updates = {
+      data: {
+        ...selectedNode.data,
+        kbId: kbRowId,
+        kbName: selectedKb?.name || '',
+        kb: selectedKb?.kb_text || '',
+      },
+    }
+    onUpdateNode(selectedNode.id, updates)
+  }
+
+  const handleResyncKnowledgeBase = async () => {
+    const kbRowId = selectedNode?.data?.kbId
+    if (!kbRowId) return
+    setKbResyncLoading(true)
+    setKbResyncError('')
+    setKbResyncNotice('')
+    try {
+      const response = await fetch(`/api/knowledge-bases/${kbRowId}`, {
+        cache: 'no-store',
+        credentials: 'include',
+      })
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(result?.error || 'Failed to load knowledge base')
+      }
+      const kb = result.knowledgeBase as {
+        id: string
+        name: string
+        kb_text: string | null
+      } | null
+      if (!kb) throw new Error('Knowledge base not found')
+
+      setKnowledgeBases((current) =>
+        current.map((item) =>
+          item.id === kb.id ? { ...item, name: kb.name, kb_text: kb.kb_text } : item
+        )
+      )
+      onUpdateNode(selectedNode.id, {
+        data: {
+          ...selectedNode.data,
+          kbName: kb.name,
+          kb: kb.kb_text || '',
+        },
+      })
+      setKbResyncNotice('Pulled latest snippet from KB.')
+    } catch (error: any) {
+      setKbResyncError(error?.message || 'Failed to sync')
+    } finally {
+      setKbResyncLoading(false)
+    }
   }
 
   const handleMetaConfigSelect = (configId: string) => {
@@ -884,6 +979,105 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
 
             {/* Extract Variables */}
             {renderExtractVars()}
+          </div>
+        )
+
+      case 'knowledgeBaseNode':
+      case 'Knowledge Base':
+        return (
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="name">Node Name</Label>
+              <Input
+                id="name"
+                value={selectedNode.data.name || ''}
+                onChange={(e) => handleFieldChange('name', e.target.value)}
+                placeholder="e.g., Restaurant Questions"
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="knowledgeBase">Knowledge Base *</Label>
+                {selectedNode.data.kbId ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => void handleResyncKnowledgeBase()}
+                    disabled={kbResyncLoading}
+                  >
+                    {kbResyncLoading ? (
+                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                    ) : (
+                      <RefreshCw className="mr-1 h-3 w-3" />
+                    )}
+                    Re-sync from KB
+                  </Button>
+                ) : null}
+              </div>
+              <Select
+                value={selectedNode.data.kbId || ''}
+                onValueChange={(value) => handleKnowledgeBaseSelect(value)}
+              >
+                <SelectTrigger id="knowledgeBase">
+                  <SelectValue
+                    placeholder={
+                      knowledgeBasesLoading
+                        ? 'Loading knowledge bases...'
+                        : knowledgeBases.length === 0
+                          ? 'No knowledge bases available'
+                          : 'Select a knowledge base'
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {knowledgeBases.map((kb) => (
+                    <SelectItem key={kb.id} value={kb.id}>
+                      {kb.name} {kb.status !== 'COMPLETED' ? `(${kb.status})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {knowledgeBasesError ? (
+                <p className="text-xs text-destructive mt-1">{knowledgeBasesError}</p>
+              ) : kbResyncError ? (
+                <p className="text-xs text-destructive mt-1">{kbResyncError}</p>
+              ) : kbResyncNotice ? (
+                <p className="text-xs text-emerald-600 mt-1">{kbResyncNotice}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Manage knowledge bases in the Knowledge Base section of the dashboard.
+                </p>
+              )}
+            </div>
+
+            <div>
+              <Label htmlFor="kb">Knowledge Base Content</Label>
+              <AutoResizeTextarea
+                id="kb"
+                value={selectedNode.data.kb || ''}
+                onChange={(e) => handleFieldChange('kb', e.target.value)}
+                placeholder={'Opening Hours : 9am - 5pm\nStore Locations : 426 Ivy Street...'}
+                minHeight={96}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Auto-filled with the distilled snippet from the selected knowledge base. Edit freely to tweak
+                what gets sent to the pathway as <code className="font-mono">kb</code>.
+              </p>
+            </div>
+
+            <div>
+              <Label htmlFor="prompt">Prompt</Label>
+              <AutoResizeTextarea
+                id="prompt"
+                value={selectedNode.data.prompt || ''}
+                onChange={(e) => handleFieldChange('prompt', e.target.value)}
+                placeholder="Answer any questions the user may have by referring to the knowledge base..."
+                minHeight={96}
+              />
+            </div>
           </div>
         )
 
