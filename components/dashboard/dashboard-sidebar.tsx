@@ -9,6 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import {
   Home,
   BarChart3,
+  BookOpen,
   Phone,
   Users,
   CreditCard,
@@ -27,6 +28,7 @@ import { useAuth } from "@/contexts/auth-context"
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: Home },
   { name: "My Pathway", href: "/dashboard/pathway", icon: Workflow },
+  { name: "Knowledge Base", href: "/dashboard/knowledgebase", icon: BookOpen },
   { name: "Analytics", href: "/dashboard/calls", icon: BarChart3 },
   { name: "Send Call", href: "/dashboard/sendcall", icon: Phone },
   { name: "Voices", href: "/dashboard/voices", icon: Mic },

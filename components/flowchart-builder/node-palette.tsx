@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { MessageCircle, HelpCircle, MessageSquare, PhoneOff, PhoneForwarded, Globe, Facebook, ChevronLeft, ChevronRight } from 'lucide-react'
+import { MessageCircle, HelpCircle, MessageSquare, PhoneOff, PhoneForwarded, Globe, Facebook, BookOpen, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 const nodeTypes = [
@@ -32,6 +32,13 @@ const nodeTypes = [
     icon: Globe,
     color: 'bg-gradient-to-br from-orange-100 via-orange-50 to-orange-100 dark:from-orange-800 dark:via-orange-700 dark:to-orange-800 text-orange-800 dark:text-orange-100 border-orange-300 dark:border-orange-700',
     description: 'API integration'
+  },
+  {
+    type: 'knowledgeBaseNode',
+    label: 'Knowledge Base',
+    icon: BookOpen,
+    color: 'bg-gradient-to-br from-indigo-100 via-indigo-50 to-indigo-100 dark:from-indigo-800 dark:via-indigo-700 dark:to-indigo-800 text-indigo-800 dark:text-indigo-100 border-indigo-300 dark:border-indigo-700',
+    description: 'Attach KB context'
   },
   {
     type: 'facebookPixelNode',

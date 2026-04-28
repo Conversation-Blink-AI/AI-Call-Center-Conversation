@@ -48,15 +48,6 @@ export function RecentFlows() {
     loadFlows()
   }, [user?.id, user?.email])
 
-  const handleEditFlow = (pathway: any) => {
-    if (pathway.phone_number) {
-      const cleanNumber = pathway.phone_number.replace(/\D/g, "")
-      router.push(`/dashboard/call-flows/editor?phone=${cleanNumber}&pathwayId=${pathway.id}&source=pathway`)
-    } else {
-      router.push(`/dashboard/call-flows/editor?pathwayId=${pathway.id}&source=pathway`)
-    }
-  }
-
   if (loading) {
     return (
       <Card>
@@ -119,16 +110,11 @@ export function RecentFlows() {
       </CardHeader>
       <CardContent>
         {flows.map((flow) => (
-          <div key={flow.id} className="mb-4 flex items-center justify-between">
-            <div>
-              <h4 className="font-medium">{flow.name || "Untitled Flow"}</h4>
-              <p className="text-sm text-muted-foreground">
-                Last updated: {new Date(flow.updated_at).toLocaleDateString()}
-              </p>
-            </div>
-            <Button variant="outline" size="sm" onClick={() => handleEditFlow(flow)}>
-              Edit
-            </Button>
+          <div key={flow.id} className="mb-4">
+            <h4 className="font-medium">{flow.name || "Untitled Flow"}</h4>
+            <p className="text-sm text-muted-foreground">
+              Last updated: {new Date(flow.updated_at).toLocaleDateString()}
+            </p>
           </div>
         ))}
         <div className="mt-4 text-center">
