@@ -65,8 +65,11 @@ export function UpdatePathwayModal({ reactFlowData, pathwayId, phoneNumber }: Up
         if (response.ok) {
           const data = await response.json()
           if (data.success && data.pathway_id) {
-            // Auto-populate pathway ID
-            setManualPathwayId(data.pathway_id)
+            // Prefer ID from the pathway editor (already resolved like /pathway listing).
+            // Lookup must not overwrite with pathways.id — deploy/update needs Bland pathway ID.
+            if (!pathwayId?.trim()) {
+              setManualPathwayId(data.pathway_id)
+            }
             // Auto-populate name and description if available
             if (data.pathway_name && !name) {
               setName(data.pathway_name)
@@ -102,7 +105,7 @@ export function UpdatePathwayModal({ reactFlowData, pathwayId, phoneNumber }: Up
     }
 
     fetchPathwayForPhone()
-  }, [user?.id, isOpen, phoneNumber])
+  }, [user?.id, isOpen, phoneNumber, pathwayId])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

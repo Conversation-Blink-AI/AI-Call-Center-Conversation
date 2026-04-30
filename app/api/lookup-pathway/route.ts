@@ -49,6 +49,7 @@ export async function GET(request: NextRequest) {
           pn.phone_number,
           pn.pathwayid,
           p.id as pathway_id_from_phone,
+          p.bland_id as pathway_bland_id,
           p.name as pathway_name,
           p.description as pathway_description,
           p.updated_at as last_deployed_at
@@ -69,7 +70,12 @@ export async function GET(request: NextRequest) {
 
       const phoneData = result.rows[0]
 
-      const pathwayId = phoneData.pathway_id_from_phone || phoneData.pathwayid
+      // Same resolution as /api/user/phone-numbers: Bland pathway ID first (what runs on Bland),
+      // not the local pathways.id UUID — otherwise deploy/update hits the wrong pathway.
+      const pathwayId =
+        phoneData.pathwayid ||
+        phoneData.pathway_bland_id ||
+        phoneData.pathway_id_from_phone
 
       if (!pathwayId) {
         console.log(`[LOOKUP-PATHWAY] Phone number ${formattedPhone} has no pathway assigned`)
