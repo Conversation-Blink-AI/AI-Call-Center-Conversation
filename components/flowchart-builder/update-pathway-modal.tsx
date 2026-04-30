@@ -51,7 +51,7 @@ export function UpdatePathwayModal({ reactFlowData, pathwayId, phoneNumber }: Up
     }
   }, [showPreview])
 
-  // Auto-fetch pathway for phone number when modal opens
+  // Auto-fetch pathway for phone number when modal opens (fills ID only if parent did not pass one)
   useEffect(() => {
     const fetchPathwayForPhone = async () => {
       if (!user?.id || !isOpen || !phoneNumber) return
@@ -65,17 +65,15 @@ export function UpdatePathwayModal({ reactFlowData, pathwayId, phoneNumber }: Up
         if (response.ok) {
           const data = await response.json()
           if (data.success && data.pathway_id) {
-            // Prefer ID from the pathway editor (already resolved like /pathway listing).
-            // Lookup must not overwrite with pathways.id — deploy/update needs Bland pathway ID.
+            // Keep Selected Pathway ID in sync with dashboard when parent passes Bland id
             if (!pathwayId?.trim()) {
               setManualPathwayId(data.pathway_id)
             }
-            // Auto-populate name and description if available
-            if (data.pathway_name && !name) {
-              setName(data.pathway_name)
+            if (data.pathway_name) {
+              setName((n) => n || data.pathway_name)
             }
-            if (data.pathway_description && !description) {
-              setDescription(data.pathway_description)
+            if (data.pathway_description) {
+              setDescription((d) => d || data.pathway_description)
             }
           } else {
             toast({

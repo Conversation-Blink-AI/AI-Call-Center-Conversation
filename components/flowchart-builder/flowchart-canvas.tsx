@@ -97,6 +97,10 @@ export function FlowchartCanvas({
     [],
   )
 
+  /** Postgres `pathways.id` — required for save-flowchart */
+  const dbPathwayId =
+    pathwayInfo?.local_pathway_id ?? pathwayInfo?.pathway_id ?? undefined
+
   useEffect(() => {
     if (isLoadingFlowchart) return
 
@@ -107,15 +111,20 @@ export function FlowchartCanvas({
     }
 
     const loadSavedFlowchart = async () => {
-      if (!pathwayInfo?.pathway_id && !phoneNumber) return
+      const localId = pathwayInfo?.local_pathway_id
+      const fallbackId = pathwayInfo?.pathway_id
+      if (!localId && !fallbackId && !phoneNumber) return
 
       setIsLoadingFlowchart(true)
       try {
         let apiUrl = ''
-        if (pathwayInfo?.pathway_id) {
-          apiUrl = `/api/pathways/load-flowchart?pathwayId=${pathwayInfo.pathway_id}`
+        if (localId) {
+          apiUrl = `/api/pathways/load-flowchart?pathwayId=${encodeURIComponent(localId)}`
         } else if (phoneNumber) {
+          // Bland id in pathway_id without a local row — load via phone join
           apiUrl = `/api/pathways/load-flowchart?phoneNumber=${encodeURIComponent(phoneNumber)}`
+        } else if (fallbackId) {
+          apiUrl = `/api/pathways/load-flowchart?pathwayId=${encodeURIComponent(fallbackId)}`
         }
 
         const response = await fetch(apiUrl, { credentials: 'include' })
@@ -139,7 +148,7 @@ export function FlowchartCanvas({
     }
 
     loadSavedFlowchart()
-  }, [pathwayInfo?.pathway_id, phoneNumber])
+  }, [pathwayInfo?.local_pathway_id, pathwayInfo?.pathway_id, phoneNumber])
 
   const onConnect = useCallback(
     (params: Connection) => {
@@ -453,8 +462,12 @@ export function FlowchartCanvas({
         )}
 
         <div className="absolute top-4 right-4 z-10 flex gap-2">
-          <SavePathwayModal reactFlowData={{ nodes, edges }} pathwayId={pathwayInfo?.pathway_id} />
-          <UpdatePathwayModal reactFlowData={{ nodes, edges }} pathwayId={pathwayInfo?.pathway_id} phoneNumber={phoneNumber} />
+          <SavePathwayModal reactFlowData={{ nodes, edges }} pathwayId={dbPathwayId} />
+          <UpdatePathwayModal
+            reactFlowData={{ nodes, edges }}
+            pathwayId={pathwayInfo?.pathway_id ?? undefined}
+            phoneNumber={phoneNumber}
+          />
         </div>
 
         <ReactFlow
