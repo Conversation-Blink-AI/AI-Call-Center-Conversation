@@ -46,7 +46,8 @@ export async function GET(request: Request) {
           pn.status,
           pn.assigned_to,
           pn.pathwayid,
-          p.id as pathway_id_from_phone,
+          p.id as local_pathway_id,
+          p.bland_id as pathway_bland_id,
           p.name as pathway_name,
           p.description as pathway_description
          FROM phone_numbers pn
@@ -61,21 +62,32 @@ export async function GET(request: Request) {
         console.log("📊 [USER-PHONE-NUMBERS] Sample row:", JSON.stringify(result.rows[0], null, 2))
       }
 
-      const phoneNumbers = result.rows.map(row => ({
-        id: row.id,
-        number: row.number.trim(), // Clean any whitespace
-        status: row.status || 'Active',
-        location: row.location || 'Unknown',
-        type: row.type || 'Local',
-        created_at: row.created_at,
-        purchased_at: row.created_at,
-        user_id: row.user_id,
-        monthly_fee: parseFloat(row.monthly_fee) || 1.50,
-        assigned_to: row.assigned_to || 'Unassigned',
-        pathway_id: row.pathway_id_from_phone || row.pathwayid || null,
-        pathway_name: row.pathway_name || null,
-        pathway_description: row.pathway_description || null
-      }))
+      const phoneNumbers = result.rows.map(row => {
+        // The user-facing "Pathway ID" should be the Bland AI pathway id, since
+        // that's what's used to actually run calls and what's shown in the
+        // phone_numbers.pathwayid column. Prefer the value cached on the phone
+        // row, then fall back to pathways.bland_id.
+        const blandPathwayId = row.pathwayid || row.pathway_bland_id || null
+        const hasPathway = Boolean(row.local_pathway_id || row.pathway_name)
+
+        return {
+          id: row.id,
+          number: row.number.trim(), // Clean any whitespace
+          status: row.status || 'Active',
+          location: row.location || 'Unknown',
+          type: row.type || 'Local',
+          created_at: row.created_at,
+          purchased_at: row.created_at,
+          user_id: row.user_id,
+          monthly_fee: parseFloat(row.monthly_fee) || 1.50,
+          assigned_to: row.assigned_to || 'Unassigned',
+          pathway_id: blandPathwayId,
+          local_pathway_id: row.local_pathway_id || null,
+          has_pathway: hasPathway,
+          pathway_name: row.pathway_name || null,
+          pathway_description: row.pathway_description || null
+        }
+      })
 
       console.log("✅ [USER-PHONE-NUMBERS] Fetched from PostgreSQL:", phoneNumbers.length, "numbers for user", userId)
 
