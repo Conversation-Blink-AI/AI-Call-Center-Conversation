@@ -32,6 +32,8 @@ interface PhoneNumber {
   created_at: string
   user_id: string
   pathway_id?: string | null
+  local_pathway_id?: string | null
+  has_pathway?: boolean
   pathway_name?: string | null
   pathway_description?: string | null
 }
@@ -278,7 +280,7 @@ export default function PathwayListingPage() {
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {phoneNumbers.map((phone) => {
-            const hasPathway = phone.pathway_id
+            const hasPathway = phone.has_pathway || Boolean(phone.pathway_name) || Boolean(phone.pathway_id)
             const isDeactive = isDeactiveStatus(phone.status)
 
             return (
@@ -335,29 +337,35 @@ export default function PathwayListingPage() {
                             </p>
                           )}
                           
-                          <div className="bg-muted rounded-lg p-3 border">
-                            <div className="flex items-center justify-between gap-2">
-                              <div className="flex-1 min-w-0">
-                                <p className="text-xs text-muted-foreground mb-1">Pathway ID</p>
-                                <p className="text-sm font-mono text-foreground break-all">
-                                  {phone.pathway_id}
-                                </p>
+                          {phone.pathway_id ? (
+                            <div className="bg-muted rounded-lg p-3 border">
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs text-muted-foreground mb-1">Pathway ID</p>
+                                  <p className="text-sm font-mono text-foreground break-all">
+                                    {phone.pathway_id}
+                                  </p>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 flex-shrink-0 relative"
+                                  onClick={() => copyPathwayId(phone.pathway_id!)}
+                                  title={copiedId === phone.pathway_id ? "Copied!" : "Copy Pathway ID"}
+                                >
+                                  {copiedId === phone.pathway_id ? (
+                                    <span className="text-xs font-medium text-green-600">✓</span>
+                                  ) : (
+                                    <Copy className="h-4 w-4" />
+                                  )}
+                                </Button>
                               </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 w-8 p-0 flex-shrink-0 relative"
-                                onClick={() => copyPathwayId(phone.pathway_id!)}
-                                title={copiedId === phone.pathway_id ? "Copied!" : "Copy Pathway ID"}
-                              >
-                                {copiedId === phone.pathway_id ? (
-                                  <span className="text-xs font-medium text-green-600">✓</span>
-                                ) : (
-                                  <Copy className="h-4 w-4" />
-                                )}
-                              </Button>
                             </div>
-                          </div>
+                          ) : (
+                            <p className="text-xs text-muted-foreground italic">
+                              Bland AI pathway ID not yet linked for this number.
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>
