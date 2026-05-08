@@ -84,6 +84,47 @@ export default function PublicApiDocumentationPage() {
       });
   };
 
+  const handleTestGetPlans = () => {
+    const platform = (document.getElementById('plans-platform') as HTMLInputElement).value.trim();
+    const planId = (document.getElementById('plans-planid') as HTMLInputElement).value.trim();
+    const resultDiv = document.getElementById('plans-result');
+
+    if (resultDiv) resultDiv.innerHTML = '<div style="color: #3b82f6; padding: 15px; background: #f0f9ff; border: 1px solid #7dd3fc; border-radius: 8px;">🔄 Testing API...</div>';
+
+    const params = new URLSearchParams();
+    if (platform) params.append('platform', platform);
+    if (planId) params.append('planId', planId);
+    const qs = params.toString();
+    const url = `/api/Public_api/getPlans${qs ? `?${qs}` : ''}`;
+
+    fetch(url)
+      .then(response => response.json().then(data => ({ data, status: response.status })))
+      .then(({ data, status }) => {
+        if (resultDiv) {
+          const statusColor = status >= 200 && status < 300 ? '#10b981' : '#ef4444';
+          resultDiv.innerHTML = `
+            <div style="padding: 15px; background: #f0f9ff; border: 1px solid #7dd3fc; border-radius: 8px;">
+              <h4 style="margin: 0 0 10px 0; color: #1e40af;">
+                API Response
+                <span style="background: ${statusColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; margin-left: 8px;">HTTP ${status}</span>
+              </h4>
+              <p style="margin: 0 0 10px 0; font-size: 13px; color: #475569;"><strong>URL:</strong> <code>${url}</code></p>
+              <pre style="background: #1e293b; color: #f8fafc; padding: 15px; border-radius: 6px; overflow-x: auto; font-size: 14px; margin: 0; max-height: 600px;">${JSON.stringify(data, null, 2)}</pre>
+            </div>
+          `;
+        }
+      })
+      .catch(error => {
+        if (resultDiv) {
+          resultDiv.innerHTML = `
+            <div style="color: #ef4444; padding: 15px; background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px;">
+              <strong>Error:</strong> ${error.message}
+            </div>
+          `;
+        }
+      });
+  };
+
   const handleMouseOver = (e: React.MouseEvent<HTMLButtonElement>) => {
     (e.target as HTMLButtonElement).style.backgroundColor = '#2563eb';
   };
@@ -266,6 +307,14 @@ export default function PublicApiDocumentationPage() {
             <p>
               Retrieve call history from the <code>call_logs</code> table with pagination. <strong>Email alone is not accepted.</strong> You must call{' '}
               <code>getPurchaseNumber</code> first, then pass <strong>email</strong>, <strong>userId</strong> (from that response), and <strong>phoneNumber</strong> (the purchased <code>number</code> from <code>phoneNumbers</code>) so the server can verify they all belong together.
+            </p>
+          </div>
+
+          <div className="endpoint-info">
+            <h2>getPlans Endpoint</h2>
+            <p><span className="method">GET</span> <span className="url">/Public_api/getPlans</span></p>
+            <p>
+              Returns the full plan and pricing catalogue for the Call Center platform: wallet top-up tiers (<code>plans</code>), per-usage rates (<code>usagePricing</code>) for AI calls and phone numbers, supported payment providers, and product URLs. Optional query params: <code>platform</code> (currently only <code>callCenter</code>) and <code>planId</code> to fetch a single plan.
             </p>
           </div>
 
@@ -945,6 +994,141 @@ getCallHistory("user@example.com", "uuid-from-purchase", "+1234567890").then(cal
             </div>
 
             <div id="call-history-result" style={{marginTop: '20px'}}></div>
+          </div>
+
+          <div className="endpoint-info">
+            <h3>Try getPlans</h3>
+            <p>
+              Both fields are <strong>optional</strong>. Leave them blank to fetch the entire pricing catalogue, set <code>platform</code> to filter (only <code>callCenter</code> is supported today), or set <code>planId</code> to fetch one plan.
+            </p>
+
+            <div style={{marginTop: '20px'}}>
+              <label htmlFor="plans-platform" style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>platform (optional):</label>
+              <input
+                type="text"
+                id="plans-platform"
+                placeholder="callCenter (leave blank for all)"
+                style={{
+                  width: '100%',
+                  maxWidth: '400px',
+                  padding: '12px',
+                  border: '2px solid #cbd5e1',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  marginBottom: '15px'
+                }}
+              />
+              <label htmlFor="plans-planid" style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>planId (optional):</label>
+              <input
+                type="text"
+                id="plans-planid"
+                placeholder="starter | growth | pro | scale"
+                style={{
+                  width: '100%',
+                  maxWidth: '400px',
+                  padding: '12px',
+                  border: '2px solid #cbd5e1',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  marginBottom: '15px'
+                }}
+              />
+              <div style={{display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '15px'}}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    (document.getElementById('plans-platform') as HTMLInputElement).value = '';
+                    (document.getElementById('plans-planid') as HTMLInputElement).value = '';
+                  }}
+                  style={{
+                    background: '#f1f5f9',
+                    color: '#475569',
+                    border: '1px solid #cbd5e1',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Clear
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    (document.getElementById('plans-platform') as HTMLInputElement).value = 'callCenter';
+                    (document.getElementById('plans-planid') as HTMLInputElement).value = '';
+                  }}
+                  style={{
+                    background: '#f1f5f9',
+                    color: '#475569',
+                    border: '1px solid #cbd5e1',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Preset: callCenter
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    (document.getElementById('plans-platform') as HTMLInputElement).value = '';
+                    (document.getElementById('plans-planid') as HTMLInputElement).value = 'growth';
+                  }}
+                  style={{
+                    background: '#f1f5f9',
+                    color: '#475569',
+                    border: '1px solid #cbd5e1',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Preset: planId=growth
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    (document.getElementById('plans-platform') as HTMLInputElement).value = 'lander';
+                    (document.getElementById('plans-planid') as HTMLInputElement).value = '';
+                  }}
+                  style={{
+                    background: '#fef2f2',
+                    color: '#b91c1c',
+                    border: '1px solid #fca5a5',
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    fontSize: '13px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Preset: 404 (unknown platform)
+                </button>
+              </div>
+              <button
+                id="plans-test-btn"
+                onClick={handleTestGetPlans}
+                style={{
+                  background: '#3b82f6',
+                  color: 'white',
+                  border: 'none',
+                  padding: '12px 24px',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s'
+                }}
+                onMouseOver={handleMouseOver}
+                onMouseOut={handleMouseOut}
+              >
+                Test getPlans
+              </button>
+            </div>
+
+            <div id="plans-result" style={{marginTop: '20px'}}></div>
           </div>
 
           <h2>🆘 Support</h2>

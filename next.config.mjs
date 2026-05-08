@@ -26,6 +26,14 @@ const nextConfig = {
       },
     ]
   },
+  async rewrites() {
+    return [
+      {
+        source: '/Public_api/:path*',
+        destination: '/api/Public_api/:path*',
+      },
+    ]
+  },
 }
 
 export default nextConfig
