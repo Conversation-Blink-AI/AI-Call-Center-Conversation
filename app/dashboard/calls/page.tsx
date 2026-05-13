@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, Fragment, useMemo } from "react"
+import { useState, useEffect, Fragment } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -75,13 +75,6 @@ interface DatabaseCall {
   phone_number_detail?: string
 }
 
-interface PhoneNumberItem {
-  id: string
-  number: string
-  location?: string
-  status?: string
-}
-
 interface MetaCapiEvent {
   id: string
   call_id: string
@@ -133,19 +126,6 @@ export default function CallsPage() {
   const [expandedCallId, setExpandedCallId] = useState<string | null>(null)
   const [metaCapiLogs, setMetaCapiLogs] = useState<Record<string, MetaCapiState>>({})
   const [showMetaCapiPanel, setShowMetaCapiPanel] = useState(false)
-  const [metaPhoneNumbers, setMetaPhoneNumbers] = useState<PhoneNumberItem[]>([])
-  const [selectedMetaNumber, setSelectedMetaNumber] = useState<string>("")
-  const [metaAnalyticsLoading, setMetaAnalyticsLoading] = useState(false)
-  const [metaAnalyticsError, setMetaAnalyticsError] = useState<string | null>(null)
-  const [metaAnalyticsSeries, setMetaAnalyticsSeries] = useState<Array<{
-    day: string
-    config_id: string
-    count: number
-  }>>([])
-  const [metaAnalyticsConfigs, setMetaAnalyticsConfigs] = useState<Array<{
-    id: string
-    nickname: string
-  }>>([])
 
   // Wallet balance state
   const [walletBalance, setWalletBalance] = useState<string>("$0.00")
@@ -255,65 +235,6 @@ export default function CallsPage() {
     setExpandedCallId(nextExpanded)
     if (nextExpanded && !metaCapiLogs[callId]) {
       fetchMetaCapiEvents(callId)
-    }
-  }
-
-  const fetchMetaPhoneNumbers = async () => {
-    try {
-      const response = await fetch("/api/user/phone-numbers", {
-        credentials: "include"
-      })
-      const result = await response.json()
-      if (!response.ok || !result.success) {
-        throw new Error(result?.message || "Failed to load phone numbers")
-      }
-      const numbers = result.phoneNumbers || []
-      setMetaPhoneNumbers(numbers)
-      if (!selectedMetaNumber && numbers.length > 0) {
-        setSelectedMetaNumber(numbers[0].number)
-      }
-    } catch (fetchError: any) {
-      setMetaAnalyticsError(fetchError.message || "Failed to load phone numbers")
-    }
-  }
-
-  const getTimeframeRange = () => {
-    if (timeframe === "all") {
-      return { start: undefined, end: undefined }
-    }
-    const days = parseInt(timeframe.replace("d", ""), 10)
-    if (Number.isNaN(days)) {
-      return { start: undefined, end: undefined }
-    }
-    const now = new Date()
-    const start = new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
-    return { start: start.toISOString(), end: now.toISOString() }
-  }
-
-  const fetchMetaAnalytics = async (phoneNumber: string) => {
-    if (!phoneNumber) return
-    setMetaAnalyticsLoading(true)
-    setMetaAnalyticsError(null)
-    try {
-      const { start, end } = getTimeframeRange()
-      const params = new URLSearchParams({ phone_number: phoneNumber })
-      if (start) params.set("start", start)
-      if (end) params.set("end", end)
-      const response = await fetch(`/api/meta-capi/analytics?${params.toString()}`, {
-        credentials: "include"
-      })
-      const result = await response.json()
-      if (!response.ok) {
-        throw new Error(result?.error || "Failed to load Meta CAPI analytics")
-      }
-      setMetaAnalyticsSeries(result.series || [])
-      setMetaAnalyticsConfigs(result.configs || [])
-    } catch (fetchError: any) {
-      setMetaAnalyticsError(fetchError.message || "Failed to load Meta CAPI analytics")
-      setMetaAnalyticsSeries([])
-      setMetaAnalyticsConfigs([])
-    } finally {
-      setMetaAnalyticsLoading(false)
     }
   }
 
@@ -449,18 +370,6 @@ export default function CallsPage() {
     }
   }, [user?.id, timeframe, page]) // Added page dependency
 
-  useEffect(() => {
-    if (showMetaCapiPanel) {
-      if (metaPhoneNumbers.length === 0) {
-        fetchMetaPhoneNumbers()
-      }
-      if (selectedMetaNumber) {
-        fetchMetaAnalytics(selectedMetaNumber)
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [showMetaCapiPanel, selectedMetaNumber, timeframe])
-
 
   const formatDuration = (seconds: number) => {
     if (!seconds) return 'N/A'
@@ -510,50 +419,6 @@ export default function CallsPage() {
 
   const chartData = chartMetric === "qualified" ? qualifiedLeadsData : volumeData
   const chartTitle = chartMetric === "qualified" ? "Qualified Leads" : "Call Volume"
-
-  const metaChartConfig = useMemo(() => {
-    const config: Record<string, { label: string; color: string }> = {}
-    metaAnalyticsConfigs.forEach((item, index) => {
-      const key = `pixel_${index + 1}`
-      config[key] = {
-        label: item.nickname || `Pixel ${index + 1}`,
-        color: `hsl(var(--chart-${(index % 5) + 1}))`
-      }
-    })
-    return config
-  }, [metaAnalyticsConfigs])
-
-  const metaChartData = useMemo(() => {
-    if (metaAnalyticsSeries.length === 0) return []
-    const configKeyMap = new Map<string, string>()
-    metaAnalyticsConfigs.forEach((item, index) => {
-      configKeyMap.set(item.id, `pixel_${index + 1}`)
-    })
-
-    const dayMap = new Map<string, any>()
-    metaAnalyticsSeries.forEach((row) => {
-      const key = configKeyMap.get(row.config_id)
-      if (!key) return
-      if (!dayMap.has(row.day)) {
-        dayMap.set(row.day, {
-          date: row.day,
-          label: new Date(row.day).toLocaleDateString(undefined, { month: "short", day: "numeric" })
-        })
-      }
-      dayMap.get(row.day)[key] = row.count
-    })
-
-    const data = Array.from(dayMap.values()).sort((a, b) => a.date.localeCompare(b.date))
-    // Ensure missing keys are zeroed for consistent lines
-    data.forEach((item) => {
-      Object.keys(metaChartConfig).forEach((key) => {
-        if (item[key] === undefined) {
-          item[key] = 0
-        }
-      })
-    })
-    return data
-  }, [metaAnalyticsSeries, metaAnalyticsConfigs, metaChartConfig])
 
   if (loading) {
     return (
@@ -708,77 +573,6 @@ export default function CallsPage() {
             <CardDescription>Expand a call to view Meta response details.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex flex-wrap items-center gap-3">
-              <div className="min-w-[220px]">
-                <Select value={selectedMetaNumber} onValueChange={setSelectedMetaNumber}>
-                  <SelectTrigger className="h-8">
-                    <SelectValue placeholder="Select number" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {metaPhoneNumbers.map((number) => (
-                      <SelectItem key={number.id} value={number.number}>
-                        {number.number}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  if (selectedMetaNumber) {
-                    fetchMetaAnalytics(selectedMetaNumber)
-                  }
-                }}
-              >
-                Refresh Graph
-              </Button>
-            </div>
-
-            {metaAnalyticsError && (
-              <Alert variant="destructive">
-                <AlertDescription>{metaAnalyticsError}</AlertDescription>
-              </Alert>
-            )}
-
-            <div className="rounded-md border p-3">
-              {metaAnalyticsLoading ? (
-                <div className="text-xs text-muted-foreground">Loading Meta CAPI analytics...</div>
-              ) : metaChartData.length === 0 ? (
-                <div className="text-xs text-muted-foreground">No Meta CAPI events for this number yet.</div>
-              ) : (
-                <ChartContainer config={metaChartConfig} className="h-[180px] w-full aspect-auto">
-                  <LineChart data={metaChartData} margin={{ left: 0, right: 12, top: 8, bottom: 0 }}>
-                    <CartesianGrid vertical={false} strokeDasharray="3 3" />
-                    <XAxis
-                      dataKey="label"
-                      tickLine={false}
-                      axisLine={false}
-                      interval="preserveStartEnd"
-                    />
-                    <YAxis
-                      tickLine={false}
-                      axisLine={false}
-                      width={24}
-                      allowDecimals={false}
-                    />
-                    <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
-                    {Object.keys(metaChartConfig).map((key) => (
-                      <Line
-                        key={key}
-                        type="monotone"
-                        dataKey={key}
-                        stroke={`var(--color-${key})`}
-                        strokeWidth={2}
-                        dot={false}
-                      />
-                    ))}
-                  </LineChart>
-                </ChartContainer>
-              )}
-            </div>
-
             {calls.length === 0 && (
               <div className="text-sm text-muted-foreground">No calls available yet.</div>
             )}

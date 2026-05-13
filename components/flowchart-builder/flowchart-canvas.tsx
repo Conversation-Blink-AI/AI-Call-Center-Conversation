@@ -23,7 +23,6 @@ import { EndCallNode } from './nodes/end-call-node'
 import { TransferNode } from './nodes/transfer-node'
 import { WebhookNode } from './nodes/webhook-node'
 import { FacebookPixelNode } from './nodes/facebook-pixel-node'
-import { KnowledgeBaseNode } from './nodes/knowledge-base-node'
 import { NodeEditorDrawer } from './node-editor-drawer'
 import { CustomEdge } from './edges/custom-edge'
 import { EdgeEditorDrawer } from './edge-editor-drawer'
@@ -87,19 +86,13 @@ export function FlowchartCanvas({
       customerResponseNode: (props: any) => <CustomerResponseNode {...props} />,
       webhookNode: (props: any) => <WebhookNode {...props} />,
       facebookPixelNode: (props: any) => <FacebookPixelNode {...props} />,
-      knowledgeBaseNode: (props: any) => <KnowledgeBaseNode {...props} />,
       transferNode: (props: any) => <TransferNode {...props} />,
       endCallNode: (props: any) => <EndCallNode {...props} />,
       Default: (props: any) => <CustomerResponseNode {...props} />,
       'End Call': (props: any) => <EndCallNode {...props} />,
-      'Knowledge Base': (props: any) => <KnowledgeBaseNode {...props} />,
     }),
     [],
   )
-
-  /** Postgres `pathways.id` — required for save-flowchart */
-  const dbPathwayId =
-    pathwayInfo?.local_pathway_id ?? pathwayInfo?.pathway_id ?? undefined
 
   useEffect(() => {
     if (isLoadingFlowchart) return
@@ -111,20 +104,15 @@ export function FlowchartCanvas({
     }
 
     const loadSavedFlowchart = async () => {
-      const localId = pathwayInfo?.local_pathway_id
-      const fallbackId = pathwayInfo?.pathway_id
-      if (!localId && !fallbackId && !phoneNumber) return
+      if (!pathwayInfo?.pathway_id && !phoneNumber) return
 
       setIsLoadingFlowchart(true)
       try {
         let apiUrl = ''
-        if (localId) {
-          apiUrl = `/api/pathways/load-flowchart?pathwayId=${encodeURIComponent(localId)}`
+        if (pathwayInfo?.pathway_id) {
+          apiUrl = `/api/pathways/load-flowchart?pathwayId=${pathwayInfo.pathway_id}`
         } else if (phoneNumber) {
-          // Bland id in pathway_id without a local row — load via phone join
           apiUrl = `/api/pathways/load-flowchart?phoneNumber=${encodeURIComponent(phoneNumber)}`
-        } else if (fallbackId) {
-          apiUrl = `/api/pathways/load-flowchart?pathwayId=${encodeURIComponent(fallbackId)}`
         }
 
         const response = await fetch(apiUrl, { credentials: 'include' })
@@ -148,7 +136,7 @@ export function FlowchartCanvas({
     }
 
     loadSavedFlowchart()
-  }, [pathwayInfo?.local_pathway_id, pathwayInfo?.pathway_id, phoneNumber])
+  }, [pathwayInfo?.pathway_id, phoneNumber])
 
   const onConnect = useCallback(
     (params: Connection) => {
@@ -240,12 +228,7 @@ export function FlowchartCanvas({
       })
 
       const newNode: Node = {
-        id:
-          type === 'greetingNode'
-            ? '1'
-            : type === 'knowledgeBaseNode'
-              ? `randomnode_${Date.now()}`
-              : `${type}_${Date.now()}`,
+        id: type === 'greetingNode' ? '1' : `${type}_${Date.now()}`,
         type: type === 'endCallNode' ? 'End Call' : type,
         position,
         data: getDefaultNodeData(type),
@@ -436,14 +419,6 @@ export function FlowchartCanvas({
           actionSource: 'phone_call',
           eventData: {},
         }
-      case 'knowledgeBaseNode':
-        return {
-          name: 'Knowledge Base',
-          prompt: 'Answer any questions the user may have by referring to the knowledge base.',
-          kb: '',
-          kbId: '',
-          kbName: '',
-        }
       default:
         return { name: 'Unknown Node' }
     }
@@ -462,12 +437,8 @@ export function FlowchartCanvas({
         )}
 
         <div className="absolute top-4 right-4 z-10 flex gap-2">
-          <SavePathwayModal reactFlowData={{ nodes, edges }} pathwayId={dbPathwayId} />
-          <UpdatePathwayModal
-            reactFlowData={{ nodes, edges }}
-            pathwayId={pathwayInfo?.pathway_id ?? undefined}
-            phoneNumber={phoneNumber}
-          />
+          <SavePathwayModal reactFlowData={{ nodes, edges }} pathwayId={pathwayInfo?.pathway_id} />
+          <UpdatePathwayModal reactFlowData={{ nodes, edges }} pathwayId={pathwayInfo?.pathway_id} phoneNumber={phoneNumber} />
         </div>
 
         <ReactFlow
@@ -529,15 +500,9 @@ export function FlowchartCanvas({
               wrapperRef={reactFlowWrapper}
               onEdit={() => {
                 // Normalize node type to ensure editor drawer recognizes it
-                const normalizedType =
-                  currentNode.type === 'Webhook'
-                    ? 'webhookNode'
-                    : currentNode.type === 'Knowledge Base'
-                      ? 'knowledgeBaseNode'
-                      : currentNode.type
                 const normalizedNode = {
                   ...currentNode,
-                  type: normalizedType,
+                  type: currentNode.type === 'Webhook' ? 'webhookNode' : currentNode.type
                 }
                 setSelectedNode(normalizedNode)
                 setIsEditorOpen(true)

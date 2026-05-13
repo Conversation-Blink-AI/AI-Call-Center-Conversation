@@ -57,9 +57,7 @@ export function convertReactFlowToBland(reactFlowData: ReactFlowData): BlandFlow
       const bodyPayload: Record<string, string> = {
         call_id: '{{call_id}}',
         from: '{{from}}',
-        to: '{{to}}',
-        ip: '{{ip}}',
-        user_agent: '{{user_agent}}'
+        to: '{{to}}'
       }
       if (testEventCode) {
         bodyPayload.test_event_code = testEventCode
@@ -130,23 +128,6 @@ export function convertReactFlowToBland(reactFlowData: ReactFlowData): BlandFlow
       return nodeWithPosition
     }
     
-    // Special handling for Knowledge Base nodes.
-    // `data.kb` is the distilled snippet (kb_text) the agent will reference at
-    // runtime — NOT a Bland knowledge_base_id. Bland accepts inline text here.
-    if (node.type === 'knowledgeBaseNode') {
-      nodeWithPosition.type = 'Knowledge Base'
-      nodeWithPosition.data = {
-        name: cleanData.name || 'Knowledge Base',
-        prompt: cleanData.prompt || '',
-        kb: cleanData.kb || '',
-        // Preserve selection metadata so editor can rehydrate the dropdown
-        kbId: cleanData.kbId || '',
-        kbName: cleanData.kbName || '',
-        __reactFlowType: 'knowledgeBaseNode',
-      }
-      return nodeWithPosition
-    }
-
     // Special handling for End Call nodes
     if (node.type === 'endCallNode') {
       nodeWithPosition.type = 'End Call'
@@ -249,8 +230,7 @@ export function convertBlandToReactFlow(blandData: BlandFlowData): ReactFlowData
     'Webhook': 'webhookNode',
     'Transfer': 'transferNode',
     'Transfer Call': 'transferNode', // Handle both "Transfer" and "Transfer Call" for backward compatibility
-    'End Call': 'endCallNode',
-    'Knowledge Base': 'knowledgeBaseNode'
+    'End Call': 'endCallNode'
   }
   
   // Add UI properties to nodes

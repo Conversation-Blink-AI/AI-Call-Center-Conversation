@@ -6,10 +6,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { AutoResizeTextarea } from '@/components/ui/auto-resize-textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Trash2, Send, Lock, FileText, Code, HelpCircle, RefreshCw, Loader2 } from 'lucide-react'
+import { Plus, Trash2, Send, Lock, FileText, Code, HelpCircle } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
 
@@ -37,22 +36,6 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
   }>>([]);
   const [metaConfigsLoading, setMetaConfigsLoading] = React.useState(false);
   const [metaConfigsError, setMetaConfigsError] = React.useState<string>('');
-
-  // Knowledge base selection state (used by Knowledge Base node)
-  const [knowledgeBases, setKnowledgeBases] = React.useState<Array<{
-    id: string
-    bland_kb_id: string | null
-    name: string
-    description: string | null
-    status: string
-    type: string
-    kb_text: string | null
-  }>>([]);
-  const [knowledgeBasesLoading, setKnowledgeBasesLoading] = React.useState(false);
-  const [knowledgeBasesError, setKnowledgeBasesError] = React.useState<string>('');
-  const [kbResyncLoading, setKbResyncLoading] = React.useState(false);
-  const [kbResyncError, setKbResyncError] = React.useState<string>('');
-  const [kbResyncNotice, setKbResyncNotice] = React.useState<string>('');
   
   // Static text toggle state for question nodes
   const [useStaticText, setUseStaticText] = React.useState(true);
@@ -94,48 +77,6 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
     loadMetaConfigs()
   }, [selectedNode?.id, selectedNode?.type])
 
-  React.useEffect(() => {
-    const loadKnowledgeBases = async () => {
-      if (!selectedNode || selectedNode.type !== 'knowledgeBaseNode') return
-      setKnowledgeBasesLoading(true)
-      setKnowledgeBasesError('')
-      try {
-        const response = await fetch('/api/knowledge-bases', { cache: 'no-store', credentials: 'include' })
-        const result = await response.json()
-        if (!response.ok) {
-          throw new Error(result?.error || 'Failed to load knowledge bases')
-        }
-        setKnowledgeBases(result.knowledgeBases || [])
-      } catch (error: any) {
-        setKnowledgeBasesError(error?.message || 'Failed to load knowledge bases')
-      } finally {
-        setKnowledgeBasesLoading(false)
-      }
-    }
-
-    loadKnowledgeBases()
-  }, [selectedNode?.id, selectedNode?.type])
-
-  // Normalize headers to array format for webhook nodes when node is selected
-  React.useEffect(() => {
-    if (selectedNode && selectedNode.type === 'webhookNode' && selectedNode.data.headers) {
-      // If headers is not an array, convert it to array format
-      if (!Array.isArray(selectedNode.data.headers)) {
-        const headersArray = Object.entries(selectedNode.data.headers).map(([key, val]) => ({ 
-          key, 
-          value: typeof val === 'string' ? val : String(val) 
-        }))
-        // Only update if headers actually changed format
-        if (headersArray.length > 0 || Object.keys(selectedNode.data.headers).length > 0) {
-          handleFieldChange('headers', headersArray)
-        }
-      }
-    } else if (selectedNode && selectedNode.type === 'webhookNode' && !selectedNode.data.headers) {
-      // Initialize headers as empty array if it doesn't exist
-      handleFieldChange('headers', [])
-    }
-  }, [selectedNode?.id])
-
   if (!selectedNode) return null
 
   const handleFieldChange = (field: string, value: any) => {
@@ -160,63 +101,6 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
       }
     }
     onUpdateNode(selectedNode.id, updates)
-  }
-
-  const handleKnowledgeBaseSelect = (kbRowId: string) => {
-    const selectedKb = knowledgeBases.find((kb) => kb.id === kbRowId)
-    setKbResyncError('')
-    setKbResyncNotice('')
-    const updates = {
-      data: {
-        ...selectedNode.data,
-        kbId: kbRowId,
-        kbName: selectedKb?.name || '',
-        kb: selectedKb?.kb_text || '',
-      },
-    }
-    onUpdateNode(selectedNode.id, updates)
-  }
-
-  const handleResyncKnowledgeBase = async () => {
-    const kbRowId = selectedNode?.data?.kbId
-    if (!kbRowId) return
-    setKbResyncLoading(true)
-    setKbResyncError('')
-    setKbResyncNotice('')
-    try {
-      const response = await fetch(`/api/knowledge-bases/${kbRowId}`, {
-        cache: 'no-store',
-        credentials: 'include',
-      })
-      const result = await response.json()
-      if (!response.ok) {
-        throw new Error(result?.error || 'Failed to load knowledge base')
-      }
-      const kb = result.knowledgeBase as {
-        id: string
-        name: string
-        kb_text: string | null
-      } | null
-      if (!kb) throw new Error('Knowledge base not found')
-
-      setKnowledgeBases((current) =>
-        current.map((item) =>
-          item.id === kb.id ? { ...item, name: kb.name, kb_text: kb.kb_text } : item
-        )
-      )
-      onUpdateNode(selectedNode.id, {
-        data: {
-          ...selectedNode.data,
-          kbName: kb.name,
-          kb: kb.kb_text || '',
-        },
-      })
-      setKbResyncNotice('Pulled latest snippet from KB.')
-    } catch (error: any) {
-      setKbResyncError(error?.message || 'Failed to sync')
-    } finally {
-      setKbResyncLoading(false)
-    }
   }
 
   const handleMetaConfigSelect = (configId: string) => {
@@ -287,75 +171,25 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
               />
             </div>
 
-            {/* Static Text Toggle */}
-            <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/50">
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="static-text-toggle-greeting" className="text-base font-semibold">
-                    Static Text
-                  </Label>
-                  <button
-                    type="button"
-                    onClick={() => setShowStaticTextHelp((prev) => !prev)}
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                    aria-label="Static Text help"
-                  >
-                    <HelpCircle className="h-4 w-4" />
-                  </button>
-                </div>
-                <p className="text-sm text-muted-foreground mt-1">
-                  When you want the agent to say a specific dialogue. Uncheck to use AI generated text
-                </p>
-                {showStaticTextHelp && (
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Use Static Text when you need exact wording for compliance or consistency. Turn it off to let the AI
-                    generate responses based on the prompt and context.
-                  </p>
-                )}
-              </div>
-              <Switch
-                id="static-text-toggle-greeting"
-                checked={useStaticText}
-                onCheckedChange={(checked) => {
-                  setUseStaticText(checked);
-                  if (checked) {
-                    handleFieldChange('prompt', '');
-                  } else {
-                    handleFieldChange('text', '');
-                  }
-                }}
+            <div>
+              <Label htmlFor="text">Greeting Message</Label>
+              <Textarea
+                id="text"
+                value={selectedNode.data.text || ''}
+                onChange={(e) => handleFieldChange('text', e.target.value)}
+                placeholder="Hey there, how are you doing today?"
+                rows={3}
               />
             </div>
 
-            {useStaticText ? (
-              <div>
-                <Label htmlFor="text">Greeting Message</Label>
-                <AutoResizeTextarea
-                  id="text"
-                  value={selectedNode.data.text || ''}
-                  onChange={(e) => handleFieldChange('text', e.target.value)}
-                  placeholder="Exact text to be spoken by the agent"
-                />
-              </div>
-            ) : (
-              <div>
-                <Label htmlFor="prompt">Prompt</Label>
-                <AutoResizeTextarea
-                  id="prompt"
-                  value={selectedNode.data.prompt || ''}
-                  onChange={(e) => handleFieldChange('prompt', e.target.value)}
-                  placeholder="Prompt for AI-generated dialogue"
-                />
-              </div>
-            )}
-
             <div>
               <Label htmlFor="globalPrompt">Global Prompt (Optional)</Label>
-              <AutoResizeTextarea
+              <Textarea
                 id="globalPrompt"
                 value={selectedNode.data.globalPrompt || ''}
                 onChange={(e) => handleFieldChange('globalPrompt', e.target.value)}
                 placeholder="This is a phone call. Do not use exclamation marks..."
+                rows={3}
               />
             </div>
 
@@ -422,32 +256,35 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
             {useStaticText ? (
               <div>
                 <Label htmlFor="text">Text</Label>
-                <AutoResizeTextarea
+                <Textarea
                   id="text"
                   value={selectedNode.data.text || ''}
                   onChange={(e) => handleFieldChange('text', e.target.value)}
                   placeholder="Exact text to be spoken by the agent"
+                  rows={3}
                 />
               </div>
             ) : (
               <div>
                 <Label htmlFor="prompt">Prompt</Label>
-                <AutoResizeTextarea
+                <Textarea
                   id="prompt"
                   value={selectedNode.data.prompt || ''}
                   onChange={(e) => handleFieldChange('prompt', e.target.value)}
                   placeholder="Prompt for AI-generated dialogue"
+                  rows={3}
                 />
               </div>
             )}
 
             <div>
               <Label htmlFor="globalPrompt">Global Prompt (Optional)</Label>
-              <AutoResizeTextarea
+              <Textarea
                 id="globalPrompt"
                 value={selectedNode.data.globalPrompt || ''}
                 onChange={(e) => handleFieldChange('globalPrompt', e.target.value)}
                 placeholder="Additional context or instructions..."
+                rows={2}
               />
             </div>
 
@@ -559,67 +396,16 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
               />
             </div>
 
-            {/* Static Text Toggle */}
-            <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/50">
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="static-text-toggle-fb" className="text-base font-semibold">
-                    Static Text
-                  </Label>
-                  <button
-                    type="button"
-                    onClick={() => setShowStaticTextHelp((prev) => !prev)}
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                    aria-label="Static Text help"
-                  >
-                    <HelpCircle className="h-4 w-4" />
-                  </button>
-                </div>
-                <p className="text-sm text-muted-foreground mt-1">
-                  When you want the agent to say a specific dialogue. Uncheck to use AI generated text
-                </p>
-                {showStaticTextHelp && (
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Use Static Text when you need exact wording for compliance or consistency. Turn it off to let the AI
-                    generate responses based on the prompt and context.
-                  </p>
-                )}
-              </div>
-              <Switch
-                id="static-text-toggle-fb"
-                checked={useStaticText}
-                onCheckedChange={(checked) => {
-                  setUseStaticText(checked);
-                  if (checked) {
-                    handleFieldChange('prompt', '');
-                  } else {
-                    handleFieldChange('text', '');
-                  }
-                }}
+            <div>
+              <Label htmlFor="text">Display Message</Label>
+              <Textarea
+                id="text"
+                value={selectedNode.data.text || ''}
+                onChange={(e) => handleFieldChange('text', e.target.value)}
+                placeholder="Tracking conversion event..."
+                rows={2}
               />
             </div>
-
-            {useStaticText ? (
-              <div>
-                <Label htmlFor="text">Display Message</Label>
-                <AutoResizeTextarea
-                  id="text"
-                  value={selectedNode.data.text || ''}
-                  onChange={(e) => handleFieldChange('text', e.target.value)}
-                  placeholder="Exact text to be spoken by the agent"
-                />
-              </div>
-            ) : (
-              <div>
-                <Label htmlFor="prompt">Prompt</Label>
-                <AutoResizeTextarea
-                  id="prompt"
-                  value={selectedNode.data.prompt || ''}
-                  onChange={(e) => handleFieldChange('prompt', e.target.value)}
-                  placeholder="Prompt for AI-generated dialogue"
-                />
-              </div>
-            )}
 
             <div className="bg-muted p-3 rounded-lg border border-border">
               <h4 className="text-sm font-semibold text-foreground mb-3">Facebook Pixel Configuration</h4>
@@ -695,67 +481,16 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
               />
             </div>
 
-            {/* Static Text Toggle */}
-            <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/50">
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="static-text-toggle-webhook" className="text-base font-semibold">
-                    Static Text
-                  </Label>
-                  <button
-                    type="button"
-                    onClick={() => setShowStaticTextHelp((prev) => !prev)}
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                    aria-label="Static Text help"
-                  >
-                    <HelpCircle className="h-4 w-4" />
-                  </button>
-                </div>
-                <p className="text-sm text-muted-foreground mt-1">
-                  When you want the agent to say a specific dialogue. Uncheck to use AI generated text
-                </p>
-                {showStaticTextHelp && (
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Use Static Text when you need exact wording for compliance or consistency. Turn it off to let the AI
-                    generate responses based on the prompt and context.
-                  </p>
-                )}
-              </div>
-              <Switch
-                id="static-text-toggle-webhook"
-                checked={useStaticText}
-                onCheckedChange={(checked) => {
-                  setUseStaticText(checked);
-                  if (checked) {
-                    handleFieldChange('prompt', '');
-                  } else {
-                    handleFieldChange('text', '');
-                  }
-                }}
+            <div>
+              <Label htmlFor="text">Display Message</Label>
+              <Textarea
+                id="text"
+                value={selectedNode.data.text || ''}
+                onChange={(e) => handleFieldChange('text', e.target.value)}
+                placeholder="Please give me a moment as I check our system.."
+                rows={2}
               />
             </div>
-
-            {useStaticText ? (
-              <div>
-                <Label htmlFor="text">Display Message</Label>
-                <AutoResizeTextarea
-                  id="text"
-                  value={selectedNode.data.text || ''}
-                  onChange={(e) => handleFieldChange('text', e.target.value)}
-                  placeholder="Exact text to be spoken by the agent"
-                />
-              </div>
-            ) : (
-              <div>
-                <Label htmlFor="prompt">Prompt</Label>
-                <AutoResizeTextarea
-                  id="prompt"
-                  value={selectedNode.data.prompt || ''}
-                  onChange={(e) => handleFieldChange('prompt', e.target.value)}
-                  placeholder="Prompt for AI-generated dialogue"
-                />
-              </div>
-            )}
 
             <div>
               <Label htmlFor="method">HTTP Method</Label>
@@ -807,67 +542,27 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
               />
             </div>
 
-            {/* Static Text Toggle */}
-            <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/50">
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="static-text-toggle-transfer" className="text-base font-semibold">
-                    Static Text
-                  </Label>
-                  <button
-                    type="button"
-                    onClick={() => setShowStaticTextHelp((prev) => !prev)}
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                    aria-label="Static Text help"
-                  >
-                    <HelpCircle className="h-4 w-4" />
-                  </button>
-                </div>
-                <p className="text-sm text-muted-foreground mt-1">
-                  When you want the agent to say a specific dialogue. Uncheck to use AI generated text
-                </p>
-                {showStaticTextHelp && (
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Use Static Text when you need exact wording for compliance or consistency. Turn it off to let the AI
-                    generate responses based on the prompt and context.
-                  </p>
-                )}
-              </div>
-              <Switch
-                id="static-text-toggle-transfer"
-                checked={useStaticText}
-                onCheckedChange={(checked) => {
-                  setUseStaticText(checked);
-                  if (checked) {
-                    handleFieldChange('prompt', '');
-                  } else {
-                    handleFieldChange('text', '');
-                  }
-                }}
+            <div>
+              <Label htmlFor="text">Transfer Message (Static Text)</Label>
+              <Textarea
+                id="text"
+                value={selectedNode.data.text || ''}
+                onChange={(e) => handleFieldChange('text', e.target.value)}
+                placeholder="Transferring the call now. Please hold.."
+                rows={2}
               />
             </div>
 
-            {useStaticText ? (
-              <div>
-                <Label htmlFor="text">Transfer Message</Label>
-                <AutoResizeTextarea
-                  id="text"
-                  value={selectedNode.data.text || ''}
-                  onChange={(e) => handleFieldChange('text', e.target.value)}
-                  placeholder="Exact text to be spoken by the agent"
-                />
-              </div>
-            ) : (
-              <div>
-                <Label htmlFor="prompt">Prompt</Label>
-                <AutoResizeTextarea
-                  id="prompt"
-                  value={selectedNode.data.prompt || ''}
-                  onChange={(e) => handleFieldChange('prompt', e.target.value)}
-                  placeholder="Prompt for AI-generated dialogue"
-                />
-              </div>
-            )}
+            <div>
+              <Label htmlFor="prompt">Prompt (Dynamic Text - Alternative to Static Text)</Label>
+              <Textarea
+                id="prompt"
+                value={selectedNode.data.prompt || ''}
+                onChange={(e) => handleFieldChange('prompt', e.target.value)}
+                placeholder="Generate a dynamic transfer message based on context..."
+                rows={2}
+              />
+            </div>
 
             <div>
               <Label htmlFor="transferNumber">Transfer Number</Label>
@@ -882,11 +577,12 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
 
             <div>
               <Label htmlFor="condition">Condition</Label>
-              <AutoResizeTextarea
+              <Textarea
                 id="condition"
                 value={selectedNode.data.condition || ''}
                 onChange={(e) => handleFieldChange('condition', e.target.value)}
                 placeholder="Condition that needs to be met to proceed from this node"
+                rows={2}
               />
             </div>
 
@@ -944,31 +640,34 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
                   <div className="space-y-3 pt-2">
                     <div>
                       <Label htmlFor="pathwayExamples" className="text-xs">Pathway Examples</Label>
-                      <AutoResizeTextarea
+                      <Textarea
                         id="pathwayExamples"
                         value={selectedNode.data.pathwayExamples || ''}
                         onChange={(e) => handleFieldChange('pathwayExamples', e.target.value)}
                         placeholder="Fine-tuning examples for the agent at this node for the pathways chosen"
+                        rows={3}
                         className="text-sm"
                       />
                     </div>
                     <div>
                       <Label htmlFor="conditionExamples" className="text-xs">Condition Examples</Label>
-                      <AutoResizeTextarea
+                      <Textarea
                         id="conditionExamples"
                         value={selectedNode.data.conditionExamples || ''}
                         onChange={(e) => handleFieldChange('conditionExamples', e.target.value)}
                         placeholder="Fine-tuning examples for the condition at this node"
+                        rows={3}
                         className="text-sm"
                       />
                     </div>
                     <div>
                       <Label htmlFor="dialogueExamples" className="text-xs">Dialogue Examples</Label>
-                      <AutoResizeTextarea
+                      <Textarea
                         id="dialogueExamples"
                         value={selectedNode.data.dialogueExamples || ''}
                         onChange={(e) => handleFieldChange('dialogueExamples', e.target.value)}
                         placeholder="Fine-tuning examples for the dialogue at this node"
+                        rows={3}
                         className="text-sm"
                       />
                     </div>
@@ -979,105 +678,6 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
 
             {/* Extract Variables */}
             {renderExtractVars()}
-          </div>
-        )
-
-      case 'knowledgeBaseNode':
-      case 'Knowledge Base':
-        return (
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="name">Node Name</Label>
-              <Input
-                id="name"
-                value={selectedNode.data.name || ''}
-                onChange={(e) => handleFieldChange('name', e.target.value)}
-                placeholder="e.g., Restaurant Questions"
-              />
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between gap-2">
-                <Label htmlFor="knowledgeBase">Knowledge Base *</Label>
-                {selectedNode.data.kbId ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-2 text-xs"
-                    onClick={() => void handleResyncKnowledgeBase()}
-                    disabled={kbResyncLoading}
-                  >
-                    {kbResyncLoading ? (
-                      <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                    ) : (
-                      <RefreshCw className="mr-1 h-3 w-3" />
-                    )}
-                    Re-sync from KB
-                  </Button>
-                ) : null}
-              </div>
-              <Select
-                value={selectedNode.data.kbId || ''}
-                onValueChange={(value) => handleKnowledgeBaseSelect(value)}
-              >
-                <SelectTrigger id="knowledgeBase">
-                  <SelectValue
-                    placeholder={
-                      knowledgeBasesLoading
-                        ? 'Loading knowledge bases...'
-                        : knowledgeBases.length === 0
-                          ? 'No knowledge bases available'
-                          : 'Select a knowledge base'
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {knowledgeBases.map((kb) => (
-                    <SelectItem key={kb.id} value={kb.id}>
-                      {kb.name} {kb.status !== 'COMPLETED' ? `(${kb.status})` : ''}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {knowledgeBasesError ? (
-                <p className="text-xs text-destructive mt-1">{knowledgeBasesError}</p>
-              ) : kbResyncError ? (
-                <p className="text-xs text-destructive mt-1">{kbResyncError}</p>
-              ) : kbResyncNotice ? (
-                <p className="text-xs text-emerald-600 mt-1">{kbResyncNotice}</p>
-              ) : (
-                <p className="text-xs text-muted-foreground mt-1">
-                  Manage knowledge bases in the Knowledge Base section of the dashboard.
-                </p>
-              )}
-            </div>
-
-            <div>
-              <Label htmlFor="kb">Knowledge Base Content</Label>
-              <AutoResizeTextarea
-                id="kb"
-                value={selectedNode.data.kb || ''}
-                onChange={(e) => handleFieldChange('kb', e.target.value)}
-                placeholder={'Opening Hours : 9am - 5pm\nStore Locations : 426 Ivy Street...'}
-                minHeight={96}
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                Auto-filled with the distilled snippet from the selected knowledge base. Edit freely to tweak
-                what gets sent to the pathway as <code className="font-mono">kb</code>.
-              </p>
-            </div>
-
-            <div>
-              <Label htmlFor="prompt">Prompt</Label>
-              <AutoResizeTextarea
-                id="prompt"
-                value={selectedNode.data.prompt || ''}
-                onChange={(e) => handleFieldChange('prompt', e.target.value)}
-                placeholder="Answer any questions the user may have by referring to the knowledge base..."
-                minHeight={96}
-              />
-            </div>
           </div>
         )
 
@@ -1094,67 +694,16 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
               />
             </div>
 
-            {/* Static Text Toggle */}
-            <div className="flex items-center justify-between p-4 rounded-lg border bg-muted/50">
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="static-text-toggle-endcall" className="text-base font-semibold">
-                    Static Text
-                  </Label>
-                  <button
-                    type="button"
-                    onClick={() => setShowStaticTextHelp((prev) => !prev)}
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                    aria-label="Static Text help"
-                  >
-                    <HelpCircle className="h-4 w-4" />
-                  </button>
-                </div>
-                <p className="text-sm text-muted-foreground mt-1">
-                  When you want the agent to say a specific dialogue. Uncheck to use AI generated text
-                </p>
-                {showStaticTextHelp && (
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Use Static Text when you need exact wording for compliance or consistency. Turn it off to let the AI
-                    generate responses based on the prompt and context.
-                  </p>
-                )}
-              </div>
-              <Switch
-                id="static-text-toggle-endcall"
-                checked={useStaticText}
-                onCheckedChange={(checked) => {
-                  setUseStaticText(checked);
-                  if (checked) {
-                    handleFieldChange('prompt', '');
-                  } else {
-                    handleFieldChange('text', '');
-                  }
-                }}
+            <div>
+              <Label htmlFor="prompt">Goodbye Message</Label>
+              <Textarea
+                id="prompt"
+                value={selectedNode.data.prompt || selectedNode.data.text || ''}
+                onChange={(e) => handleFieldChange('prompt', e.target.value)}
+                placeholder="Say goodbye to the user"
+                rows={2}
               />
             </div>
-
-            {useStaticText ? (
-              <div>
-                <Label htmlFor="text">Goodbye Message</Label>
-                <AutoResizeTextarea
-                  id="text"
-                  value={selectedNode.data.text || ''}
-                  onChange={(e) => handleFieldChange('text', e.target.value)}
-                  placeholder="Exact text to be spoken by the agent"
-                />
-              </div>
-            ) : (
-              <div>
-                <Label htmlFor="prompt">Prompt</Label>
-                <AutoResizeTextarea
-                  id="prompt"
-                  value={selectedNode.data.prompt || ''}
-                  onChange={(e) => handleFieldChange('prompt', e.target.value)}
-                  placeholder="Prompt for AI-generated goodbye message"
-                />
-              </div>
-            )}
           </div>
         )
 
@@ -1267,50 +816,21 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
   )
 
   const handleHeaderAdd = () => {
-    // Ensure headers is always an array
-    let currentHeaders = selectedNode.data.headers || []
-    
-    // If headers is not an array (e.g., it's an object), convert it to an array
-    if (!Array.isArray(currentHeaders)) {
-      currentHeaders = Object.entries(currentHeaders).map(([key, val]) => ({ key, value: val }))
-    }
-    
+    const currentHeaders = selectedNode.data.headers || []
     const newHeader = { key: '', value: '' }
     handleFieldChange('headers', [...currentHeaders, newHeader])
   }
 
   const handleHeaderUpdate = (index: number, field: string, value: string) => {
-    // Ensure headers is always an array
-    let currentHeaders = selectedNode.data.headers || []
-    
-    // If headers is not an array (e.g., it's an object), convert it to an array
-    if (!Array.isArray(currentHeaders)) {
-      currentHeaders = Object.entries(currentHeaders).map(([key, val]) => ({ key, value: val }))
-    }
-    
-    // Create a new array with updated header
-    const updatedHeaders = [...currentHeaders]
-    if (updatedHeaders[index]) {
-      updatedHeaders[index] = {
-        ...updatedHeaders[index],
-        [field]: value
-      }
-      handleFieldChange('headers', updatedHeaders)
-    }
+    const currentHeaders = [...(selectedNode.data.headers || [])]
+    currentHeaders[index][field] = value
+    handleFieldChange('headers', currentHeaders)
   }
 
   const handleHeaderRemove = (index: number) => {
-    // Ensure headers is always an array
-    let currentHeaders = selectedNode.data.headers || []
-    
-    // If headers is not an array (e.g., it's an object), convert it to an array
-    if (!Array.isArray(currentHeaders)) {
-      currentHeaders = Object.entries(currentHeaders).map(([key, val]) => ({ key, value: val }))
-    }
-    
-    const updatedHeaders = [...currentHeaders]
-    updatedHeaders.splice(index, 1)
-    handleFieldChange('headers', updatedHeaders)
+    const currentHeaders = [...(selectedNode.data.headers || [])]
+    currentHeaders.splice(index, 1)
+    handleFieldChange('headers', currentHeaders)
   }
 
   const renderWebhookSettings = () => {
@@ -1332,16 +852,10 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
           'Content-Type': selectedNode.data.contentType || 'application/json'
         };
 
-        // Add custom headers - ensure it's an array
-        let customHeaders = selectedNode.data.headers || []
-        if (!Array.isArray(customHeaders)) {
-          // If headers is an object, convert to array format
-          customHeaders = Object.entries(customHeaders).map(([key, val]) => ({ key, value: val }))
-        }
-        
-        if (customHeaders.length > 0) {
-          customHeaders.forEach((header: any) => {
-            if (header && header.key && header.value) {
+        // Add custom headers
+        if (selectedNode.data.headers && selectedNode.data.headers.length > 0) {
+          selectedNode.data.headers.forEach((header: any) => {
+            if (header.key && header.value) {
               headers[header.key] = header.value;
             }
           });
@@ -1395,26 +909,11 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
           responseData = await response.text();
         }
 
-        const responseHeaders: Record<string, string> = {}
-        try {
-          if (response?.headers && typeof response.headers.forEach === "function") {
-            response.headers.forEach((value, key) => {
-              responseHeaders[key] = value
-            })
-          } else if ((response as any)?.headers) {
-            Object.entries((response as any).headers).forEach(([key, value]) => {
-              responseHeaders[key] = String(value)
-            })
-          }
-        } catch (headerError) {
-          console.warn("⚠️ Failed to read response headers:", headerError)
-        }
-
         setTestResult({
           success: true,
           status: response.status,
           statusText: response.statusText,
-          headers: responseHeaders,
+          headers: Object.fromEntries(response.headers.entries()),
           data: responseData,
           timestamp: new Date().toISOString()
         });
@@ -1550,14 +1049,7 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
                 </Button>
               </div>
 
-              {(() => {
-                // Ensure headers is always an array for rendering
-                let headers = selectedNode.data.headers || []
-                if (!Array.isArray(headers)) {
-                  headers = Object.entries(headers).map(([key, val]) => ({ key, value: val }))
-                }
-                return headers
-              })().map((header: any, index: number) => (
+              {(selectedNode.data.headers || []).map((header: any, index: number) => (
                 <div key={index} className="flex items-center space-x-2">
                   <Input
                     value={header.key || ''}
@@ -1582,14 +1074,7 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
                 </div>
               ))}
 
-              {(() => {
-                // Ensure headers is always an array for length check
-                let headers = selectedNode.data.headers || []
-                if (!Array.isArray(headers)) {
-                  headers = Object.entries(headers).map(([key, val]) => ({ key, value: val }))
-                }
-                return headers.length === 0
-              })() && (
+              {(selectedNode.data.headers || []).length === 0 && (
                 <div className="text-sm text-gray-500 text-center py-4">
                   No headers configured. Click "Add Header" to start.
                 </div>
@@ -1650,12 +1135,11 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }
 
               <div>
                 <Label className="text-xs">Request Body</Label>
-                <AutoResizeTextarea
+                <Textarea
                   value={selectedNode.data.body || ''}
                   onChange={(e) => handleFieldChange('body', e.target.value)}
                   placeholder='{ "key": "value" }'
-                  className="font-mono text-sm"
-                  minHeight={96}
+                  className="h-24 font-mono text-sm"
                 />
               </div>
             </div>

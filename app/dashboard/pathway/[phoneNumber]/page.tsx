@@ -20,8 +20,6 @@ import { Card, CardContent } from "@/components/ui/card"
 
 interface PathwayInfo {
   pathway_id: string | null
-  /** pathways.id — required for load/save-flowchart (Postgres row key) */
-  local_pathway_id?: string | null
   pathway_name: string | null
   pathway_description: string | null
   last_deployed_at?: string
@@ -153,36 +151,11 @@ export default function PathwayEditorPage({ params, searchParams }: PathwayEdito
       setError(null)
       console.log("[PATHWAY-PAGE] 🔍 Fetching pathway info for user:", user.email)
 
-      // If pathway info is passed via URL params, still merge lookup for local_pathway_id / canonical ids
+      // If pathway info is passed via URL params, use it directly
       if (resolvedSearchParams?.pathwayId) {
-        console.log("[PATHWAY-PAGE] ✅ Merging URL params with lookup-pathway for consistent IDs")
-        try {
-          const lookupResponse = await fetch(`/api/lookup-pathway?phone=${encodeURIComponent(phoneNumber)}`, {
-            method: "GET",
-            headers: { "Content-Type": "application/json" },
-            credentials: "include",
-          })
-          if (lookupResponse.ok) {
-            const result = await lookupResponse.json()
-            if (result.success && result.pathway_id) {
-              setPathwayInfo({
-                pathway_id: result.pathway_id,
-                local_pathway_id: result.local_pathway_id ?? null,
-                pathway_name: resolvedSearchParams.pathwayName || result.pathway_name || null,
-                pathway_description: result.pathway_description ?? null,
-                last_deployed_at: result.last_deployed_at,
-              })
-              setIsLoadingPathway(false)
-              setIsInitialized(true)
-              return
-            }
-          }
-        } catch (e) {
-          console.warn("[PATHWAY-PAGE] Lookup failed with URL params, falling back to URL only:", e)
-        }
+        console.log("[PATHWAY-PAGE] ✅ Using pathway info from URL params")
         setPathwayInfo({
           pathway_id: resolvedSearchParams.pathwayId,
-          local_pathway_id: null,
           pathway_name: resolvedSearchParams.pathwayName || null,
           pathway_description: null,
         })
@@ -227,7 +200,6 @@ export default function PathwayEditorPage({ params, searchParams }: PathwayEdito
         console.log("[PATHWAY-PAGE] 🎯 PATHWAY FOUND:", result.pathway_id)
         setPathwayInfo({
           pathway_id: result.pathway_id,
-          local_pathway_id: result.local_pathway_id ?? null,
           pathway_name: result.pathway_name,
           pathway_description: result.pathway_description,
           last_deployed_at: result.last_deployed_at,
