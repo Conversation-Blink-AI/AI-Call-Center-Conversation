@@ -52,15 +52,7 @@ export async function GET(request: NextRequest) {
 
       let pathwayResult
 
-      if (pathwayId) {
-        // Load by pathway ID
-        console.log(`[LOAD-FLOWCHART] Loading by pathway ID: ${pathwayId}`)
-        pathwayResult = await client.query(`
-          SELECT id, name, description, data, phone_id, created_at, updated_at
-          FROM pathways
-          WHERE id = $1 AND creator_id = $2
-        `, [pathwayId, userId])
-      } else if (phoneNumber) {
+      if (phoneNumber) {
         // Load by phone number - find pathway via phone_id relationship
         console.log(`[LOAD-FLOWCHART] Loading by phone number: ${phoneNumber}`)
         const formattedPhone = toE164Format(phoneNumber)
@@ -73,6 +65,18 @@ export async function GET(request: NextRequest) {
           WHERE pn.user_id = $2 AND p.creator_id = $2
             AND (pn.phone_number_hash = $1 OR pn.phone_number = $3)
         `, [phoneHash, userId, formattedPhone])
+      } else if (pathwayId) {
+        // The pathwayId is the Bland pathway id stored on the phone number row.
+        // Resolve it through phone_numbers.id before reading pathways.data.
+        console.log(`[LOAD-FLOWCHART] Loading by Bland pathway ID via phone number: ${pathwayId}`)
+
+        pathwayResult = await client.query(`
+          SELECT p.id, p.name, p.description, p.data, p.phone_id, p.created_at, p.updated_at
+          FROM phone_numbers pn
+          JOIN pathways p ON p.phone_id = pn.id
+          WHERE pn.user_id = $2 AND p.creator_id = $2
+            AND pn.pathwayid = $1
+        `, [pathwayId, userId])
       } else {
         await client.end()
         return NextResponse.json({ error: "Pathway ID or phone number is required" }, { status: 400 })

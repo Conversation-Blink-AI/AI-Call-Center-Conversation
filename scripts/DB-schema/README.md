@@ -111,7 +111,6 @@ Columns:
 - `created_at` TIMESTAMPTZ DEFAULT `CURRENT_TIMESTAMP`
 - `updated_at` TIMESTAMPTZ DEFAULT `CURRENT_TIMESTAMP`
 - `data` JSONB NULL
-- `bland_id` VARCHAR(255) NULL
 - `phone_number_id` UUID UNIQUE FK -> `phone_numbers(id)` ON DELETE CASCADE
 
 Indexes:

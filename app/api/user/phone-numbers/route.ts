@@ -47,7 +47,6 @@ export async function GET(request: Request) {
           pn.assigned_to,
           pn.pathwayid,
           p.id as local_pathway_id,
-          p.bland_id as pathway_bland_id,
           p.name as pathway_name,
           p.description as pathway_description
          FROM phone_numbers pn
@@ -63,11 +62,8 @@ export async function GET(request: Request) {
       }
 
       const phoneNumbers = result.rows.map(row => {
-        // The user-facing "Pathway ID" should be the Bland AI pathway id, since
-        // that's what's used to actually run calls and what's shown in the
-        // phone_numbers.pathwayid column. Prefer the value cached on the phone
-        // row, then fall back to pathways.bland_id.
-        const blandPathwayId = row.pathwayid || row.pathway_bland_id || null
+        // The user-facing "Pathway ID" is the Bland AI pathway id stored on the phone row.
+        const blandPathwayId = row.pathwayid || null
         const hasPathway = Boolean(row.local_pathway_id || row.pathway_name)
 
         return {

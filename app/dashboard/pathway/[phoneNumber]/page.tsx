@@ -20,6 +20,8 @@ import { Card, CardContent } from "@/components/ui/card"
 
 interface PathwayInfo {
   pathway_id: string | null
+  local_pathway_id?: string | null
+  bland_pathway_id?: string | null
   pathway_name: string | null
   pathway_description: string | null
   last_deployed_at?: string
@@ -156,6 +158,8 @@ export default function PathwayEditorPage({ params, searchParams }: PathwayEdito
         console.log("[PATHWAY-PAGE] ✅ Using pathway info from URL params")
         setPathwayInfo({
           pathway_id: resolvedSearchParams.pathwayId,
+          local_pathway_id: resolvedSearchParams.pathwayId,
+          bland_pathway_id: null,
           pathway_name: resolvedSearchParams.pathwayName || null,
           pathway_description: null,
         })
@@ -197,9 +201,14 @@ export default function PathwayEditorPage({ params, searchParams }: PathwayEdito
       console.log("[PATHWAY-PAGE] ✅ API response:", result)
 
       if (result.success && result.pathway_id) {
-        console.log("[PATHWAY-PAGE] 🎯 PATHWAY FOUND:", result.pathway_id)
+        const localPathwayId = result.local_pathway_id || result.pathway_id
+        const blandPathwayId = result.bland_pathway_id || (result.local_pathway_id ? result.pathway_id : null)
+
+        console.log("[PATHWAY-PAGE] 🎯 PATHWAY FOUND:", localPathwayId)
         setPathwayInfo({
-          pathway_id: result.pathway_id,
+          pathway_id: localPathwayId,
+          local_pathway_id: localPathwayId,
+          bland_pathway_id: blandPathwayId,
           pathway_name: result.pathway_name,
           pathway_description: result.pathway_description,
           last_deployed_at: result.last_deployed_at,

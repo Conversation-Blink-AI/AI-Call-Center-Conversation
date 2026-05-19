@@ -20,9 +20,10 @@ interface ReactFlowData {
 interface SavePathwayModalProps {
   reactFlowData: ReactFlowData
   pathwayId?: string // Optional for backwards compatibility
+  phoneNumber?: string | null
 }
 
-export function SavePathwayModal({ reactFlowData, pathwayId }: SavePathwayModalProps) {
+export function SavePathwayModal({ reactFlowData, pathwayId, phoneNumber: phoneNumberProp }: SavePathwayModalProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isSuccess, setIsSuccess] = useState(false)
@@ -39,7 +40,7 @@ export function SavePathwayModal({ reactFlowData, pathwayId }: SavePathwayModalP
     return pathParts[phoneNumberIndex] || null
   }
 
-  const phoneNumber = getPhoneNumberFromPath()
+  const phoneNumber = phoneNumberProp || getPhoneNumberFromPath()
   const convertedData = convertReactFlowToBland(reactFlowData)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -50,8 +51,8 @@ export function SavePathwayModal({ reactFlowData, pathwayId }: SavePathwayModalP
       return
     }
 
-    if (!pathwayId) {
-      toast.error("No pathway ID found. Cannot save flowchart.")
+    if (!phoneNumber) {
+      toast.error("No phone number found. Cannot save flowchart.")
       return
     }
 
@@ -65,6 +66,7 @@ export function SavePathwayModal({ reactFlowData, pathwayId }: SavePathwayModalP
         },
         body: JSON.stringify({
           pathwayId,
+          phoneNumber,
           flowchartData: convertedData,
         }),
       })
@@ -193,7 +195,7 @@ export function SavePathwayModal({ reactFlowData, pathwayId }: SavePathwayModalP
             </Button>
             <Button 
               type="submit" 
-              disabled={isLoading || isSuccess || !pathwayId}
+              disabled={isLoading || isSuccess || !phoneNumber}
               className="bg-blue-600 hover:bg-blue-700"
             >
               {isLoading ? (

@@ -183,7 +183,6 @@ export async function POST(request: Request) {
           creator_id: data.creator_id,
           updater_id: data.updater_id || data.creator_id,
           data: data.pathwayData || null,
-          bland_id: data.bland_id || null,
           phone_number: data.phone_number || null
         })
         break

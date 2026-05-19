@@ -51,7 +51,6 @@ interface Pathway {
   creator_id: string
   created_at: string
   updated_at: string
-  bland_id: string | null
   phone_number: string | null
 }
 
@@ -518,9 +517,6 @@ export default function DatabaseManagement() {
                           </div>
                           <div>
                             <strong>Phone Number:</strong> {pathway.phone_number || 'N/A'}
-                          </div>
-                          <div>
-                            <strong>Bland ID:</strong> {pathway.bland_id || 'N/A'}
                           </div>
                           <div>
                             <strong>Created:</strong> {new Date(pathway.created_at).toLocaleDateString()}

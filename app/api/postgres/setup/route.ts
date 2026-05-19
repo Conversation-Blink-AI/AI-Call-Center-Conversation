@@ -72,7 +72,6 @@ CREATE TABLE IF NOT EXISTS pathways (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     data JSONB,
-    bland_id VARCHAR(255),
     phone_number VARCHAR(20),
     FOREIGN KEY (team_id) REFERENCES teams(id) ON DELETE CASCADE,
     FOREIGN KEY (creator_id) REFERENCES users(id) ON DELETE CASCADE,

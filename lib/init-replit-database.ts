@@ -410,15 +410,14 @@ export async function createPathwayRecord(pathwayData: {
   creator_id: string
   updater_id?: string
   data?: any
-  bland_id?: string
   phone_number?: string
 }) {
   const client = createPgClient()
   try {
     await client.connect()
     const result = await client.query(
-      `INSERT INTO pathways (name, description, team_id, creator_id, updater_id, data, bland_id, phone_number, created_at, updated_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())
+      `INSERT INTO pathways (name, description, team_id, creator_id, updater_id, data, phone_number, created_at, updated_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())
        RETURNING *`,
       [
         pathwayData.name,
@@ -427,7 +426,6 @@ export async function createPathwayRecord(pathwayData: {
         pathwayData.creator_id,
         pathwayData.updater_id || pathwayData.creator_id,
         pathwayData.data ? JSON.stringify(pathwayData.data) : null,
-        pathwayData.bland_id || null,
         pathwayData.phone_number || null
       ]
     )

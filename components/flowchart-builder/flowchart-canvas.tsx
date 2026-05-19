@@ -78,6 +78,8 @@ export function FlowchartCanvas({
   useEffect(() => setMounted(true), [])
 
   const isDarkMode = mounted && (resolvedTheme === 'dark' || theme === 'dark')
+  const localPathwayId = pathwayInfo?.local_pathway_id || pathwayInfo?.pathway_id
+  const blandPathwayId = pathwayInfo?.bland_pathway_id || pathwayInfo?.pathway_id
 
   const nodeTypes = useMemo(
     () => ({
@@ -104,15 +106,15 @@ export function FlowchartCanvas({
     }
 
     const loadSavedFlowchart = async () => {
-      if (!pathwayInfo?.pathway_id && !phoneNumber) return
+      if (!localPathwayId && !phoneNumber) return
 
       setIsLoadingFlowchart(true)
       try {
         let apiUrl = ''
-        if (pathwayInfo?.pathway_id) {
-          apiUrl = `/api/pathways/load-flowchart?pathwayId=${pathwayInfo.pathway_id}`
-        } else if (phoneNumber) {
+        if (phoneNumber) {
           apiUrl = `/api/pathways/load-flowchart?phoneNumber=${encodeURIComponent(phoneNumber)}`
+        } else if (localPathwayId) {
+          apiUrl = `/api/pathways/load-flowchart?pathwayId=${localPathwayId}`
         }
 
         const response = await fetch(apiUrl, { credentials: 'include' })
@@ -136,7 +138,7 @@ export function FlowchartCanvas({
     }
 
     loadSavedFlowchart()
-  }, [pathwayInfo?.pathway_id, phoneNumber])
+  }, [localPathwayId, phoneNumber])
 
   const onConnect = useCallback(
     (params: Connection) => {
@@ -437,8 +439,8 @@ export function FlowchartCanvas({
         )}
 
         <div className="absolute top-4 right-4 z-10 flex gap-2">
-          <SavePathwayModal reactFlowData={{ nodes, edges }} pathwayId={pathwayInfo?.pathway_id} />
-          <UpdatePathwayModal reactFlowData={{ nodes, edges }} pathwayId={pathwayInfo?.pathway_id} phoneNumber={phoneNumber} />
+          <SavePathwayModal reactFlowData={{ nodes, edges }} pathwayId={localPathwayId} phoneNumber={phoneNumber} />
+          <UpdatePathwayModal reactFlowData={{ nodes, edges }} pathwayId={blandPathwayId} phoneNumber={phoneNumber} />
         </div>
 
         <ReactFlow

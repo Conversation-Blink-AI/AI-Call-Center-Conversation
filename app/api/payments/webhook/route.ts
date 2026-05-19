@@ -475,8 +475,8 @@ async function handlePhoneNumberPurchase(
             const pathwayDescription = `Default pathway for ${normalizedPhone}`
             
             const pathwayResult = await client.query(
-              `INSERT INTO pathways (name, description, creator_id, phone_number, phone_id, bland_id, created_at, updated_at)
-               VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+              `INSERT INTO pathways (name, description, creator_id, phone_number, phone_id, created_at, updated_at)
+               VALUES ($1, $2, $3, $4, $5, NOW(), NOW())
                RETURNING *`,
               [
                 pathwayName,
@@ -484,22 +484,13 @@ async function handlePhoneNumberPurchase(
                 userId,
                 normalizedPhone,
                 savedPhoneId,
-                blandPathwayId,
               ],
             )
             
             const newPathway = pathwayResult.rows[0]
             console.log('✅ [WEBHOOK] Local pathway created in pathways table:', newPathway.id)
           } else {
-            // Update existing pathway with bland_id if not set
-            console.log('💾 [WEBHOOK] Updating existing pathway with bland_id...')
-            await client.query(
-              `UPDATE pathways 
-               SET bland_id = $1, updated_at = NOW()
-               WHERE phone_id = $2 AND (bland_id IS NULL OR bland_id != $1)`,
-              [blandPathwayId, savedPhoneId],
-            )
-            console.log('✅ [WEBHOOK] Pathway updated with bland_id')
+            console.log('✅ [WEBHOOK] Local pathway already exists for phone number:', savedPhoneId)
           }
 
           // Update phone_numbers.pathwayid if not already set

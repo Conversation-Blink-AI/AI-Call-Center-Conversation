@@ -49,7 +49,6 @@ export async function GET(request: NextRequest) {
           pn.phone_number,
           pn.pathwayid,
           p.id as pathway_id_from_phone,
-          p.bland_id as pathway_bland_id,
           p.name as pathway_name,
           p.description as pathway_description,
           p.updated_at as last_deployed_at
@@ -71,8 +70,7 @@ export async function GET(request: NextRequest) {
       const phoneData = result.rows[0]
 
       // Align with /api/user/phone-numbers: user-facing / Bland id for deploy and dashboard cards
-      const blandPathwayId =
-        phoneData.pathwayid || phoneData.pathway_bland_id || null
+      const blandPathwayId = phoneData.pathwayid || null
       const localPathwayId = phoneData.pathway_id_from_phone || null
       const pathwayId = blandPathwayId || localPathwayId
 
@@ -90,6 +88,7 @@ export async function GET(request: NextRequest) {
         success: true,
         pathway_id: pathwayId,
         local_pathway_id: localPathwayId,
+        bland_pathway_id: blandPathwayId,
         pathway_name: phoneData.pathway_name,
         pathway_description: phoneData.pathway_description,
         last_deployed_at: phoneData.last_deployed_at,

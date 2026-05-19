@@ -31,7 +31,6 @@ export interface Pathway {
   created_at: string
   updated_at: string
   data: any
-  bland_id: string | null
   phone_number: string | null
 }
 

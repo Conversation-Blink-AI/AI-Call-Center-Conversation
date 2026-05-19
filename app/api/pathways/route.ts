@@ -59,7 +59,6 @@ export async function GET(req: NextRequest) {
           p.created_at,
           p.updated_at,
           p.data,
-          p.bland_id,
           p.phone_id,
           pn.id as phone_number_table_id,
           pn.phone_number,
