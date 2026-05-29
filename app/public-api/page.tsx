@@ -227,6 +227,16 @@ export default function PublicApiDocumentationPage() {
               font-family: 'Monaco', 'Menlo', monospace;
               color: #dc2626;
             }
+            input {
+              background-color: #ffffff;
+              color: #0f172a;
+              caret-color: #0f172a;
+              color-scheme: light;
+            }
+            input::placeholder {
+              color: #64748b;
+              opacity: 1;
+            }
             pre {
               background: #1e293b;
               color: #f8fafc;
