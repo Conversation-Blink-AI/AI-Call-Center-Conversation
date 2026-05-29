@@ -10,12 +10,29 @@ interface User {
   id: string;
   email: string;
   name?: string | null;
+  firstName?: string | null;
+  first_name?: string | null;
+  lastName?: string | null;
+  last_name?: string | null;
   role?: string | null;
   company?: string | null;
   phone_number?: string | null;
+  phoneNumber?: string | null;
   created_at?: Date | null;
+  createdAt?: Date | null;
   updated_at?: Date | null;
+  updatedAt?: Date | null;
   last_login?: Date | null;
+  lastLogin?: Date | null;
+  passwordHash?: string | null;
+  password_hash?: string | null;
+  external_id?: string | null;
+  external_token?: string | null;
+  externalToken?: string | null;
+  platforms?: unknown[];
+  verified?: boolean;
+  is_verified?: boolean;
+  is_admin?: boolean;
 }
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
@@ -125,6 +142,10 @@ export async function getUserFromRequest(req: NextRequest): Promise<User | null>
       id: user.id,
       email: user.email,
       name: user.name || 'User',
+      firstName: user.firstName || user.first_name || null,
+      first_name: user.first_name || user.firstName || null,
+      lastName: user.lastName || user.last_name || null,
+      last_name: user.last_name || user.lastName || null,
       company: user.company || '',
       role: user.role || 'user',
       phoneNumber: user.phoneNumber || user.phone_number || '',
@@ -132,6 +153,11 @@ export async function getUserFromRequest(req: NextRequest): Promise<User | null>
       createdAt: user.createdAt || user.created_at,
       updatedAt: user.updatedAt || user.updated_at,
       lastLogin: user.lastLogin || user.last_login,
+      external_id: user.external_id,
+      external_token: user.external_token,
+      externalToken: user.external_token,
+      platforms: user.platforms || [],
+      verified: user.verified || user.is_verified || false,
       is_admin: user.is_admin || false
     }
   } catch (error) {
@@ -210,6 +236,10 @@ export async function getCurrentUser(): Promise<User | null> {
       id: user.id,
       email: user.email,
       name: user.name || 'User',
+      firstName: user.firstName || user.first_name || null,
+      first_name: user.first_name || user.firstName || null,
+      lastName: user.lastName || user.last_name || null,
+      last_name: user.last_name || user.lastName || null,
       company: user.company || '',
       role: user.role || 'user',
       phoneNumber: user.phoneNumber || user.phone_number || '',
@@ -217,6 +247,11 @@ export async function getCurrentUser(): Promise<User | null> {
       createdAt: user.createdAt || user.created_at,
       updatedAt: user.updatedAt || user.updated_at,
       lastLogin: user.lastLogin || user.last_login,
+      external_id: user.external_id,
+      external_token: user.external_token,
+      externalToken: user.external_token,
+      platforms: user.platforms || [],
+      verified: user.verified || user.is_verified || false,
       is_admin: user.is_admin || false
     }
   } catch (error) {
@@ -226,11 +261,11 @@ export async function getCurrentUser(): Promise<User | null> {
 }
 
 // Validate auth token (for API routes)
-export async function verifyJWT(token: string): Promise<{ isValid: boolean; user: any; error?: string }> {
+export async function verifyJWT(token: string): Promise<{ isValid: boolean; user: any; error?: string | null }> {
   return validateAuthToken(token)
 }
 
-export async function validateAuthToken(token?: string): Promise<{ isValid: boolean; user: any; error?: string }> {
+export async function validateAuthToken(token?: string): Promise<{ isValid: boolean; user: any; error?: string | null }> {
   try {
     let authToken = token
 
@@ -269,6 +304,8 @@ export async function validateAuthToken(token?: string): Promise<{ isValid: bool
     }
   }
 }
+
+export const validateSessionToken = validateAuthToken
 
 // Get session token from cookies
 export async function getSessionToken(): Promise<string | null> {

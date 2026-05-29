@@ -6,6 +6,9 @@ import { getSSLConfig } from "@/lib/db-client"
 import { normalizeEmail } from "@/lib/utils"
 import { encryptString, hashEmail, hashPhoneNumber, phoneLast4 } from "@/lib/encryption"
 import { toE164Format } from "@/utils/phone-utils"
+import { extractForexAuthFields } from "@/lib/forex-permissions"
+import { syncForexOrgMemberships } from "@/lib/forex-org-sync"
+import { decodeJwtPayload, mergeDefined } from "@/lib/forex-token"
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
 
@@ -66,6 +69,10 @@ export async function POST(request: Request) {
     }
 
     const externalUserData = externalResult.data || {}
+    const externalToken = externalUserData.token || externalResult.token
+    const externalTokenPayload = decodeJwtPayload(externalToken)
+    const externalProfile = mergeDefined(externalTokenPayload, externalUserData)
+    const forexAuthFields = extractForexAuthFields(externalProfile, externalUserData.role || "client")
     const normalizedEmail = normalizeEmail(externalUserData.email || "")
 
     if (!normalizedEmail) {
@@ -133,8 +140,8 @@ export async function POST(request: Request) {
             phoneHash,
             phoneLast,
             externalUserData.role || 'client',
-            externalUserData._id,
-            externalUserData.token,
+            externalUserData._id || externalProfile.id,
+            externalToken,
             Boolean(externalUserData.verified),
             'AI Call',
             emailHash,
@@ -177,8 +184,8 @@ export async function POST(request: Request) {
             phoneHash,
             phoneLast,
             externalUserData.role || 'client',
-            externalUserData._id,
-            externalUserData.token,
+            externalUserData._id || externalProfile.id,
+            externalToken,
             Boolean(externalUserData.verified),
             'AI Call',
             ''
@@ -186,6 +193,10 @@ export async function POST(request: Request) {
         )
         localUser = insertResult.rows[0]
         console.log("[AUTH/2FA] Created new local user:", localUser.id)
+      }
+
+      if (localUser?.id) {
+        await syncForexOrgMemberships(client, localUser.id, externalProfile as any)
       }
     } catch (dbError: any) {
       console.error("[AUTH/2FA] Database error:", dbError)
@@ -208,8 +219,8 @@ export async function POST(request: Request) {
       {
         userId: localUser.id,
         email: localUser.email,
-        externalId: externalUserData._id,
-        externalToken: externalUserData.token,
+        externalId: externalUserData._id || externalProfile.id,
+        externalToken,
         exp: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60)
       },
       JWT_SECRET
@@ -239,11 +250,15 @@ export async function POST(request: Request) {
         status: externalUserData.status,
         verified: externalUserData.verified,
         platforms: externalUserData.platforms,
+        permissions: forexAuthFields.permissions,
+        orgMemberships: forexAuthFields.orgMemberships,
+        activeOrgId: forexAuthFields.activeOrgId,
+        activeRole: forexAuthFields.activeRole,
         createdDate: externalUserData.createdDate,
         updatedDate: externalUserData.updatedDate
       },
-      token: externalUserData.token,
-      externalToken: externalUserData.token
+      token: externalToken,
+      externalToken
     })
   } catch (error: any) {
     console.error("[AUTH/2FA] Unexpected error:", error)

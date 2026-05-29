@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import { NextRequest } from "next/server"
 import { getUserFromRequest } from "@/lib/auth-utils"
+import { extractForexAuthFields } from "@/lib/forex-permissions"
+import { decodeJwtPayload } from "@/lib/forex-token"
 
 export async function GET(req: NextRequest) {
   try {
@@ -27,6 +29,10 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    const externalToken = user.external_token || user.externalToken
+    const externalPayload = decodeJwtPayload(externalToken)
+    const forexAuthFields = extractForexAuthFields(externalPayload, user.role || 'client')
+
     // Ensure we return consistent user data structure
     const userData = {
       id: user.id,
@@ -42,7 +48,11 @@ export async function GET(req: NextRequest) {
       verified: user.verified || user.is_verified || false,
       platforms: user.platforms || [],
       externalId: user.external_id,
-      externalToken: user.external_token,
+      externalToken,
+      permissions: forexAuthFields.permissions,
+      orgMemberships: forexAuthFields.orgMemberships,
+      activeOrgId: forexAuthFields.activeOrgId,
+      activeRole: forexAuthFields.activeRole,
       is_admin: user.is_admin || false
     }
 

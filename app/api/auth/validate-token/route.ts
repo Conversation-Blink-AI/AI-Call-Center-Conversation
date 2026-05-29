@@ -7,6 +7,8 @@ import { getSSLConfig } from "@/lib/db-client"
 import { normalizeEmail } from "@/lib/utils"
 import { encryptString, hashEmail, hashPhoneNumber, phoneLast4 } from "@/lib/encryption"
 import { toE164Format } from "@/utils/phone-utils"
+import { extractForexAuthFields } from "@/lib/forex-permissions"
+import { syncForexOrgMemberships } from "@/lib/forex-org-sync"
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
 const EXTERNAL_API_URL = process.env.FOREX_URL || process.env.EXTERNAL_API_URL
@@ -76,6 +78,7 @@ export async function POST(request: NextRequest) {
     const normalizedPhone = externalUserData.phoneNumber || externalUserData.phone_number
       ? toE164Format(externalUserData.phoneNumber || externalUserData.phone_number)
       : ""
+    const forexAuthFields = extractForexAuthFields(externalUserData, externalUserData.role || "client")
     const emailEnc = encryptString(normalizedEmail)
     const emailHash = hashEmail(normalizedEmail)
     const phoneEnc = normalizedPhone ? encryptString(normalizedPhone) : null
@@ -219,6 +222,10 @@ export async function POST(request: NextRequest) {
         console.error("[VALIDATE-TOKEN] Failed to ensure wallet for user:", walletError)
       }
 
+      if (user?.id) {
+        await syncForexOrgMemberships(client, user.id, externalUserData)
+      }
+
     } finally {
       await client.end()
     }
@@ -257,8 +264,14 @@ export async function POST(request: NextRequest) {
         role: user.role || "client",
         phoneNumber: user.phone_number || user.phoneNumber || "",
         verified: user.verified || user.is_verified || false,
-        platforms: user.platforms || []
-      }
+        platforms: user.platforms || [],
+        permissions: forexAuthFields.permissions,
+        orgMemberships: forexAuthFields.orgMemberships,
+        activeOrgId: forexAuthFields.activeOrgId,
+        activeRole: forexAuthFields.activeRole
+      },
+      token,
+      externalToken: token
     })
 
   } catch (error: any) {

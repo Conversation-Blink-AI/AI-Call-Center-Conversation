@@ -2,16 +2,32 @@
 
 import React, { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
+import {
+  ForexAccessLevel,
+  ForexOrgMembership,
+  ForexPermission,
+  ForexPermissionUser,
+  canAccessPlatform,
+  getActiveOrgMembership,
+  resolveEffectivePermissions,
+} from '@/lib/forex-permissions'
 
-export interface User {
+export interface User extends ForexPermissionUser {
   id: string
+  _id?: string
   email?: string | null
+  name?: string | null
+  avatarUrl?: string | null
   firstName?: string | null
   lastName?: string | null
   company?: string | null
   phoneNumber?: string | null
-  role?: string
+  role?: string | null
   is_admin?: boolean
+  permissions?: ForexPermission[]
+  orgMemberships?: ForexOrgMembership[]
+  activeOrgId?: string | null
+  activeRole?: string | null
 }
 
 interface AuthContextType {
@@ -24,6 +40,9 @@ interface AuthContextType {
   resetPassword: (email: string) => Promise<{ success: boolean; message: string }>
   refreshAuth: () => Promise<void>
   isAuthenticated: boolean
+  effectivePermissions: ForexPermission[]
+  activeOrgMembership: ForexOrgMembership | null
+  canAccessPlatform: (platformNameOrId: string, accessLevel: ForexAccessLevel) => boolean
 }
 
 export interface SignupData {
@@ -46,6 +65,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /** Cancels in-flight /api/auth/me so a stale 401 cannot run after a fresh login (classic long-session bug). */
   const authCheckAbortRef = useRef<AbortController | null>(null)
   const router = useRouter()
+  const effectivePermissions = resolveEffectivePermissions(user)
+  const activeOrgMembership = getActiveOrgMembership(user)
 
   const checkAuth = async () => {
     authCheckAbortRef.current?.abort()
@@ -398,6 +419,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         resetPassword,
         refreshAuth,
         isAuthenticated,
+        effectivePermissions,
+        activeOrgMembership,
+        canAccessPlatform: (platformNameOrId, accessLevel) =>
+          canAccessPlatform(user, platformNameOrId, accessLevel),
       }}
     >
       {children}

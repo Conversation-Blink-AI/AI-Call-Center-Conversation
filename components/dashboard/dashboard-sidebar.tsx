@@ -22,6 +22,7 @@ import {
   HelpCircle,
   Workflow,
   Shield,
+  Building2,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 
@@ -46,7 +47,12 @@ export function DashboardSidebar() {
   const { user, logout } = useAuth()
   const dropdownRef = useRef<HTMLDivElement>(null)
   const isAdmin = Boolean(user?.is_admin)
-  const navLinks = isAdmin ? [...navigation, { name: "Admin", href: "/admin", icon: Shield }] : navigation
+  const organizationLinks = user?.orgMemberships?.length
+    ? [{ name: "My Organization", href: "/dashboard/organization", icon: Building2 }]
+    : []
+  const navLinks = isAdmin
+    ? [...navigation.slice(0, 1), ...organizationLinks, ...navigation.slice(1), { name: "Admin", href: "/admin", icon: Shield }]
+    : [...navigation.slice(0, 1), ...organizationLinks, ...navigation.slice(1)]
 
   const handleLogout = async () => {
     try {
