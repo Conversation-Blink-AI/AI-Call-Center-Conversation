@@ -44,6 +44,13 @@ function getStringArray(value: unknown): string[] {
     : []
 }
 
+function getOrgUsers(payload: ForexOrganizationWebhookPayload): Record<string, unknown>[] {
+  const orgUsers = payload.org_users || payload.orgUsers
+  return Array.isArray(orgUsers)
+    ? orgUsers.filter((item): item is Record<string, unknown> => Boolean(item && typeof item === "object"))
+    : []
+}
+
 export async function ensureForexOrgTables(client: Queryable) {
   await client.query(`
     CREATE TABLE IF NOT EXISTS forex_organizations (
@@ -386,9 +393,75 @@ export async function syncForexOrganizationWebhook(
     )
   }
 
+  let syncedOrgUsersCount = 0
+  const orgUsers = getOrgUsers(payload)
+
+  for (const orgUser of orgUsers) {
+    const userExternalId = getString(orgUser.userId) || getString(orgUser._id) || getString(orgUser.id)
+    if (!userExternalId) continue
+
+    const localUserResult = await client.query(
+      "SELECT id FROM users WHERE external_id = $1 LIMIT 1",
+      [userExternalId],
+    )
+    const localUserId = localUserResult.rows[0]?.id ?? null
+    const explicitRole = getString(orgUser.role)
+    const role = explicitRole
+      || (userExternalId === normalized.ownerExternalUserId ? "organization_admin" : "organization_user")
+    const status = getString(orgUser.status) || "active"
+    const email = getString(orgUser.email)
+    const membershipExternalId = getString(orgUser._id) || getString(orgUser.id)
+    const permissions = Array.isArray(orgUser.permissions) ? orgUser.permissions : []
+
+    await client.query(
+      `
+        INSERT INTO forex_org_memberships (
+          user_id,
+          user_external_id,
+          user_email,
+          external_org_id,
+          membership_external_id,
+          role,
+          status,
+          permissions,
+          membership_snapshot,
+          updated_at
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, NOW())
+        ON CONFLICT (external_org_id, user_external_id) DO UPDATE SET
+          user_id = COALESCE(EXCLUDED.user_id, forex_org_memberships.user_id),
+          user_email = COALESCE(EXCLUDED.user_email, forex_org_memberships.user_email),
+          membership_external_id = COALESCE(EXCLUDED.membership_external_id, forex_org_memberships.membership_external_id),
+          role = EXCLUDED.role,
+          status = EXCLUDED.status,
+          permissions = EXCLUDED.permissions,
+          membership_snapshot = EXCLUDED.membership_snapshot,
+          updated_at = NOW()
+      `,
+      [
+        localUserId,
+        userExternalId,
+        email,
+        normalized.externalOrgId,
+        membershipExternalId,
+        role,
+        status,
+        JSON.stringify(permissions),
+        JSON.stringify({
+          source: "forex_organization_webhook_org_users",
+          organizationId: normalized.externalOrgId,
+          user: orgUser,
+        }),
+      ],
+    )
+
+    syncedOrgUsersCount += 1
+  }
+
   return {
     externalOrgId: normalized.externalOrgId,
     ownerExternalUserId: normalized.ownerExternalUserId,
     localOwnerUserId,
+    syncedOrgUsersCount,
   }
 }
