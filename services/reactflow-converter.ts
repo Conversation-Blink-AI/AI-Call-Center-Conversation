@@ -51,13 +51,36 @@ export function convertReactFlowToBland(reactFlowData: ReactFlowData): BlandFlow
       const configNickname = cleanData.configNickname || ''
       const eventName = cleanData.eventName || 'CallLead'
       const testEventCode = cleanData.testEventCode || ''
+      const userDataMappings = Array.isArray(cleanData.userDataMappings) ? cleanData.userDataMappings : []
       const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://dev.conversation.blinklab.in').replace(/\/$/, '')
       const url = configId ? `${baseUrl}/api/integrations/meta-capi/${configId}` : ''
 
-      const bodyPayload: Record<string, string> = {
+      const bodyPayload: Record<string, any> = {
         call_id: '{{call_id}}',
         from: '{{from}}',
-        to: '{{to}}'
+        to: '{{to}}',
+        country: '{{country}}',
+        state: '{{state}}',
+        city: '{{city}}',
+        zip: '{{zip}}'
+      }
+      if (userDataMappings.length > 0) {
+        const userData: Record<string, string> = {}
+        const customData: Record<string, string> = {}
+        userDataMappings.forEach((mapping: any) => {
+          if (!mapping?.key || !mapping?.variable) return
+          if (mapping.key === 'custom_data') {
+            customData[mapping.variable] = `{{${mapping.variable}}}`
+            return
+          }
+          userData[mapping.key] = `{{${mapping.variable}}}`
+        })
+        if (Object.keys(userData).length > 0) {
+          bodyPayload.user_data = userData
+        }
+        if (Object.keys(customData).length > 0) {
+          bodyPayload.custom_data = customData
+        }
       }
       if (testEventCode) {
         bodyPayload.test_event_code = testEventCode
@@ -83,6 +106,7 @@ export function convertReactFlowToBland(reactFlowData: ReactFlowData): BlandFlow
           configNickname,
           eventName,
           testEventCode,
+          userDataMappings,
           __reactFlowType: 'facebookPixelNode'
         }
       }
