@@ -47,7 +47,7 @@ export function DashboardSidebar() {
   const { user, logout } = useAuth()
   const dropdownRef = useRef<HTMLDivElement>(null)
   const isAdmin = Boolean(user?.is_admin)
-  const organizationLinks = user?.orgMemberships?.length
+  const organizationLinks = user
     ? [{ name: "My Organization", href: "/dashboard/organization", icon: Building2 }]
     : []
   const navLinks = isAdmin
