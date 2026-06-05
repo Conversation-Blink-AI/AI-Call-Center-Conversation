@@ -64,50 +64,6 @@ export async function POST(request: NextRequest, context: { params: { configId: 
     }
 
     const phoneHash = sha256Hash(fromPhone)
-    const allowedUserDataKeys = new Set([
-      "em",
-      "ph",
-      "fn",
-      "ln",
-      "ge",
-      "db",
-      "ct",
-      "st",
-      "zp",
-      "country",
-      "external_id",
-      "client_ip_address",
-      "client_user_agent",
-      "fbc",
-      "fbp",
-      "subscription_id",
-      "fb_login_id",
-      "lead_id",
-      "anon_id",
-      "madid",
-      "page_id",
-      "page_scoped_user_id",
-      "ctwa_clid",
-      "ig_account_id",
-      "ig_sid"
-    ])
-    const nonHashedKeys = new Set([
-      "client_ip_address",
-      "client_user_agent",
-      "fbc",
-      "fbp",
-      "subscription_id",
-      "fb_login_id",
-      "lead_id",
-      "anon_id",
-      "madid",
-      "page_id",
-      "page_scoped_user_id",
-      "ctwa_clid",
-      "ig_account_id",
-      "ig_sid"
-    ])
-    const arrayKeys = new Set(["em", "ph"])
     const userData: Record<string, string | string[]> = {
       ph: [phoneHash]
     }
@@ -118,32 +74,6 @@ export async function POST(request: NextRequest, context: { params: { configId: 
       userData.client_user_agent = userAgent
     }
 
-    userData.external_id = callId
-
-    const extraUserData = body?.user_data && typeof body.user_data === "object" ? body.user_data : null
-    if (extraUserData) {
-      Object.entries(extraUserData).forEach(([key, rawValue]) => {
-        if (!allowedUserDataKeys.has(key)) return
-        const values = Array.isArray(rawValue) ? rawValue : [rawValue]
-        const cleanedValues = values
-          .map((value) => (typeof value === "string" ? value.trim() : ""))
-          .filter((value) => value)
-          .map((value) => (nonHashedKeys.has(key) ? value : sha256Hash(value)))
-
-        if (cleanedValues.length === 0) return
-        if (arrayKeys.has(key)) {
-          const current = Array.isArray(userData[key]) ? (userData[key] as string[]) : []
-          const merged = Array.from(new Set([...current, ...cleanedValues]))
-          userData[key] = merged
-          return
-        }
-
-        userData[key] = cleanedValues[0]
-      })
-    }
-
-    const customData = body?.custom_data && typeof body.custom_data === "object" ? body.custom_data : null
-
     const payload: any = {
       data: [
         {
@@ -151,8 +81,7 @@ export async function POST(request: NextRequest, context: { params: { configId: 
           event_time: Math.floor(Date.now() / 1000),
           event_id: callId,
           action_source: "phone_call",
-          user_data: userData,
-          ...(customData ? { custom_data: customData } : {})
+          user_data: userData
         }
       ]
     }

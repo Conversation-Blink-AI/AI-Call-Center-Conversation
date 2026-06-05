@@ -12,7 +12,6 @@ interface FacebookPixelNodeProps {
     configId?: string
     configNickname?: string
     testEventCode?: string
-    userDataMappings?: Array<{ key: string; variable: string }>
     url?: string
     method?: string
     headers?: any[]
@@ -66,11 +65,6 @@ export function FacebookPixelNode({ data, selected }: FacebookPixelNodeProps) {
           {data.testEventCode && (
             <div className="text-[11px] opacity-80 text-gray-600 dark:text-gray-300 mt-0.5">
               Test: {data.testEventCode}
-            </div>
-          )}
-          {(data.userDataMappings || []).length > 0 && (
-            <div className="text-[11px] opacity-80 text-gray-600 dark:text-gray-300 mt-0.5">
-              User data: {data.userDataMappings?.length} vars
             </div>
           )}
 

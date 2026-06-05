@@ -17,10 +17,9 @@ interface NodeEditorDrawerProps {
   onClose: () => void
   selectedNode: any | null
   onUpdateNode: (nodeId: string, updates: any) => void
-  availableVariables: string[]
 }
 
-export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode, availableVariables }: NodeEditorDrawerProps) {
+export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode }: NodeEditorDrawerProps) {
   const scrollContainerRef = React.useRef<HTMLDivElement>(null)
   
   // Webhook settings state - must be at component level (React hooks rules)
@@ -37,34 +36,6 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode, 
   }>>([]);
   const [metaConfigsLoading, setMetaConfigsLoading] = React.useState(false);
   const [metaConfigsError, setMetaConfigsError] = React.useState<string>('');
-  const metaUserDataKeys = [
-    'em',
-    'ph',
-    'fn',
-    'ln',
-    'ge',
-    'db',
-    'ct',
-    'st',
-    'zp',
-    'country',
-    'external_id',
-    'client_ip_address',
-    'client_user_agent',
-    'fbc',
-    'fbp',
-    'subscription_id',
-    'fb_login_id',
-    'lead_id',
-    'anon_id',
-    'madid',
-    'page_id',
-    'page_scoped_user_id',
-    'ctwa_clid',
-    'ig_account_id',
-    'ig_sid',
-    'custom_data'
-  ]
   
   // Static text toggle state for question nodes
   const [useStaticText, setUseStaticText] = React.useState(true);
@@ -140,44 +111,6 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode, 
         configId,
         configNickname: selectedConfig?.nickname || '',
         eventName: selectedConfig?.event_name || selectedNode?.data?.eventName || ''
-      }
-    }
-    onUpdateNode(selectedNode.id, updates)
-  }
-
-  const handleUserDataMappingAdd = () => {
-    const currentMappings = selectedNode.data.userDataMappings || []
-    const updates = {
-      data: {
-        ...selectedNode.data,
-        userDataMappings: [...currentMappings, { key: '', variable: '' }]
-      }
-    }
-    onUpdateNode(selectedNode.id, updates)
-  }
-
-  const handleUserDataMappingUpdate = (index: number, field: 'key' | 'variable', value: string) => {
-    const currentMappings = [...(selectedNode.data.userDataMappings || [])]
-    currentMappings[index] = {
-      ...currentMappings[index],
-      [field]: value
-    }
-    const updates = {
-      data: {
-        ...selectedNode.data,
-        userDataMappings: currentMappings
-      }
-    }
-    onUpdateNode(selectedNode.id, updates)
-  }
-
-  const handleUserDataMappingRemove = (index: number) => {
-    const currentMappings = [...(selectedNode.data.userDataMappings || [])]
-    currentMappings.splice(index, 1)
-    const updates = {
-      data: {
-        ...selectedNode.data,
-        userDataMappings: currentMappings
       }
     }
     onUpdateNode(selectedNode.id, updates)
@@ -517,75 +450,6 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode, 
                     placeholder="TEST28924"
                   />
                   <p className="text-xs text-muted-foreground mt-1">Only used for Meta Test Events.</p>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label>Meta User Data Mappings</Label>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleUserDataMappingAdd}
-                      className="h-8"
-                    >
-                      <Plus className="w-4 h-4 mr-1" />
-                      Add Mapping
-                    </Button>
-                  </div>
-
-                  {(selectedNode.data.userDataMappings || []).map((mapping: any, index: number) => (
-                    <div key={index} className="grid grid-cols-1 md:grid-cols-[160px_1fr_auto] gap-2 items-center">
-                      <Select
-                        value={mapping.key || ''}
-                        onValueChange={(value) => handleUserDataMappingUpdate(index, 'key', value)}
-                      >
-                        <SelectTrigger className="h-8">
-                          <SelectValue placeholder="Meta key" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {metaUserDataKeys.map((key) => (
-                            <SelectItem key={key} value={key}>
-                              {key}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Select
-                        value={mapping.variable || ''}
-                        onValueChange={(value) => handleUserDataMappingUpdate(index, 'variable', value)}
-                        disabled={availableVariables.length === 0}
-                      >
-                        <SelectTrigger className="h-8">
-                          <SelectValue placeholder={availableVariables.length === 0 ? "No variables yet" : "Select variable"} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableVariables.map((variable) => (
-                            <SelectItem key={variable} value={variable}>
-                              {variable}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => handleUserDataMappingRemove(index)}
-                        className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  ))}
-
-                  {(selectedNode.data.userDataMappings || []).length === 0 && (
-                    <p className="text-xs text-muted-foreground">No user data mappings yet.</p>
-                  )}
-
-                  {availableVariables.length > 0 && (
-                    <p className="text-xs text-muted-foreground">
-                      Available variables: {availableVariables.join(', ')}
-                    </p>
-                  )}
                 </div>
 
                 <div className="bg-card p-2 rounded border border-border">

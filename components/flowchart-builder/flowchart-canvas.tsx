@@ -81,20 +81,6 @@ export function FlowchartCanvas({
   const localPathwayId = pathwayInfo?.local_pathway_id || pathwayInfo?.pathway_id
   const blandPathwayId = pathwayInfo?.bland_pathway_id || pathwayInfo?.pathway_id
 
-  const availableVariables = useMemo(() => {
-    const vars = new Set<string>(['country', 'state', 'city', 'zip', 'call_id'])
-    nodes.forEach((node) => {
-      const extractVars = node.data?.extractVars
-      if (Array.isArray(extractVars)) {
-        extractVars.forEach((extractVar: any[]) => {
-          const name = extractVar?.[0]
-          if (name) vars.add(name)
-        })
-      }
-    })
-    return Array.from(vars)
-  }, [nodes])
-
   const nodeTypes = useMemo(
     () => ({
       greetingNode: (props: any) => <GreetingNode {...props} />,
@@ -432,7 +418,6 @@ export function FlowchartCanvas({
           configNickname: '',
           eventName: 'CallLead',
           testEventCode: '',
-          userDataMappings: [],
           actionSource: 'phone_call',
           eventData: {},
         }
@@ -560,7 +545,6 @@ export function FlowchartCanvas({
         onClose={() => setIsEditorOpen(false)}
         selectedNode={selectedNode}
         onUpdateNode={onUpdateNode}
-        availableVariables={availableVariables}
       />
 
       <EdgeEditorDrawer
