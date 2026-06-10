@@ -1,6 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
+import { resolveAnalyticsDateRange } from '@/lib/analytics-date-range'
 import { CallDatabaseService } from '@/services/call-database-service'
 
 export async function GET(request: NextRequest) {
@@ -19,25 +20,22 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(searchParams.get('offset') || '0')
     const status = searchParams.get('status') || undefined
     const phoneNumber = searchParams.get('phoneNumber') || undefined
-    const startDate = searchParams.get('startDate') || undefined
-    const endDate = searchParams.get('endDate') || undefined
-    const timeframe = searchParams.get('timeframe') || undefined
+    const metaCapiStatus = searchParams.get('metaCapiStatus') as 'fired' | 'failed' | 'not_fired' | null
+    const { start: rangeStart, end: rangeEnd } = resolveAnalyticsDateRange(searchParams)
+    const isAllTime = !rangeStart && !rangeEnd
 
     // Verify the user ID matches the authenticated user
     if (userId !== user.id) {
       return NextResponse.json({ error: 'User ID mismatch' }, { status: 403 })
     }
 
+    const now = new Date()
+    const startDate = rangeStart?.toISOString()
+    const endDate = isAllTime ? undefined : (rangeEnd ?? now).toISOString()
+
     console.log(`🔍 [DATABASE-CALLS] Fetching calls for user: ${user.id}`, {
       limit, offset, status, phoneNumber, startDate, endDate
     })
-
-    const now = new Date()
-    const isAllTime = timeframe === 'all'
-    const timeframeDays = timeframe && !isAllTime ? parseInt(timeframe.replace('d', ''), 10) : NaN
-    const timeframeStart = !isNaN(timeframeDays)
-      ? new Date(now.getTime() - (timeframeDays * 24 * 60 * 60 * 1000)).toISOString()
-      : undefined
 
     // Get calls from database
     const result = await CallDatabaseService.getCallsForUser(userId, {
@@ -45,8 +43,9 @@ export async function GET(request: NextRequest) {
       offset,
       status,
       phoneNumber,
-      startDate: startDate || timeframeStart,
-      endDate: endDate || (isAllTime ? undefined : now.toISOString())
+      startDate,
+      endDate,
+      metaCapiStatus: metaCapiStatus || undefined,
     })
 
     console.log(`✅ [DATABASE-CALLS] Found ${result.calls.length} calls, total: ${result.total}`)

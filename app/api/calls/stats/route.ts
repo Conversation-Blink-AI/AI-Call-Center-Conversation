@@ -1,6 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
+import { resolveAnalyticsDateRange } from '@/lib/analytics-date-range'
 import { CallDatabaseService } from '@/services/call-database-service'
 
 export async function GET(request: NextRequest) {
@@ -16,7 +17,6 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
-    const timeframe = searchParams.get('timeframe') || '7d'
 
     if (!userId || userId !== user.id) {
       return NextResponse.json(
@@ -25,7 +25,10 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Calculate date ranges
+    const { start: rangeStart, end: rangeEnd } = resolveAnalyticsDateRange(searchParams)
+    const isAllTime = !rangeStart && !rangeEnd
+
+    // Calculate date ranges for comparison metrics
     const now = new Date()
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000)
@@ -36,19 +39,13 @@ export async function GET(request: NextRequest) {
     const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
     const lastMonthEnd = new Date(thisMonthStart.getTime() - 1)
 
-    const isAllTime = timeframe === 'all'
-    const timeframeDays = isAllTime ? NaN : parseInt(timeframe.replace('d', ''), 10)
-    const timeframeStart = isNaN(timeframeDays)
-      ? null
-      : new Date(now.getTime() - (timeframeDays * 24 * 60 * 60 * 1000))
-
-    // Get basic stats (scoped to timeframe)
+    // Get basic stats (scoped to selected date range)
     const basicStats = await CallDatabaseService.getCallStatsForRange(userId, {
-      startDate: timeframeStart ? timeframeStart.toISOString() : undefined,
-      endDate: isAllTime ? undefined : now.toISOString()
+      startDate: rangeStart ? rangeStart.toISOString() : undefined,
+      endDate: isAllTime ? undefined : (rangeEnd ?? now).toISOString()
     })
 
-    // Get enhanced stats with timeframe filtering
+    // Get enhanced stats with date range filtering
     const enhancedStats = await getEnhancedStats(userId, {
       today,
       yesterday,
@@ -58,18 +55,18 @@ export async function GET(request: NextRequest) {
       thisMonthStart,
       lastMonthStart,
       lastMonthEnd,
-      rangeStart: timeframeStart,
-      rangeEnd: isAllTime ? null : now
+      rangeStart,
+      rangeEnd: isAllTime ? null : (rangeEnd ?? now)
     })
 
     const volumeSeries = await getCallVolumeSeries(userId, {
-      rangeStart: timeframeStart,
-      rangeEnd: isAllTime ? null : now
+      rangeStart,
+      rangeEnd: isAllTime ? null : (rangeEnd ?? now)
     })
 
     const qualifiedLeadsSeries = await getQualifiedLeadsSeries(userId, {
-      rangeStart: timeframeStart,
-      rangeEnd: isAllTime ? null : now
+      rangeStart,
+      rangeEnd: isAllTime ? null : (rangeEnd ?? now)
     })
 
     // Calculate derived metrics
@@ -285,7 +282,8 @@ async function getQualifiedLeadsSeries(
       FROM call_logs
       WHERE user_id = $1
         AND (
-          ended_reason ILIKE '%transfer%' 
+          (transferred_to IS NOT NULL AND TRIM(transferred_to) != '')
+          OR ended_reason ILIKE '%transfer%' 
           OR ended_reason ILIKE '%transferred%'
           OR ended_reason ILIKE '%transfered%'
         )
