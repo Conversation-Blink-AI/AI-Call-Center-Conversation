@@ -110,9 +110,10 @@ export class CallDatabaseService {
       phoneNumber?: string
       startDate?: string
       endDate?: string
+      metaCapiStatus?: 'fired' | 'failed' | 'not_fired'
     }
   ): Promise<{ calls: Call[], total: number }> {
-    const { limit = 50, offset = 0, status, phoneNumber, startDate, endDate } = options || {}
+    const { limit = 50, offset = 0, status, phoneNumber, startDate, endDate, metaCapiStatus } = options || {}
 
     let whereConditions = ['c.user_id = $1']
     const values: any[] = [userId]
@@ -148,7 +149,40 @@ export class CallDatabaseService {
       values.push(endDate)
     }
 
+    if (metaCapiStatus === 'fired') {
+      whereConditions.push(`EXISTS (
+        SELECT 1 FROM meta_capi_events e
+        WHERE e.call_id = c.call_id
+          AND e.response_status IS NOT NULL AND e.response_status < 300
+      )`)
+    } else if (metaCapiStatus === 'failed') {
+      whereConditions.push(`EXISTS (
+        SELECT 1 FROM meta_capi_events e WHERE e.call_id = c.call_id
+      )`)
+      whereConditions.push(`NOT EXISTS (
+        SELECT 1 FROM meta_capi_events e
+        WHERE e.call_id = c.call_id
+          AND e.response_status IS NOT NULL AND e.response_status < 300
+      )`)
+    } else if (metaCapiStatus === 'not_fired') {
+      whereConditions.push(`NOT EXISTS (
+        SELECT 1 FROM meta_capi_events e WHERE e.call_id = c.call_id
+      )`)
+    }
+
     const whereClause = whereConditions.join(' AND ')
+
+    const metaCapiStatusSelect = `
+      CASE
+        WHEN NOT EXISTS (SELECT 1 FROM meta_capi_events e WHERE e.call_id = c.call_id) THEN 'not_fired'
+        WHEN EXISTS (
+          SELECT 1 FROM meta_capi_events e
+          WHERE e.call_id = c.call_id
+            AND e.response_status IS NOT NULL AND e.response_status < 300
+        ) THEN 'fired'
+        ELSE 'failed'
+      END AS meta_capi_status
+    `
 
     // Get total count
     const countQuery = `
@@ -161,7 +195,7 @@ export class CallDatabaseService {
 
     // Get calls with pagination
     const callsQuery = `
-      SELECT c.*, pn.phone_number as phone_number_detail
+      SELECT c.*, pn.phone_number as phone_number_detail, ${metaCapiStatusSelect}
       FROM call_logs c
       LEFT JOIN phone_numbers pn ON c.phone_number_id = pn.id
       WHERE ${whereClause}
@@ -404,7 +438,10 @@ export class CallDatabaseService {
         COUNT(CASE WHEN status = 'failed' OR status = 'error' THEN 1 END) as failed_calls,
         COUNT(
           CASE 
-            WHEN transferred_to IS NOT NULL AND TRIM(transferred_to) <> ''
+            WHEN (transferred_to IS NOT NULL AND TRIM(transferred_to) != '')
+              OR ended_reason ILIKE '%transfer%' 
+              OR ended_reason ILIKE '%transferred%'
+              OR ended_reason ILIKE '%transfered%'
             THEN 1 
           END
         ) as transferred_calls,
