@@ -418,6 +418,7 @@ export default function CallHistoryPage() {
                         <TableHead className="font-semibold text-foreground whitespace-nowrap">Duration</TableHead>
                         <TableHead className="font-semibold text-foreground whitespace-nowrap">Status</TableHead>
                         <TableHead className="font-semibold text-foreground whitespace-nowrap">Ended Reason</TableHead>
+                        <TableHead className="font-semibold text-foreground whitespace-nowrap">Transferred To</TableHead>
                         <TableHead className="font-semibold text-foreground">Pathway ID</TableHead>
                         <TableHead className="font-semibold text-foreground">Conversation Summary</TableHead>
                         <TableHead className="font-semibold text-foreground whitespace-nowrap w-[200px]">Call Recordings</TableHead>
@@ -448,6 +449,9 @@ export default function CallHistoryPage() {
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
                             {call.ended_reason || call.outcome || "—"}
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground font-mono whitespace-nowrap">
+                            {call.transferred_to || "—"}
                           </TableCell>
                           <TableCell className="text-xs text-muted-foreground font-mono break-all max-w-[200px]">
                             {call.pathway_id || "—"}

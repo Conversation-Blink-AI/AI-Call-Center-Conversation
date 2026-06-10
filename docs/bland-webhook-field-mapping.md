@@ -14,7 +14,23 @@ This document shows how Bland.ai built-in variables and webhook payload fields a
 | `status` | `status` | Call status (completed, failed, etc.) |
 | `duration`, `call_length`, `corrected_duration` | `duration_seconds` | Call duration in seconds |
 | `recording_url` | `recording_url` | URL to call recording |
-| `transcription`, `transcript` | `transcript` | Full call transcript |
+| `concatenated_transcript`, `transcripts[]`, `transcription`, `transcript` | `transcript` | Full call transcript |
+| `transcripts` | `transcripts_json` | Raw transcript array (JSONB) |
+| `pathway_logs` | `pathway_logs_json` | Raw pathway logs (JSONB) |
+| *(full payload)* | `raw_webhook_payload` | Complete webhook JSON (JSONB) |
+| `transferred_to` | `transferred_to` | Transfer destination number |
+| `transferred_at` | `transferred_at` | Transfer timestamp |
+| `record` | `record_enabled` | Whether recording was enabled |
+| `completed` | `completed` | Whether call completed |
+| `error_message` | `error_message` | Error message if any |
+| `queue_status` | `queue_status` | Queue status |
+| `pre_transfer_duration` | `pre_transfer_duration` | Seconds before transfer |
+| `post_transfer_duration` | `post_transfer_duration` | Seconds after transfer |
+| `variables.language` | `language` | Call language |
+| `variables.placement_group` | `placement_group` | Bland placement group |
+| `variables.region` | `region` | Bland region |
+| `variables.now` | `call_local_time` | Human-readable local time string |
+| `variables.timestamp` | `call_timezone` | ISO timestamp in call timezone |
 | `summary` | `summary` | Call summary |
 | `pathway_id` | `pathway_id` | Pathway used for the call |
 | `ended_reason` | `ended_reason` | Reason call ended |

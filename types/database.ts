@@ -119,13 +119,28 @@ export interface CallLog {
   interruptions: number | null
   phone_number_id: string | null
   // Bland.ai built-in variables
-  phone_number: string | null // The other party's number (always the other party)
-  country: string | null // Country code (e.g., US)
-  state: string | null // State/province abbreviation (e.g., CA)
-  city: string | null // Full city name, capitalized
-  zip: string | null // Zip code
-  short_from: string | null // Outbound number with country code removed
-  short_to: string | null // Inbound number with country code removed
-  call_timezone: string | null // {{now}} - Current time in call's timezone
-  call_time_utc: string | null // {{now_utc}} - Current time in UTC
+  phone_number: string | null
+  country: string | null
+  state: string | null
+  city: string | null
+  zip: string | null
+  short_from: string | null
+  short_to: string | null
+  call_timezone: string | null
+  call_time_utc: string | null
+  call_local_time: string | null
+  transferred_to: string | null
+  transferred_at: string | null
+  record_enabled: boolean | null
+  completed: boolean | null
+  error_message: string | null
+  queue_status: string | null
+  pre_transfer_duration: number | null
+  post_transfer_duration: number | null
+  language: string | null
+  placement_group: string | null
+  region: string | null
+  transcripts_json: unknown | null
+  pathway_logs_json: unknown | null
+  raw_webhook_payload: unknown | null
 }

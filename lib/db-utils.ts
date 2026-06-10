@@ -8,6 +8,7 @@ import {
   phoneLast4
 } from "./encryption"
 import { toE164Format } from "@/utils/phone-utils"
+import type { BlandCallLogPayload } from "./bland-webhook-utils"
 
 export async function connectToDatabase() {
   if (!process.env.DATABASE_URL) {
@@ -237,16 +238,16 @@ export async function createCall(callData: {
     ) 
     ON CONFLICT (call_id) 
     DO UPDATE SET
-      duration_seconds = EXCLUDED.duration_seconds,
-      status = EXCLUDED.status,
-      recording_url = EXCLUDED.recording_url,
-      recording_url_enc = EXCLUDED.recording_url_enc,
-      transcript = EXCLUDED.transcript,
-      transcript_enc = EXCLUDED.transcript_enc,
-      summary = EXCLUDED.summary,
-      summary_enc = EXCLUDED.summary_enc,
-      cost_cents = EXCLUDED.cost_cents,
-      ended_reason = EXCLUDED.ended_reason,
+      duration_seconds = COALESCE(EXCLUDED.duration_seconds, call_logs.duration_seconds),
+      status = COALESCE(EXCLUDED.status, call_logs.status),
+      recording_url = COALESCE(EXCLUDED.recording_url, call_logs.recording_url),
+      recording_url_enc = COALESCE(EXCLUDED.recording_url_enc, call_logs.recording_url_enc),
+      transcript = COALESCE(EXCLUDED.transcript, call_logs.transcript),
+      transcript_enc = COALESCE(EXCLUDED.transcript_enc, call_logs.transcript_enc),
+      summary = COALESCE(EXCLUDED.summary, call_logs.summary),
+      summary_enc = COALESCE(EXCLUDED.summary_enc, call_logs.summary_enc),
+      cost_cents = COALESCE(EXCLUDED.cost_cents, call_logs.cost_cents),
+      ended_reason = COALESCE(EXCLUDED.ended_reason, call_logs.ended_reason),
       updated_at = NOW()
     RETURNING *
   `, [
@@ -330,38 +331,14 @@ export async function updateCall(callId: string, updateData: any) {
 }
 
 // Call log functions for webhook-based call logging
-export async function createCallLog(callData: {
-  call_id: string
-  user_id: string
-  to_number: string
-  from_number: string
-  duration_seconds?: number
-  status?: string
-  recording_url?: string
-  transcript?: string
-  summary?: string
-  pathway_id?: string
-  ended_reason?: string
-  start_time?: string
-  end_time?: string
-  queue_time?: number
-  latency_ms?: number
-  interruptions?: number
-  phone_number_id?: string
-  // Bland.ai built-in variables
-  phone_number?: string // The other party's number
-  country?: string
-  state?: string
-  city?: string
-  zip?: string
-  short_from?: string
-  short_to?: string
-  call_timezone?: string
-  call_time_utc?: string
-}) {
+export async function createCallLog(callData: BlandCallLogPayload) {
   const toNumber = callData.to_number ? toE164Format(callData.to_number) : ""
   const fromNumber = callData.from_number ? toE164Format(callData.from_number) : ""
   const otherParty = callData.phone_number ? toE164Format(callData.phone_number) : ""
+  const transferredTo = callData.transferred_to
+    ? toE164Format(callData.transferred_to)
+    : null
+
   return executeQuery(`
     INSERT INTO call_logs (
       call_id, user_id, to_number, from_number,
@@ -371,41 +348,63 @@ export async function createCallLog(callData: {
       queue_time, latency_ms, interruptions, phone_number_id,
       phone_number, phone_number_enc, phone_number_hash,
       country, state, city, zip, short_from, short_to,
-      call_timezone, call_time_utc,
+      call_timezone, call_time_utc, call_local_time,
+      transferred_to, transferred_at,
+      record_enabled, completed,
+      error_message, queue_status, pre_transfer_duration, post_transfer_duration,
+      language, placement_group, region,
+      transcripts_json, pathway_logs_json, raw_webhook_payload,
       created_at, updated_at
     ) VALUES (
       $1, $2, $3, $4, $5, $6, $7, $8,
-      $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
-      $20, $21, $22, $23, $24, $25, $26, $27, $28,
-      $29, $30,
+      $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20,
+      $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31, $32,
+      $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44,
+      $45, $46, $47, $48, $49, $50,
       NOW(), NOW()
     ) 
     ON CONFLICT (call_id) 
     DO UPDATE SET
-      duration_seconds = EXCLUDED.duration_seconds,
-      status = EXCLUDED.status,
-      recording_url = EXCLUDED.recording_url,
-      recording_url_enc = EXCLUDED.recording_url_enc,
-      transcript = EXCLUDED.transcript,
-      transcript_enc = EXCLUDED.transcript_enc,
-      summary = EXCLUDED.summary,
-      summary_enc = EXCLUDED.summary_enc,
-      ended_reason = EXCLUDED.ended_reason,
-      end_time = EXCLUDED.end_time,
-      queue_time = EXCLUDED.queue_time,
-      latency_ms = EXCLUDED.latency_ms,
-      interruptions = EXCLUDED.interruptions,
-      phone_number = EXCLUDED.phone_number,
-      phone_number_enc = EXCLUDED.phone_number_enc,
-      phone_number_hash = EXCLUDED.phone_number_hash,
-      country = EXCLUDED.country,
-      state = EXCLUDED.state,
-      city = EXCLUDED.city,
-      zip = EXCLUDED.zip,
-      short_from = EXCLUDED.short_from,
-      short_to = EXCLUDED.short_to,
-      call_timezone = EXCLUDED.call_timezone,
-      call_time_utc = EXCLUDED.call_time_utc,
+      duration_seconds = COALESCE(EXCLUDED.duration_seconds, call_logs.duration_seconds),
+      status = COALESCE(EXCLUDED.status, call_logs.status),
+      recording_url = COALESCE(EXCLUDED.recording_url, call_logs.recording_url),
+      recording_url_enc = COALESCE(EXCLUDED.recording_url_enc, call_logs.recording_url_enc),
+      transcript = COALESCE(EXCLUDED.transcript, call_logs.transcript),
+      transcript_enc = COALESCE(EXCLUDED.transcript_enc, call_logs.transcript_enc),
+      summary = COALESCE(EXCLUDED.summary, call_logs.summary),
+      summary_enc = COALESCE(EXCLUDED.summary_enc, call_logs.summary_enc),
+      ended_reason = COALESCE(EXCLUDED.ended_reason, call_logs.ended_reason),
+      start_time = COALESCE(EXCLUDED.start_time, call_logs.start_time),
+      end_time = COALESCE(EXCLUDED.end_time, call_logs.end_time),
+      queue_time = COALESCE(EXCLUDED.queue_time, call_logs.queue_time),
+      latency_ms = COALESCE(EXCLUDED.latency_ms, call_logs.latency_ms),
+      interruptions = COALESCE(EXCLUDED.interruptions, call_logs.interruptions),
+      phone_number = COALESCE(EXCLUDED.phone_number, call_logs.phone_number),
+      phone_number_enc = COALESCE(EXCLUDED.phone_number_enc, call_logs.phone_number_enc),
+      phone_number_hash = COALESCE(EXCLUDED.phone_number_hash, call_logs.phone_number_hash),
+      country = COALESCE(EXCLUDED.country, call_logs.country),
+      state = COALESCE(EXCLUDED.state, call_logs.state),
+      city = COALESCE(EXCLUDED.city, call_logs.city),
+      zip = COALESCE(EXCLUDED.zip, call_logs.zip),
+      short_from = COALESCE(EXCLUDED.short_from, call_logs.short_from),
+      short_to = COALESCE(EXCLUDED.short_to, call_logs.short_to),
+      call_timezone = COALESCE(EXCLUDED.call_timezone, call_logs.call_timezone),
+      call_time_utc = COALESCE(EXCLUDED.call_time_utc, call_logs.call_time_utc),
+      call_local_time = COALESCE(EXCLUDED.call_local_time, call_logs.call_local_time),
+      transferred_to = COALESCE(EXCLUDED.transferred_to, call_logs.transferred_to),
+      transferred_at = COALESCE(EXCLUDED.transferred_at, call_logs.transferred_at),
+      record_enabled = COALESCE(EXCLUDED.record_enabled, call_logs.record_enabled),
+      completed = COALESCE(EXCLUDED.completed, call_logs.completed),
+      error_message = COALESCE(EXCLUDED.error_message, call_logs.error_message),
+      queue_status = COALESCE(EXCLUDED.queue_status, call_logs.queue_status),
+      pre_transfer_duration = COALESCE(EXCLUDED.pre_transfer_duration, call_logs.pre_transfer_duration),
+      post_transfer_duration = COALESCE(EXCLUDED.post_transfer_duration, call_logs.post_transfer_duration),
+      language = COALESCE(EXCLUDED.language, call_logs.language),
+      placement_group = COALESCE(EXCLUDED.placement_group, call_logs.placement_group),
+      region = COALESCE(EXCLUDED.region, call_logs.region),
+      transcripts_json = COALESCE(EXCLUDED.transcripts_json, call_logs.transcripts_json),
+      pathway_logs_json = COALESCE(EXCLUDED.pathway_logs_json, call_logs.pathway_logs_json),
+      raw_webhook_payload = COALESCE(EXCLUDED.raw_webhook_payload, call_logs.raw_webhook_payload),
       updated_at = NOW()
     RETURNING *
   `, [
@@ -417,33 +416,48 @@ export async function createCallLog(callData: {
     toNumber ? hashPhoneNumber(toNumber) : null,
     fromNumber ? encryptString(fromNumber) : null,
     fromNumber ? hashPhoneNumber(fromNumber) : null,
-    callData.duration_seconds || null,
-    callData.status || null,
-    callData.recording_url || null,
+    callData.duration_seconds ?? null,
+    callData.status ?? null,
+    callData.recording_url ?? null,
     callData.recording_url ? encryptString(callData.recording_url) : null,
-    callData.transcript || null,
+    callData.transcript ?? null,
     callData.transcript ? encryptString(callData.transcript) : null,
-    callData.summary || null,
+    callData.summary ?? null,
     callData.summary ? encryptString(callData.summary) : null,
-    callData.pathway_id || null,
-    callData.ended_reason || null,
-    callData.start_time || null,
-    callData.end_time || null,
-    callData.queue_time || null,
-    callData.latency_ms || null,
-    callData.interruptions || null,
-    callData.phone_number_id || null,
+    callData.pathway_id ?? null,
+    callData.ended_reason ?? null,
+    callData.start_time ?? null,
+    callData.end_time ?? null,
+    callData.queue_time ?? null,
+    callData.latency_ms ?? null,
+    callData.interruptions ?? null,
+    callData.phone_number_id ?? null,
     otherParty || null,
     otherParty ? encryptString(otherParty) : null,
     otherParty ? hashPhoneNumber(otherParty) : null,
-    callData.country || null,
-    callData.state || null,
-    callData.city || null,
-    callData.zip || null,
-    callData.short_from || null,
-    callData.short_to || null,
-    callData.call_timezone || null,
-    callData.call_time_utc || null
+    callData.country ?? null,
+    callData.state ?? null,
+    callData.city ?? null,
+    callData.zip ?? null,
+    callData.short_from ?? null,
+    callData.short_to ?? null,
+    callData.call_timezone ?? null,
+    callData.call_time_utc ?? null,
+    callData.call_local_time ?? null,
+    transferredTo,
+    callData.transferred_at ?? null,
+    callData.record_enabled ?? null,
+    callData.completed ?? null,
+    callData.error_message ?? null,
+    callData.queue_status ?? null,
+    callData.pre_transfer_duration ?? null,
+    callData.post_transfer_duration ?? null,
+    callData.language ?? null,
+    callData.placement_group ?? null,
+    callData.region ?? null,
+    callData.transcripts_json ? JSON.stringify(callData.transcripts_json) : null,
+    callData.pathway_logs_json ? JSON.stringify(callData.pathway_logs_json) : null,
+    callData.raw_webhook_payload ? JSON.stringify(callData.raw_webhook_payload) : null,
   ])
 }
 

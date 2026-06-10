@@ -2,20 +2,29 @@
 import { executeQuery, createCall, updateCall } from '@/lib/db-utils'
 import { hashPhoneNumber } from '@/lib/encryption'
 import { toE164Format } from '@/utils/phone-utils'
+import {
+  extractBlandTranscript,
+  parseBlandDuration,
+} from '@/lib/bland-webhook-utils'
 
 export interface BlandCallResponse {
   call_id: string
   to: string
   from: string
   call_length?: number
+  corrected_duration?: number | string
   status?: string
   created_at?: string
   ended_at?: string
   recording_url?: string
   transcription?: string
+  concatenated_transcript?: string
+  transcript?: string
+  transcripts?: Array<{ user: string; text: string }>
   summary?: string
   price?: number
   ended_reason?: string
+  call_ended_by?: string
   queue_time?: number
   latency?: number
   interruptions?: number
@@ -110,14 +119,14 @@ export class CallSyncService {
         user_id: userId,
         to_number: blandCall.to,
         from_number: blandCall.from,
-        duration_seconds: blandCall.call_length || null,
+        duration_seconds: parseBlandDuration(blandCall),
         status: blandCall.status || null,
         recording_url: blandCall.recording_url || null,
-        transcript: blandCall.transcription || null,
+        transcript: extractBlandTranscript(blandCall),
         summary: blandCall.summary || null,
-        cost_cents: null, // Always null to trigger auto-billing
+        cost_cents: null,
         pathway_id: blandCall.pathway_id || null,
-        ended_reason: blandCall.ended_reason || null,
+        ended_reason: blandCall.ended_reason || blandCall.call_ended_by || null,
         phone_number_id: phoneNumberId
       }
 

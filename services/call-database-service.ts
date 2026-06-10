@@ -2,6 +2,10 @@ import { db } from "@/lib/db"
 import { Call } from "@/types/database"
 import { encryptString, hashPhoneNumber } from "@/lib/encryption"
 import { toE164Format } from "@/utils/phone-utils"
+import {
+  extractBlandTranscript,
+  parseBlandDuration,
+} from "@/lib/bland-webhook-utils"
 
 export interface CallData {
   call_id: string
@@ -46,19 +50,19 @@ export class CallDatabaseService {
       ) 
       ON CONFLICT (call_id) 
       DO UPDATE SET
-        duration_seconds = EXCLUDED.duration_seconds,
-        status = EXCLUDED.status,
-        recording_url = EXCLUDED.recording_url,
-        recording_url_enc = EXCLUDED.recording_url_enc,
-        transcript = EXCLUDED.transcript,
-        transcript_enc = EXCLUDED.transcript_enc,
-        summary = EXCLUDED.summary,
-        summary_enc = EXCLUDED.summary_enc,
-        ended_reason = EXCLUDED.ended_reason,
-        end_time = EXCLUDED.end_time,
-        queue_time = EXCLUDED.queue_time,
-        latency_ms = EXCLUDED.latency_ms,
-        interruptions = EXCLUDED.interruptions,
+        duration_seconds = COALESCE(EXCLUDED.duration_seconds, call_logs.duration_seconds),
+        status = COALESCE(EXCLUDED.status, call_logs.status),
+        recording_url = COALESCE(EXCLUDED.recording_url, call_logs.recording_url),
+        recording_url_enc = COALESCE(EXCLUDED.recording_url_enc, call_logs.recording_url_enc),
+        transcript = COALESCE(EXCLUDED.transcript, call_logs.transcript),
+        transcript_enc = COALESCE(EXCLUDED.transcript_enc, call_logs.transcript_enc),
+        summary = COALESCE(EXCLUDED.summary, call_logs.summary),
+        summary_enc = COALESCE(EXCLUDED.summary_enc, call_logs.summary_enc),
+        ended_reason = COALESCE(EXCLUDED.ended_reason, call_logs.ended_reason),
+        end_time = COALESCE(EXCLUDED.end_time, call_logs.end_time),
+        queue_time = COALESCE(EXCLUDED.queue_time, call_logs.queue_time),
+        latency_ms = COALESCE(EXCLUDED.latency_ms, call_logs.latency_ms),
+        interruptions = COALESCE(EXCLUDED.interruptions, call_logs.interruptions),
         updated_at = NOW()
       RETURNING *
     `
@@ -225,13 +229,13 @@ export class CallDatabaseService {
           user_id: userId,
           to_number: apiCall.to || apiCall.to_number || '',
           from_number: apiCall.from || apiCall.from_number || '',
-          duration_seconds: apiCall.call_length || apiCall.duration || apiCall.duration_seconds,
+          duration_seconds: parseBlandDuration(apiCall),
           status: apiCall.status,
           recording_url: apiCall.recording_url,
-          transcript: apiCall.transcription || apiCall.transcript,
+          transcript: extractBlandTranscript(apiCall),
           summary: apiCall.summary,
           pathway_id: apiCall.pathway_id,
-          ended_reason: apiCall.ended_reason,
+          ended_reason: apiCall.ended_reason || apiCall.call_ended_by,
           start_time: apiCall.started_at || apiCall.start_time,
           end_time: apiCall.ended_at || apiCall.end_time,
           queue_time: apiCall.queue_time,
@@ -271,6 +275,7 @@ export class CallDatabaseService {
         const rawFromNumber = apiCall.from_number || apiCall.from
         const normalizedTo = rawToNumber ? toE164Format(rawToNumber) : ""
         const normalizedFrom = rawFromNumber ? toE164Format(rawFromNumber) : ""
+        const transcript = extractBlandTranscript(apiCall)
         const insertResult = await db.query(`
           INSERT INTO call_logs (
             call_id, user_id, to_number, from_number,
@@ -292,12 +297,12 @@ export class CallDatabaseService {
           normalizedTo ? hashPhoneNumber(normalizedTo) : null,
           normalizedFrom ? encryptString(normalizedFrom) : null,
           normalizedFrom ? hashPhoneNumber(normalizedFrom) : null,
-          apiCall.duration || apiCall.call_length || 0,
+          parseBlandDuration(apiCall) || 0,
           apiCall.status || 'unknown',
           apiCall.recording_url || null,
           apiCall.recording_url ? encryptString(apiCall.recording_url) : null,
-          apiCall.transcription || null,
-          apiCall.transcription ? encryptString(apiCall.transcription) : null,
+          transcript,
+          transcript ? encryptString(transcript) : null,
           apiCall.summary || null,
           apiCall.summary ? encryptString(apiCall.summary) : null,
           apiCall.pathway_id || null,
