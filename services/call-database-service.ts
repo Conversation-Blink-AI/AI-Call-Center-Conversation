@@ -404,9 +404,7 @@ export class CallDatabaseService {
         COUNT(CASE WHEN status = 'failed' OR status = 'error' THEN 1 END) as failed_calls,
         COUNT(
           CASE 
-            WHEN ended_reason ILIKE '%transfer%' 
-              OR ended_reason ILIKE '%transferred%'
-              OR ended_reason ILIKE '%transfered%'
+            WHEN transferred_to IS NOT NULL AND TRIM(transferred_to) <> ''
             THEN 1 
           END
         ) as transferred_calls,

@@ -45,14 +45,14 @@ interface CallStats {
   totalCost: number
   averageDuration: number
   successRate: number
-  qualifiedLeadsRate: number
+  transferLeadsRate: number
   averageCostPerCall: number
   callsThisWeek: number
   callsThisMonth: number
   costThisWeek: number
   costThisMonth: number
   volumeSeries: { date: string; count: number }[]
-  qualifiedLeadsSeries: { date: string; count: number }[]
+  transferLeadsSeries: { date: string; count: number }[]
 }
 
 interface DatabaseCall {
@@ -408,7 +408,7 @@ export default function CallsPage() {
     count: item.count
   })) || []
 
-  const qualifiedLeadsData = callStats?.qualifiedLeadsSeries?.map((item) => ({
+  const transferLeadsData = callStats?.transferLeadsSeries?.map((item) => ({
     date: item.date,
     label: new Date(item.date).toLocaleDateString(undefined, {
       month: "short",
@@ -417,8 +417,8 @@ export default function CallsPage() {
     count: item.count
   })) || []
 
-  const chartData = chartMetric === "qualified" ? qualifiedLeadsData : volumeData
-  const chartTitle = chartMetric === "qualified" ? "Qualified Leads" : "Call Volume"
+  const chartData = chartMetric === "transfers" ? transferLeadsData : volumeData
+  const chartTitle = chartMetric === "transfers" ? "Transfer Leads" : "Call Volume"
 
   if (loading) {
     return (
@@ -509,11 +509,11 @@ export default function CallsPage() {
 
           <Card className="shadow-sm">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 py-2 px-4">
-              <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Qualified Leads</CardTitle>
+              <CardTitle className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Transfer Leads</CardTitle>
               <Activity className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="px-4 pb-3 pt-0">
-              <div className="text-xl font-semibold">{callStats.qualifiedLeadsRate.toFixed(1)}%</div>
+              <div className="text-xl font-semibold">{callStats.transferLeadsRate.toFixed(1)}%</div>
               <div className="text-[11px] text-muted-foreground">
                 {callStats.transferredCalls} transferred, {callStats.totalCalls} total
               </div>
@@ -730,7 +730,7 @@ export default function CallsPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="volume">Call Volume</SelectItem>
-                <SelectItem value="qualified">Qualified Leads</SelectItem>
+                <SelectItem value="transfers">Transfer Leads</SelectItem>
               </SelectContent>
             </Select>
           </CardHeader>

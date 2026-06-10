@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
       rangeEnd: isAllTime ? null : now
     })
 
-    const qualifiedLeadsSeries = await getQualifiedLeadsSeries(userId, {
+    const transferLeadsSeries = await getTransferLeadsSeries(userId, {
       rangeStart: timeframeStart,
       rangeEnd: isAllTime ? null : now
     })
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
       ? (basicStats.completedCalls / basicStats.totalCalls) * 100
       : 0
 
-    const qualifiedLeadsRate = basicStats.totalCalls > 0
+    const transferLeadsRate = basicStats.totalCalls > 0
       ? (basicStats.transferredCalls / basicStats.totalCalls) * 100
       : 0
 
@@ -95,14 +95,14 @@ export async function GET(request: NextRequest) {
         ...basicStats,
         averageDuration,
         successRate,
-        qualifiedLeadsRate,
+        transferLeadsRate,
         averageCostPerCall,
         callsThisWeek: enhancedStats.callsThisWeek,
         callsThisMonth: enhancedStats.callsThisMonth,
         costThisWeek: enhancedStats.costThisWeek,
         costThisMonth: enhancedStats.costThisMonth,
         volumeSeries,
-        qualifiedLeadsSeries
+        transferLeadsSeries
       },
       timeframeCounts: {
         today: enhancedStats.callsToday,
@@ -268,7 +268,7 @@ async function getCallVolumeSeries(
   }))
 }
 
-async function getQualifiedLeadsSeries(
+async function getTransferLeadsSeries(
   userId: string,
   dates: { rangeStart: Date | null; rangeEnd: Date | null }
 ) {
@@ -284,11 +284,8 @@ async function getQualifiedLeadsSeries(
         COUNT(*) AS count
       FROM call_logs
       WHERE user_id = $1
-        AND (
-          ended_reason ILIKE '%transfer%' 
-          OR ended_reason ILIKE '%transferred%'
-          OR ended_reason ILIKE '%transfered%'
-        )
+        AND transferred_to IS NOT NULL
+        AND TRIM(transferred_to) <> ''
         AND ($2::timestamptz IS NULL OR created_at >= $2::timestamptz)
         AND ($3::timestamptz IS NULL OR created_at <= $3::timestamptz)
       GROUP BY day
