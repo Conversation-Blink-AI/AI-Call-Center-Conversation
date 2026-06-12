@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS lander_events (
     placement VARCHAR(255),
     site_source_name VARCHAR(255),
     fbclid VARCHAR(500),
+    lander_url TEXT,
 
     -- Visitor / device / network
     user_agent TEXT,

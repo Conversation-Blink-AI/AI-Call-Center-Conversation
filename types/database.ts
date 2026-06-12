@@ -156,6 +156,7 @@ export interface LanderEvent {
   placement: string | null
   site_source_name: string | null
   fbclid: string | null
+  lander_url: string | null
   user_agent: string | null
   device: string | null
   ip: string | null

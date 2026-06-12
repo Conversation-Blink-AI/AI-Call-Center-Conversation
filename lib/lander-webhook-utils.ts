@@ -8,6 +8,7 @@ export interface LanderEventPayload {
   placement?: string | null
   site_source_name?: string | null
   fbclid?: string | null
+  lander_url?: string | null
   user_agent?: string | null
   device?: string | null
   ip?: string | null
@@ -62,6 +63,7 @@ export function mapLanderWebhookToEvent(body: Record<string, unknown>): LanderEv
     placement: pickString(body, "placement", "Placement"),
     site_source_name: pickString(body, "site_source_name", "siteSourceName", "Site Source Name"),
     fbclid: pickString(body, "fbclid", "FBCLID"),
+    lander_url: pickString(body, "lander_url", "landerUrl", "Lander URL"),
     user_agent: pickString(body, "user_agent", "userAgent", "User Agent"),
     device: pickString(body, "device", "Device"),
     ip: pickString(body, "ip", "IP"),

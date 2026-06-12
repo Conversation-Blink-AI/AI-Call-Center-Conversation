@@ -466,14 +466,14 @@ export async function createLanderEvent(eventData: LanderEventPayload) {
   return executeQuery(`
     INSERT INTO lander_events (
       ad_id, ad_set_id, campaign_id, ad_name, ad_set_name, campaign_name,
-      placement, site_source_name, fbclid,
+      placement, site_source_name, fbclid, lander_url,
       user_agent, device, ip, os, browser, ip_confidence, risk_flags,
       city, network_provider, connection_type, network_type,
       country, region, isp, asn, click_time, raw_webhook_payload
     ) VALUES (
-      $1, $2, $3, $4, $5, $6, $7, $8, $9,
-      $10, $11, $12, $13, $14, $15, $16,
-      $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
+      $1, $2, $3, $4, $5, $6, $7, $8, $9, $10,
+      $11, $12, $13, $14, $15, $16, $17,
+      $18, $19, $20, $21, $22, $23, $24, $25, $26, $27
     )
     RETURNING id, created_at
   `, [
@@ -486,6 +486,7 @@ export async function createLanderEvent(eventData: LanderEventPayload) {
     eventData.placement ?? null,
     eventData.site_source_name ?? null,
     eventData.fbclid ?? null,
+    eventData.lander_url ?? null,
     eventData.user_agent ?? null,
     eventData.device ?? null,
     eventData.ip ?? null,
