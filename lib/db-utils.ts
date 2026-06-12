@@ -9,6 +9,7 @@ import {
 } from "./encryption"
 import { toE164Format } from "@/utils/phone-utils"
 import type { BlandCallLogPayload } from "./bland-webhook-utils"
+import type { LanderEventPayload } from "./lander-webhook-utils"
 
 export async function connectToDatabase() {
   if (!process.env.DATABASE_URL) {
@@ -458,6 +459,50 @@ export async function createCallLog(callData: BlandCallLogPayload) {
     callData.transcripts_json ? JSON.stringify(callData.transcripts_json) : null,
     callData.pathway_logs_json ? JSON.stringify(callData.pathway_logs_json) : null,
     callData.raw_webhook_payload ? JSON.stringify(callData.raw_webhook_payload) : null,
+  ])
+}
+
+export async function createLanderEvent(eventData: LanderEventPayload) {
+  return executeQuery(`
+    INSERT INTO lander_events (
+      ad_id, ad_set_id, campaign_id, ad_name, ad_set_name, campaign_name,
+      placement, site_source_name, fbclid,
+      user_agent, device, ip, os, browser, ip_confidence, risk_flags,
+      city, network_provider, connection_type, network_type,
+      country, region, isp, asn, click_time, raw_webhook_payload
+    ) VALUES (
+      $1, $2, $3, $4, $5, $6, $7, $8, $9,
+      $10, $11, $12, $13, $14, $15, $16,
+      $17, $18, $19, $20, $21, $22, $23, $24, $25, $26
+    )
+    RETURNING id, created_at
+  `, [
+    eventData.ad_id ?? null,
+    eventData.ad_set_id ?? null,
+    eventData.campaign_id ?? null,
+    eventData.ad_name ?? null,
+    eventData.ad_set_name ?? null,
+    eventData.campaign_name ?? null,
+    eventData.placement ?? null,
+    eventData.site_source_name ?? null,
+    eventData.fbclid ?? null,
+    eventData.user_agent ?? null,
+    eventData.device ?? null,
+    eventData.ip ?? null,
+    eventData.os ?? null,
+    eventData.browser ?? null,
+    eventData.ip_confidence ?? null,
+    eventData.risk_flags ?? null,
+    eventData.city ?? null,
+    eventData.network_provider ?? null,
+    eventData.connection_type ?? null,
+    eventData.network_type ?? null,
+    eventData.country ?? null,
+    eventData.region ?? null,
+    eventData.isp ?? null,
+    eventData.asn ?? null,
+    eventData.click_time ?? null,
+    eventData.raw_webhook_payload ? JSON.stringify(eventData.raw_webhook_payload) : null,
   ])
 }
 

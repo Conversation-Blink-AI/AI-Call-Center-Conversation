@@ -144,3 +144,34 @@ export interface CallLog {
   pathway_logs_json: unknown | null
   raw_webhook_payload: unknown | null
 }
+
+export interface LanderEvent {
+  id: string
+  ad_id: string | null
+  ad_set_id: string | null
+  campaign_id: string | null
+  ad_name: string | null
+  ad_set_name: string | null
+  campaign_name: string | null
+  placement: string | null
+  site_source_name: string | null
+  fbclid: string | null
+  user_agent: string | null
+  device: string | null
+  ip: string | null
+  os: string | null
+  browser: string | null
+  ip_confidence: string | null
+  risk_flags: string | null
+  city: string | null
+  network_provider: string | null
+  connection_type: string | null
+  network_type: string | null
+  country: string | null
+  region: string | null
+  isp: string | null
+  asn: string | null
+  click_time: string | null
+  raw_webhook_payload: unknown | null
+  created_at: string
+}
