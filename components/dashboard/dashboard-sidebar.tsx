@@ -11,9 +11,7 @@ import {
   BarChart3,
   BookOpen,
   Phone,
-  Users,
   CreditCard,
-  FileText,
   History,
   ChevronUp,
   User,
@@ -25,6 +23,15 @@ import {
   Building2,
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
+import {
+  sidebarNavClass,
+  sidebarNavIconClass,
+  sidebarNavItemActiveClass,
+  sidebarNavItemInactiveClass,
+  sidebarNavListClass,
+  sidebarShellClass,
+  sidebarTransitionClass,
+} from "@/lib/sidebar-layout"
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: Home },
@@ -56,19 +63,14 @@ export function DashboardSidebar() {
 
   const handleLogout = async () => {
     try {
-      console.log("🚪 [SIDEBAR] Starting logout process...")
       setIsDropdownOpen(false)
       await logout()
-      console.log("✅ [SIDEBAR] Logout successful")
-      // Don't manually redirect - let the auth context handle it
     } catch (error) {
       console.error("❌ [SIDEBAR] Logout error:", error)
-      // Fallback redirect only on error
       router.push("/")
     }
   }
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -86,18 +88,31 @@ export function DashboardSidebar() {
 
   if (!isMounted) {
     return (
-      <aside className="fixed left-0 top-0 z-40 h-screen w-16 bg-gray-50 border-r border-gray-200">
-        <div className="flex h-16 items-center justify-center border-b border-gray-200">
-          <span className="text-xl font-bold text-gray-900">B</span>
+      <aside
+        className={cn(
+          sidebarShellClass,
+          "w-16 z-40 flex flex-col",
+        )}
+      >
+        <div className="flex h-16 shrink-0 items-center justify-center border-b border-border">
+          <span className="text-xl font-bold text-foreground">C</span>
         </div>
       </aside>
     )
   }
 
   return (
-    <aside className="peer group fixed left-0 top-0 z-40 h-screen w-16 hover:w-60 bg-background border-r border-border transition-all duration-200 ease-in-out overflow-hidden">
+    <aside
+      className={cn(
+        "peer group",
+        sidebarShellClass,
+        sidebarTransitionClass,
+        "w-16 hover:w-60",
+        "z-40 flex flex-col",
+      )}
+    >
       {/* Header */}
-      <div className="flex h-16 items-center border-b border-border px-4">
+      <div className="flex h-16 shrink-0 items-center justify-center border-b border-border px-2 group-hover:justify-start group-hover:px-4">
         <Link href="/dashboard" className="flex items-center min-w-0 cursor-pointer">
           <div className="flex-shrink-0">
             <img
@@ -105,25 +120,24 @@ export function DashboardSidebar() {
               alt="Conversation Logo"
               className="h-8 w-8 object-contain"
               onError={(e) => {
-                // Fallback to a styled letter if image fails to load
-                const target = e.target as HTMLImageElement;
-                target.style.display = 'none';
-                target.nextElementSibling?.classList.remove('hidden');
+                const target = e.target as HTMLImageElement
+                target.style.display = "none"
+                target.nextElementSibling?.classList.remove("hidden")
               }}
             />
             <div className="hidden h-8 w-8 rounded-md bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
               <span className="text-white font-bold text-sm">C</span>
             </div>
           </div>
-          <div className="ml-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-100 overflow-hidden whitespace-nowrap">
-            <span className="text-xl font-bold text-foreground">Conversation</span>
+          <div className="w-0 ml-0 overflow-hidden whitespace-nowrap font-bold text-xl text-foreground opacity-0 transition-all duration-200 delay-75 group-hover:ml-3 group-hover:w-auto group-hover:opacity-100">
+            <span>Conversation</span>
           </div>
         </Link>
       </div>
 
-      {/* Navigation - Takes up remaining space except for profile section */}
-      <div className="flex-1 overflow-y-auto py-4" style={{ height: "calc(100vh - 64px - 80px)" }}>
-        <nav className="space-y-1 px-2">
+      {/* Navigation */}
+      <div className={sidebarNavClass}>
+        <nav className={sidebarNavListClass}>
           {navLinks.map((link) => {
             const isActive =
               link.href === "/dashboard"
@@ -136,98 +150,80 @@ export function DashboardSidebar() {
                 href={link.href}
                 prefetch={true}
                 className={cn(
-                  "flex items-center rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200 group/item",
-                  isActive
-                    ? "bg-primary/10 text-primary shadow-sm"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground hover:shadow-sm",
+                  "flex items-center rounded-xl py-2.5 text-sm font-medium transition-all duration-200 group/item justify-center px-2.5 group-hover:justify-start group-hover:px-3",
+                  isActive ? sidebarNavItemActiveClass : sidebarNavItemInactiveClass,
                 )}
               >
-                <div className="flex-shrink-0">
-                  <link.icon
-                    className={cn(
-                      "h-5 w-5",
-                      isActive ? "text-primary" : "text-muted-foreground group-hover/item:text-accent-foreground",
-                    )}
-                  />
-                </div>
-                <div className="ml-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300 delay-100 overflow-hidden whitespace-nowrap">
-                  <span>{link.name}</span>
-                </div>
+                <link.icon
+                  className={cn(
+                    sidebarNavIconClass,
+                    isActive ? "text-primary" : "text-muted-foreground group-hover/item:text-accent-foreground",
+                  )}
+                />
+                <span className="w-0 ml-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 delay-75 group-hover:ml-3 group-hover:w-auto group-hover:opacity-100">{link.name}</span>
               </Link>
             )
           })}
         </nav>
       </div>
 
-      {/* Profile Section - Fixed at bottom */}
-      <div className="absolute bottom-0 left-0 right-0 border-t border-border bg-background h-16 group-hover:h-auto group-hover:p-4 flex items-center justify-center" ref={dropdownRef}>
-        <div className="relative w-full h-full flex items-center justify-center group-hover:block group-hover:h-auto">
-          {/* Collapsed state - just show avatar centered */}
-          <div className="flex items-center justify-center h-full w-full group-hover:hidden">
+      {/* Profile */}
+      <div className="relative shrink-0 border-t border-border bg-background h-16 group-hover:h-auto group-hover:p-4" ref={dropdownRef}>
+        <div className="relative flex h-full w-full items-center justify-center group-hover:block group-hover:h-auto">
+          <div className="flex h-full w-full items-center justify-center group-hover:hidden">
             <Button
               variant="ghost"
-              className="h-full w-full flex items-center justify-center p-0 hover:bg-accent rounded-xl"
-              onClick={() => {
-                console.log("🖱️ Profile dropdown clicked, current state:", isDropdownOpen)
-                setIsDropdownOpen(!isDropdownOpen)
-              }}
+              className="flex h-full w-full items-center justify-center rounded-xl p-0 hover:bg-accent"
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             >
               <Avatar className="h-8 w-8 flex-shrink-0">
                 <AvatarImage src={user?.avatarUrl || ""} alt={user?.name || "User"} />
-                <AvatarFallback className="bg-blue-600 text-white text-sm font-medium">
+                <AvatarFallback className="bg-blue-600 text-sm font-medium text-white">
                   {user?.name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || "U"}
                 </AvatarFallback>
               </Avatar>
             </Button>
           </div>
 
-          {/* Expanded state - show full button with text */}
-          <div className="hidden group-hover:block w-full">
+          <div className="hidden w-full group-hover:block">
             <Button
               variant="ghost"
-              className="w-full flex items-center justify-start gap-3 hover:bg-accent focus:bg-accent px-3 py-2.5 h-auto rounded-xl"
-              onClick={() => {
-                console.log("🖱️ Profile dropdown clicked, current state:", isDropdownOpen)
-                setIsDropdownOpen(!isDropdownOpen)
-              }}
+              className="flex h-auto w-full items-center justify-start gap-3 rounded-xl px-3 py-2.5 hover:bg-accent focus:bg-accent"
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             >
               <Avatar className="h-8 w-8 flex-shrink-0">
                 <AvatarImage src={user?.avatarUrl || ""} alt={user?.name || "User"} />
-                <AvatarFallback className="bg-blue-600 text-white text-sm font-medium">
+                <AvatarFallback className="bg-blue-600 text-sm font-medium text-white">
                   {user?.name?.charAt(0)?.toUpperCase() || user?.email?.charAt(0)?.toUpperCase() || "U"}
                 </AvatarFallback>
               </Avatar>
-              <div className="overflow-hidden whitespace-nowrap min-w-0 flex-1 text-left">
-                <p className="text-sm font-medium text-foreground truncate">
+              <div className="min-w-0 flex-1 overflow-hidden whitespace-nowrap text-left">
+                <p className="truncate text-sm font-medium text-foreground">
                   {user?.name || user?.email?.split("@")[0] || "User"}
                 </p>
-                <p className="text-xs text-muted-foreground truncate">{user?.email}</p>
+                <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
               </div>
               <ChevronUp
                 className={cn(
-                  "h-4 w-4 text-muted-foreground transition-transform duration-200 flex-shrink-0",
+                  "h-4 w-4 flex-shrink-0 text-muted-foreground transition-transform duration-200",
                   isDropdownOpen ? "rotate-180" : "",
                 )}
               />
             </Button>
           </div>
 
-          {/* Dropdown Menu - Opens upward with proper z-index */}
           {isDropdownOpen && (
-            <div className="absolute bottom-full left-0 right-0 mb-2 bg-popover border border-border rounded-md shadow-lg z-[60]">
-              {/* User Info Header */}
-              <div className="px-4 py-3 border-b border-border/50">
+            <div className="absolute bottom-full left-0 right-0 z-[60] mb-2 rounded-md border border-border bg-popover shadow-lg">
+              <div className="border-b border-border/50 px-4 py-3">
                 <p className="text-sm font-medium text-popover-foreground">
                   {user?.name || user?.email?.split("@")[0] || "User"}
                 </p>
                 <p className="text-xs text-muted-foreground">{user?.email}</p>
               </div>
-
-              {/* Menu Items */}
               <div className="py-1">
                 <Link
                   href="/dashboard/profile"
-                  className="flex items-center px-4 py-2 text-sm text-popover-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+                  className="flex items-center px-4 py-2 text-sm text-popover-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
                   onClick={() => setIsDropdownOpen(false)}
                 >
                   <User className="mr-3 h-4 w-4" />
@@ -236,7 +232,7 @@ export function DashboardSidebar() {
                 <hr className="my-1 border-border/50" />
                 <button
                   onClick={handleLogout}
-                  className="flex items-center w-full px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors"
+                  className="flex w-full items-center px-4 py-2 text-sm text-red-400 transition-colors hover:bg-red-500/10"
                 >
                   <LogOut className="mr-3 h-4 w-4" />
                   Log Out

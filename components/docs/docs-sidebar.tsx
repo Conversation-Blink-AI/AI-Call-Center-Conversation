@@ -3,6 +3,11 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import {
+  sidebarNavClass,
+  sidebarNavItemExpandedClass,
+  sidebarNavItemInactiveClass,
+} from '@/lib/sidebar-layout'
 import { cn } from '@/lib/utils'
 import { 
   BookOpen, 
@@ -133,15 +138,15 @@ export function DocsSidebar() {
   })
 
   return (
-    <aside className="hidden lg:flex flex-col w-64 border-r border-border bg-muted/30 h-screen fixed left-0 top-0 overflow-y-auto">
-      <div className="p-4 border-b border-border">
-        <Link href="/docs" className="flex items-center gap-2">
-          <BookOpen className="h-5 w-5 text-primary" />
-          <span className="font-semibold text-lg">Documentation</span>
+    <aside className="hidden lg:flex flex-col w-60 border-r border-border bg-background h-screen fixed left-0 top-0 overflow-y-auto">
+      <div className="flex h-16 shrink-0 items-center border-b border-border px-4">
+        <Link href="/docs" className="flex items-center gap-3 min-w-0">
+          <BookOpen className="h-5 w-5 text-primary flex-shrink-0" />
+          <span className="font-semibold text-lg whitespace-nowrap">Documentation</span>
         </Link>
       </div>
 
-      <nav className="flex-1 p-4 space-y-1">
+      <nav className={cn(sidebarNavClass, "space-y-1")}>
         {navSections.map((section) => {
           const isOpen = openSections.has(section.title)
           const Icon = section.icon
@@ -152,7 +157,13 @@ export function DocsSidebar() {
               open={isOpen}
               onOpenChange={() => toggleSection(section.title)}
             >
-              <CollapsibleTrigger className="w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors">
+              <CollapsibleTrigger
+                className={cn(
+                  sidebarNavItemExpandedClass,
+                  "w-full gap-2",
+                  sidebarNavItemInactiveClass,
+                )}
+              >
                 {isOpen ? (
                   <ChevronDown className="h-4 w-4" />
                 ) : (
@@ -171,10 +182,11 @@ export function DocsSidebar() {
                       key={item.href}
                       href={item.href}
                       className={cn(
-                        'flex items-center justify-between px-3 py-2 rounded-md text-sm transition-colors',
+                        sidebarNavItemExpandedClass,
+                        "justify-between",
                         isActive
-                          ? 'bg-primary/10 text-primary font-medium'
-                          : 'text-muted-foreground hover:text-foreground hover:bg-accent'
+                          ? 'bg-primary/10 text-primary font-medium shadow-sm'
+                          : sidebarNavItemInactiveClass,
                       )}
                     >
                       <span>{item.title}</span>

@@ -39,6 +39,7 @@ import {
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { toast } from "sonner"
+import { isValidPhoneNumber, sanitizePhoneNumberInput } from "@/utils/phone-utils"
 
 interface Pathway {
   id: string
@@ -104,6 +105,35 @@ interface PurchasedNumber {
   number: string
 }
 
+function getLocalDateTimeMinValue(date = new Date()): string {
+  const pad = (value: number) => String(value).padStart(2, "0")
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
+}
+
+function isPastDateTimeLocal(value: string): boolean {
+  const selected = new Date(value)
+  if (Number.isNaN(selected.getTime())) return true
+
+  const now = new Date()
+  now.setSeconds(0, 0)
+  now.setMilliseconds(0)
+  selected.setSeconds(0, 0)
+  selected.setMilliseconds(0)
+
+  return selected < now
+}
+
+function sanitizeCommaSeparatedInput(value: string): string {
+  return value.replace(/[^a-zA-Z0-9\s,\-_]/g, "")
+}
+
+function parseCommaSeparatedList(value: string): string[] {
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
 export default function SendCallPage() {
   const { user } = useAuth()
   const [pathways, setPathways] = useState<Pathway[]>([])
@@ -166,6 +196,11 @@ export default function SendCallPage() {
   const [selectedCountryCode, setSelectedCountryCode] = useState("+1")
   const [phoneNumberInput, setPhoneNumberInput] = useState("")
 
+  // Raw string state for comma-separated fields (parsed on blur/submit)
+  const [dispositionsInput, setDispositionsInput] = useState("")
+  const [keywordsInput, setKeywordsInput] = useState("")
+  const [webhookEventsInput, setWebhookEventsInput] = useState("")
+
   // Sample prompts for quick selection
   const savedPrompts = [
     { id: "saved", name: "Saved Prompts", icon: Bookmark },
@@ -181,6 +216,27 @@ export default function SendCallPage() {
 
   const updateCallData = (field: keyof CallData, value: any) => {
     setCallData(prev => ({ ...prev, [field]: value }))
+  }
+
+  const minStartTime = getLocalDateTimeMinValue()
+
+  const handleStartTimeChange = (value: string) => {
+    if (!value) {
+      updateCallData("start_time", undefined)
+      return
+    }
+
+    if (isPastDateTimeLocal(value)) {
+      toast.error("Start time cannot be in the past")
+      return
+    }
+
+    updateCallData("start_time", value)
+  }
+
+  const handleTransferPhoneNumberChange = (value: string) => {
+    const sanitized = sanitizePhoneNumberInput(value)
+    updateCallData("transfer_phone_number", sanitized || undefined)
   }
 
   // Fetch user pathways and voices
@@ -364,12 +420,33 @@ export default function SendCallPage() {
       return
     }
 
+    if (callData.start_time && isPastDateTimeLocal(callData.start_time)) {
+      toast.error("Start time cannot be in the past")
+      return
+    }
+
+    if (callData.transfer_phone_number && !isValidPhoneNumber(callData.transfer_phone_number)) {
+      toast.error("Transfer phone number must be a valid number (10-15 digits)")
+      return
+    }
+
     setIsLoading(true)
 
     try {
+      const parsedDispositions = parseCommaSeparatedList(dispositionsInput)
+      const parsedKeywords = parseCommaSeparatedList(keywordsInput)
+      const parsedWebhookEvents = parseCommaSeparatedList(webhookEventsInput)
+
+      const callPayload: CallData = {
+        ...callData,
+        dispositions: parsedDispositions.length ? parsedDispositions : undefined,
+        keywords: parsedKeywords.length ? parsedKeywords : undefined,
+        webhook_events: parsedWebhookEvents.length ? parsedWebhookEvents : undefined,
+      }
+
       // Clean up the call data - remove undefined values
       const cleanCallData = Object.fromEntries(
-        Object.entries(callData).filter(([_, v]) => v !== undefined && v !== "" && v !== null)
+        Object.entries(callPayload).filter(([_, v]) => v !== undefined && v !== "" && v !== null)
       )
 
       console.log("Final call data before sending:", cleanCallData)
@@ -397,6 +474,9 @@ export default function SendCallPage() {
         }))
         setPhoneNumberInput("")
         setSelectedCountryCode("+1")
+        setDispositionsInput("")
+        setKeywordsInput("")
+        setWebhookEventsInput("")
       } else {
         toast.error(data.error || 'Failed to send call')
       }
@@ -423,8 +503,19 @@ export default function SendCallPage() {
 
   // Generate code preview
   const generateCodePreview = () => {
+    const parsedDispositions = parseCommaSeparatedList(dispositionsInput)
+    const parsedKeywords = parseCommaSeparatedList(keywordsInput)
+    const parsedWebhookEvents = parseCommaSeparatedList(webhookEventsInput)
+
+    const previewPayload: CallData = {
+      ...callData,
+      dispositions: parsedDispositions.length ? parsedDispositions : undefined,
+      keywords: parsedKeywords.length ? parsedKeywords : undefined,
+      webhook_events: parsedWebhookEvents.length ? parsedWebhookEvents : undefined,
+    }
+
     const cleanData = Object.fromEntries(
-      Object.entries(callData).filter(([_, v]) => v !== undefined && v !== "" && v !== null)
+      Object.entries(previewPayload).filter(([_, v]) => v !== undefined && v !== "" && v !== null)
     )
 
     // Show the properly formatted phone number in preview
@@ -1303,8 +1394,9 @@ console.log('Call result:', result);`
                       <Label>Start Time</Label>
                       <Input
                         type="datetime-local"
+                        min={minStartTime}
                         value={callData.start_time || ""}
-                        onChange={(e) => updateCallData('start_time', e.target.value)}
+                        onChange={(e) => handleStartTimeChange(e.target.value)}
                       />
                     </div>
                   </div>
@@ -1312,9 +1404,12 @@ console.log('Call result:', result);`
                   <div className="space-y-2">
                     <Label>Transfer Phone Number</Label>
                     <Input
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
                       placeholder="+1234567890"
                       value={callData.transfer_phone_number || ""}
-                      onChange={(e) => updateCallData('transfer_phone_number', e.target.value)}
+                      onChange={(e) => handleTransferPhoneNumberChange(e.target.value)}
                     />
                   </div>
                 </CardContent>
@@ -1442,18 +1537,32 @@ console.log('Call result:', result);`
                     <Label>Dispositions (comma-separated)</Label>
                     <Input
                       placeholder="interested, not-interested, callback"
-                      value={callData.dispositions?.join(', ') || ""}
-                      onChange={(e) => updateCallData('dispositions', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                      value={dispositionsInput}
+                      onChange={(e) => setDispositionsInput(sanitizeCommaSeparatedInput(e.target.value))}
+                      onBlur={() => {
+                        const parsed = parseCommaSeparatedList(dispositionsInput)
+                        updateCallData("dispositions", parsed.length ? parsed : undefined)
+                      }}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Use letters, numbers, spaces, hyphens, and commas only.
+                    </p>
                   </div>
 
                   <div className="space-y-2">
                     <Label>Keywords (comma-separated)</Label>
                     <Input
                       placeholder="pricing, appointment, demo"
-                      value={callData.keywords?.join(', ') || ""}
-                      onChange={(e) => updateCallData('keywords', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                      value={keywordsInput}
+                      onChange={(e) => setKeywordsInput(sanitizeCommaSeparatedInput(e.target.value))}
+                      onBlur={() => {
+                        const parsed = parseCommaSeparatedList(keywordsInput)
+                        updateCallData("keywords", parsed.length ? parsed : undefined)
+                      }}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Use letters, numbers, spaces, hyphens, and commas only.
+                    </p>
                   </div>
                 </CardContent>
               </CollapsibleContent>
@@ -1502,9 +1611,16 @@ console.log('Call result:', result);`
                     <Label>Webhook Events (comma-separated)</Label>
                     <Input
                       placeholder="call_started, call_ended, call_analyzed"
-                      value={callData.webhook_events?.join(', ') || ""}
-                      onChange={(e) => updateCallData('webhook_events', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
+                      value={webhookEventsInput}
+                      onChange={(e) => setWebhookEventsInput(sanitizeCommaSeparatedInput(e.target.value))}
+                      onBlur={() => {
+                        const parsed = parseCommaSeparatedList(webhookEventsInput)
+                        updateCallData("webhook_events", parsed.length ? parsed : undefined)
+                      }}
                     />
+                    <p className="text-xs text-muted-foreground">
+                      Use letters, numbers, spaces, hyphens, and commas only.
+                    </p>
                   </div>
                 </CardContent>
               </CollapsibleContent>

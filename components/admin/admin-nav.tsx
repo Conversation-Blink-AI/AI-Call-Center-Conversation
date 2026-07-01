@@ -1,6 +1,5 @@
 "use client"
 
-import { useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
@@ -15,8 +14,16 @@ import {
   PhoneCall,
   Shield,
   ChevronLeft,
-  ChevronRight,
 } from "lucide-react"
+import {
+  sidebarNavClass,
+  sidebarNavIconClass,
+  sidebarNavItemActiveClass,
+  sidebarNavItemInactiveClass,
+  sidebarNavListClass,
+  sidebarShellClass,
+  sidebarTransitionClass,
+} from "@/lib/sidebar-layout"
 
 const navigation = [
   { name: "Overview", href: "/admin", icon: LayoutDashboard },
@@ -28,100 +35,71 @@ const navigation = [
   { name: "Call Logs", href: "/admin/call-logs", icon: PhoneCall },
 ]
 
+const navLabelClass =
+  "w-0 ml-0 overflow-hidden whitespace-nowrap opacity-0 transition-all duration-200 delay-75 group-hover:ml-3 group-hover:w-auto group-hover:opacity-100"
+
 export function AdminNav() {
-  const [isExpanded, setIsExpanded] = useState(true)
   const pathname = usePathname()
 
   return (
     <aside
       className={cn(
-        "peer group fixed left-0 top-0 z-50 h-screen bg-background border-r border-border transition-all duration-300 ease-in-out shadow-sm",
-        isExpanded ? "w-64" : "w-16 hover:w-64"
+        "peer group",
+        sidebarShellClass,
+        sidebarTransitionClass,
+        "w-16 hover:w-60",
+        "z-50 flex flex-col shadow-sm",
       )}
     >
-      <div className="flex h-full flex-col">
-        {/* Header */}
-        <div className="flex h-16 items-center justify-between border-b border-border px-4 relative">
-          {isExpanded ? (
-            <>
-              <div className="flex items-center gap-2">
-                <Shield className="h-6 w-6 text-primary" />
-                <span className="font-semibold text-lg whitespace-nowrap">Admin</span>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="h-8 w-8"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-            </>
-          ) : (
-            <>
-              <Shield className="h-6 w-6 text-primary mx-auto group-hover:opacity-0 transition-opacity duration-300" />
-              <div className="absolute left-4 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                <Shield className="h-6 w-6 text-primary" />
-                <span className="font-semibold text-lg whitespace-nowrap">Admin</span>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsExpanded(!isExpanded)}
-                className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </>
-          )}
+      {/* Header */}
+      <div className="flex h-16 shrink-0 items-center justify-center border-b border-border px-2 group-hover:justify-start group-hover:px-4">
+        <div className="flex min-w-0 items-center">
+          <Shield className={cn(sidebarNavIconClass, "text-primary")} />
+          <span className={cn(navLabelClass, "text-lg font-semibold text-foreground")}>Admin</span>
         </div>
+      </div>
 
-        {/* Navigation */}
-        <nav className="flex-1 space-y-1 px-2 py-4">
+      {/* Navigation */}
+      <div className={sidebarNavClass}>
+        <nav className={sidebarNavListClass}>
           {navigation.map((item) => {
-            const isActive = pathname === item.href || 
-              (item.href !== "/admin" && pathname.startsWith(item.href))
-            
+            const isActive =
+              pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href))
+
             return (
-              <Link key={item.name} href={item.href}>
-                <Button
-                  variant={isActive ? "secondary" : "ghost"}
+              <Link
+                key={item.name}
+                href={item.href}
+                className={cn(
+                  "flex items-center rounded-xl py-2.5 text-sm font-medium transition-all duration-200 group/item justify-center px-2.5 group-hover:justify-start group-hover:px-3",
+                  isActive ? sidebarNavItemActiveClass : sidebarNavItemInactiveClass,
+                )}
+              >
+                <item.icon
                   className={cn(
-                    "w-full justify-start transition-all duration-300",
-                    isExpanded ? "px-4" : "px-2 group-hover:px-4",
-                    isActive && "bg-secondary"
+                    sidebarNavIconClass,
+                    isActive ? "text-primary" : "text-muted-foreground group-hover/item:text-accent-foreground",
                   )}
-                >
-                  <item.icon className={cn(
-                    "h-5 w-5 flex-shrink-0 transition-all duration-300",
-                    isExpanded ? "mr-3" : "mr-0 group-hover:mr-3 mx-auto group-hover:mx-0"
-                  )} />
-                  <span className={cn(
-                    "transition-all duration-300 whitespace-nowrap",
-                    isExpanded ? "opacity-100" : "opacity-0 group-hover:opacity-100 w-0 group-hover:w-auto overflow-hidden"
-                  )}>
-                    {item.name}
-                  </span>
-                </Button>
+                />
+                <span className={navLabelClass}>{item.name}</span>
               </Link>
             )
           })}
         </nav>
+      </div>
 
-        {/* Footer */}
-        <div className="border-t border-border p-4">
-          <Link href="/dashboard">
-            <Button variant="outline" className="w-full justify-start transition-all duration-300" size="sm">
-              <ChevronLeft className="h-4 w-4 mr-2 flex-shrink-0" />
-              <span className={cn(
-                "transition-all duration-300 whitespace-nowrap",
-                isExpanded ? "opacity-100" : "opacity-0 group-hover:opacity-100 w-0 group-hover:w-auto overflow-hidden"
-              )}>
-                Back to Dashboard
-              </span>
-            </Button>
-          </Link>
-        </div>
+      {/* Footer */}
+      <div className="flex shrink-0 items-center justify-center border-t border-border bg-background h-16 group-hover:block group-hover:h-auto group-hover:p-4">
+        <Link href="/dashboard" className="w-full">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-10 w-full justify-center rounded-xl px-2.5 group-hover:justify-start group-hover:px-3"
+          >
+            <ChevronLeft className={sidebarNavIconClass} />
+            <span className={navLabelClass}>Back to Dashboard</span>
+          </Button>
+        </Link>
       </div>
     </aside>
   )

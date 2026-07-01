@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/auth-context"
 import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Phone, BarChart3, Settings, TrendingUp, Activity, Zap, RefreshCw } from "lucide-react"
+import { Phone, BarChart3, Settings, TrendingUp, Activity, Zap } from "lucide-react"
 import Link from "next/link"
 import { RecentFlows } from "@/components/recent-flows"
 import { useUserCallData } from "@/hooks/use-user-call-data"
@@ -21,7 +21,6 @@ export default function DashboardPage() {
     loading: callDataLoading,
     error,
     lastUpdated,
-    refetch,
   } = useUserCallData()
 
   // Wallet balance state
@@ -207,7 +206,7 @@ export default function DashboardPage() {
     <div className="bg-background">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header Section */}
-        <div className="mb-8 flex justify-between items-center">
+        <div className="mb-8">
           <div>
             <h1 className="text-3xl font-bold text-foreground mb-2">
               Welcome back, {user.first_name && user.last_name ? `${user.first_name} ${user.last_name}` : user.first_name || user.last_name || user.email?.split("@")[0] || "User"}! <span className={`inline-block ${shouldAnimateWave ? 'wave-animation' : ''}`}>👋</span>
@@ -218,16 +217,6 @@ export default function DashboardPage() {
               <p className="text-xs text-muted-foreground mt-1">Last updated: {formatRelativeTime(lastUpdated)}</p>
             )}
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={refetch}
-            disabled={callDataLoading}
-            className="flex items-center gap-1"
-          >
-            <RefreshCw className={`h-4 w-4 ${callDataLoading ? "animate-spin" : ""}`} />
-            {callDataLoading ? "Refreshing..." : "Refresh"}
-          </Button>
         </div>
 
         {/* Error State */}

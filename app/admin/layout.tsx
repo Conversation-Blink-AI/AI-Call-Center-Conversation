@@ -4,6 +4,8 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { AdminNav } from "@/components/admin/admin-nav"
 import { useAuth } from "@/contexts/auth-context"
+import { sidebarTransitionClass } from "@/lib/sidebar-layout"
+import { cn } from "@/lib/utils"
 
 export default function AdminLayout({
   children,
@@ -82,7 +84,7 @@ export default function AdminLayout({
   return (
     <div className="h-screen flex overflow-hidden bg-background">
       <AdminNav />
-      <div className="flex-1 flex flex-col overflow-y-auto ml-16 peer-hover:ml-64 transition-all duration-300 ease-in-out min-h-0">
+      <div className={cn("flex min-h-0 flex-1 flex-col overflow-y-auto ml-16 peer-hover:ml-60", sidebarTransitionClass)}>
         {children}
       </div>
     </div>

@@ -8,9 +8,43 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Trash2, Send, Lock, FileText, Code, HelpCircle } from 'lucide-react'
+import { Plus, Trash2, Send, Lock, FileText, Code, HelpCircle, Settings } from 'lucide-react'
 import { Switch } from '@/components/ui/switch'
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+
+const MODEL_OPTION_MIN = 0
+const MODEL_OPTION_MAX = 1
+
+function formatModelOptionDisplay(value: unknown): string | number {
+  if (value === undefined || value === null || value === '') return ''
+  const parsed = typeof value === 'number' ? value : parseFloat(String(value))
+  if (!Number.isFinite(parsed) || parsed < MODEL_OPTION_MIN || parsed > MODEL_OPTION_MAX) return ''
+  return parsed
+}
+
+function isValidModelOptionValue(value: number): boolean {
+  return Number.isFinite(value) && value >= MODEL_OPTION_MIN && value <= MODEL_OPTION_MAX
+}
+
+function sanitizeModelOptions(modelOptions: Record<string, unknown> | undefined) {
+  if (!modelOptions) return modelOptions
+
+  const next = { ...modelOptions }
+  let changed = false
+
+  for (const key of ['temperature', 'interruptionThreshold'] as const) {
+    const value = next[key]
+    if (value === undefined || value === null || value === '') continue
+
+    const parsed = typeof value === 'number' ? value : parseFloat(String(value))
+    if (!isValidModelOptionValue(parsed)) {
+      next[key] = undefined
+      changed = true
+    }
+  }
+
+  return changed ? next : modelOptions
+}
 
 interface NodeEditorDrawerProps {
   isOpen: boolean
@@ -18,9 +52,19 @@ interface NodeEditorDrawerProps {
   selectedNode: any | null
   onUpdateNode: (nodeId: string, updates: any) => void
   availableVariables: string[]
+  onOpenMetaCapiConfigs?: () => void
+  metaConfigsVersion?: number
 }
 
-export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode, availableVariables }: NodeEditorDrawerProps) {
+export function NodeEditorDrawer({
+  isOpen,
+  onClose,
+  selectedNode,
+  onUpdateNode,
+  availableVariables,
+  onOpenMetaCapiConfigs,
+  metaConfigsVersion = 0,
+}: NodeEditorDrawerProps) {
   const scrollContainerRef = React.useRef<HTMLDivElement>(null)
   
   // Webhook settings state - must be at component level (React hooks rules)
@@ -104,7 +148,21 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode, 
     }
 
     loadMetaConfigs()
-  }, [selectedNode?.id, selectedNode?.type])
+  }, [selectedNode?.id, selectedNode?.type, metaConfigsVersion])
+
+  React.useEffect(() => {
+    if (!selectedNode) return
+
+    const sanitizedModelOptions = sanitizeModelOptions(selectedNode.data?.modelOptions)
+    if (sanitizedModelOptions !== selectedNode.data?.modelOptions) {
+      onUpdateNode(selectedNode.id, {
+        data: {
+          ...selectedNode.data,
+          modelOptions: sanitizedModelOptions,
+        },
+      })
+    }
+  }, [selectedNode?.id])
 
   if (!selectedNode) return null
 
@@ -130,6 +188,21 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode, 
       }
     }
     onUpdateNode(selectedNode.id, updates)
+  }
+
+  const handleModelOptionRangeChange = (
+    field: 'temperature' | 'interruptionThreshold',
+    rawValue: string,
+  ) => {
+    if (rawValue === '') {
+      handleNestedFieldChange('modelOptions', field, undefined)
+      return
+    }
+
+    const parsed = parseFloat(rawValue)
+    if (!isValidModelOptionValue(parsed)) return
+
+    handleNestedFieldChange('modelOptions', field, parsed)
   }
 
   const handleMetaConfigSelect = (configId: string) => {
@@ -417,11 +490,14 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode, 
                       <Input
                         id="interruptionThreshold"
                         type="number"
-                        min="0"
-                        max="1"
+                        min={MODEL_OPTION_MIN}
+                        max={MODEL_OPTION_MAX}
                         step="0.1"
-                        value={selectedNode.data.modelOptions?.interruptionThreshold ?? ''}
-                        onChange={(e) => handleNestedFieldChange('modelOptions', 'interruptionThreshold', e.target.value ? parseFloat(e.target.value) : undefined)}
+                        value={formatModelOptionDisplay(selectedNode.data.modelOptions?.interruptionThreshold)}
+                        onChange={(e) => handleModelOptionRangeChange('interruptionThreshold', e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault()
+                        }}
                         placeholder="0.5"
                         className="h-8"
                       />
@@ -431,11 +507,14 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode, 
                       <Input
                         id="temperature"
                         type="number"
-                        min="0"
-                        max="1"
+                        min={MODEL_OPTION_MIN}
+                        max={MODEL_OPTION_MAX}
                         step="0.1"
-                        value={selectedNode.data.modelOptions?.temperature ?? ''}
-                        onChange={(e) => handleNestedFieldChange('modelOptions', 'temperature', e.target.value ? parseFloat(e.target.value) : undefined)}
+                        value={formatModelOptionDisplay(selectedNode.data.modelOptions?.temperature)}
+                        onChange={(e) => handleModelOptionRangeChange('temperature', e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault()
+                        }}
                         placeholder="0.7"
                         className="h-8"
                       />
@@ -480,25 +559,65 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode, 
               <div className="space-y-3">
                 <div>
                   <Label htmlFor="metaConfig">Saved Config *</Label>
-                  <Select
-                    value={selectedNode.data.configId || ''}
-                    onValueChange={(value) => handleMetaConfigSelect(value)}
-                  >
-                    <SelectTrigger id="metaConfig">
-                      <SelectValue placeholder={metaConfigsLoading ? "Loading configs..." : "Select a config"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {metaConfigs.map((config) => (
-                        <SelectItem key={config.id} value={config.id}>
-                          {config.nickname}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {metaConfigsLoading ? (
+                    <div className="mt-1 h-9 flex items-center px-3 rounded-md border border-input bg-background text-sm text-muted-foreground">
+                      Loading configs...
+                    </div>
+                  ) : metaConfigs.length === 0 ? (
+                    <div className="mt-1 rounded-md border border-dashed border-amber-500/50 bg-amber-50/60 dark:bg-amber-950/20 p-3 space-y-2">
+                      <p className="text-xs text-muted-foreground">
+                        No Meta CAPI configs yet. Add a config to fire Facebook Pixel events from this node.
+                      </p>
+                      {onOpenMetaCapiConfigs ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-8"
+                          onClick={onOpenMetaCapiConfigs}
+                        >
+                          <Settings className="w-3.5 h-3.5 mr-1.5" />
+                          Open Meta CAPI Configs
+                        </Button>
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          Use the Meta CAPI Configs button in the pathway toolbar to add one.
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      <Select
+                        value={selectedNode.data.configId || ''}
+                        onValueChange={(value) => handleMetaConfigSelect(value)}
+                      >
+                        <SelectTrigger id="metaConfig">
+                          <SelectValue placeholder="Select a config" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {metaConfigs.map((config) => (
+                            <SelectItem key={config.id} value={config.id}>
+                              {config.nickname}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {selectedNode.data.configId &&
+                        !metaConfigs.some((config) => config.id === selectedNode.data.configId) && (
+                          <p className="text-xs text-destructive mt-1">
+                            The selected config was deleted. Choose another config or create a new one.
+                          </p>
+                        )}
+                      {!selectedNode.data.configId && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Choose a saved config for this node&apos;s pixel event.
+                        </p>
+                      )}
+                    </>
+                  )}
                   {metaConfigsError && (
                     <p className="text-xs text-destructive mt-1">{metaConfigsError}</p>
                   )}
-                  <p className="text-xs text-muted-foreground mt-1">Create configs in Settings → Meta CAPI Configs.</p>
                 </div>
 
                 {selectedNode.data.configId && (
@@ -743,11 +862,14 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode, 
                       <Input
                         id="interruptionThreshold"
                         type="number"
-                        min="0"
-                        max="1"
+                        min={MODEL_OPTION_MIN}
+                        max={MODEL_OPTION_MAX}
                         step="0.1"
-                        value={selectedNode.data.modelOptions?.interruptionThreshold ?? ''}
-                        onChange={(e) => handleNestedFieldChange('modelOptions', 'interruptionThreshold', e.target.value ? parseFloat(e.target.value) : undefined)}
+                        value={formatModelOptionDisplay(selectedNode.data.modelOptions?.interruptionThreshold)}
+                        onChange={(e) => handleModelOptionRangeChange('interruptionThreshold', e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault()
+                        }}
                         placeholder="0.5"
                         className="h-8"
                       />
@@ -757,11 +879,14 @@ export function NodeEditorDrawer({ isOpen, onClose, selectedNode, onUpdateNode, 
                       <Input
                         id="temperature"
                         type="number"
-                        min="0"
-                        max="1"
+                        min={MODEL_OPTION_MIN}
+                        max={MODEL_OPTION_MAX}
                         step="0.1"
-                        value={selectedNode.data.modelOptions?.temperature ?? ''}
-                        onChange={(e) => handleNestedFieldChange('modelOptions', 'temperature', e.target.value ? parseFloat(e.target.value) : undefined)}
+                        value={formatModelOptionDisplay(selectedNode.data.modelOptions?.temperature)}
+                        onChange={(e) => handleModelOptionRangeChange('temperature', e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === '-' || e.key === 'e' || e.key === 'E') e.preventDefault()
+                        }}
                         placeholder="0.7"
                         className="h-8"
                       />

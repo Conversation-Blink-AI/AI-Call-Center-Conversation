@@ -50,6 +50,8 @@ interface FlowchartCanvasProps {
   pathwayInfo?: any
   initialNodes?: Node[]
   initialEdges?: Edge[]
+  onOpenMetaCapiConfigs?: () => void
+  metaConfigsVersion?: number
 }
 
 export function FlowchartCanvas({
@@ -57,6 +59,8 @@ export function FlowchartCanvas({
   pathwayInfo,
   initialNodes = [],
   initialEdges = [],
+  onOpenMetaCapiConfigs,
+  metaConfigsVersion,
 }: FlowchartCanvasProps = {}) {
   const { theme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
@@ -561,6 +565,8 @@ export function FlowchartCanvas({
         selectedNode={selectedNode}
         onUpdateNode={onUpdateNode}
         availableVariables={availableVariables}
+        onOpenMetaCapiConfigs={onOpenMetaCapiConfigs}
+        metaConfigsVersion={metaConfigsVersion}
       />
 
       <EdgeEditorDrawer

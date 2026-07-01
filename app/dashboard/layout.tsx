@@ -3,6 +3,8 @@
 import type React from "react"
 import { useEffect } from "react"
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar"
+import { sidebarTransitionClass } from "@/lib/sidebar-layout"
+import { cn } from "@/lib/utils"
 
 export default function DashboardLayout({
   children,
@@ -26,7 +28,9 @@ export default function DashboardLayout({
       <DashboardSidebar />
 
       {/* Main content area - offset by sidebar width */}
-      <div className="flex-1 flex flex-col overflow-y-auto ml-16 peer-hover:ml-60 transition-all duration-150 ease-in-out min-h-0">{children}</div>
+      <div className={cn("flex min-h-0 flex-1 flex-col overflow-y-auto ml-16 peer-hover:ml-60", sidebarTransitionClass)}>
+        {children}
+      </div>
     </div>
   )
 }

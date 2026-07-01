@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { toast } from "sonner"
 import { useAuth } from "@/contexts/auth-context"
 import { formatPhoneNumber } from "@/utils/phone-utils"
+import { LANGUAGE_OPTIONS, LANGUAGE_VALUES } from "@/lib/language-options"
 import React from "react"
 
 interface ManageNumberPageProps {
@@ -47,6 +48,18 @@ interface VoiceOption {
   voiceId: string
   tags: string[]
   gender?: string | null
+}
+
+const INTERRUPTION_THRESHOLD_MIN = 50
+const INTERRUPTION_THRESHOLD_MAX = 200
+const INTERRUPTION_THRESHOLD_DEFAULT = 100
+
+function normalizeInterruptionThreshold(value: unknown): number {
+  const parsed = typeof value === "number" ? value : Number(value)
+  if (!Number.isFinite(parsed) || parsed < INTERRUPTION_THRESHOLD_MIN) {
+    return INTERRUPTION_THRESHOLD_DEFAULT
+  }
+  return Math.min(INTERRUPTION_THRESHOLD_MAX, Math.max(INTERRUPTION_THRESHOLD_MIN, Math.round(parsed)))
 }
 
 export default function ManageNumberPage({ params }: ManageNumberPageProps) {
@@ -169,9 +182,9 @@ export default function ManageNumberPage({ params }: ManageNumberPageProps) {
         const modelValue = typeof data.model === "string" ? data.model : "base"
         const backgroundTrackValue =
           typeof data.background_track === "string" && data.background_track ? data.background_track : "null"
-        const languageValue = typeof data.language === "string" ? data.language : "en-US"
-        const interruptionThresholdValue =
-          typeof data.interruption_threshold === "number" ? data.interruption_threshold : 100
+        const languageValue =
+          typeof data.language === "string" && LANGUAGE_VALUES.has(data.language) ? data.language : "en-US"
+        const interruptionThresholdValue = normalizeInterruptionThreshold(data.interruption_threshold)
         const recordValue = typeof data.record === "boolean" ? data.record : false
         const summaryPromptValue = typeof data.summary_prompt === "string" ? data.summary_prompt : ""
         const noiseCancellationValue = typeof data.noise_cancellation === "boolean" ? data.noise_cancellation : false
@@ -442,10 +455,7 @@ export default function ManageNumberPage({ params }: ManageNumberPageProps) {
                 Set the language for conversations. The AI will speak and understand in this language.
               </p>
               <p className="text-sm font-medium">Example:</p>
-              <p className="text-sm text-muted-foreground">en-US (English - US), es-419 (Spanish - Latin America), fr-FR (French - France)</p>
-              <p className="text-sm text-muted-foreground mt-1">
-                <strong>Tip:</strong> Use language codes like en-US, es-419, fr-FR, etc.
-              </p>
+              <p className="text-sm text-muted-foreground">English (US), Spanish (Latin America), French (Canada)</p>
             </div>
             <div>
               <h3 className="font-semibold mb-2">Interruption Threshold</h3>
@@ -515,6 +525,11 @@ export default function ManageNumberPage({ params }: ManageNumberPageProps) {
       return
     }
 
+    const interruptionThreshold = normalizeInterruptionThreshold(data.interruption_threshold)
+    if (interruptionThreshold !== data.interruption_threshold) {
+      setValue("interruption_threshold", interruptionThreshold)
+    }
+
     setSaving(true)
     setError(null)
 
@@ -549,7 +564,7 @@ export default function ManageNumberPage({ params }: ManageNumberPageProps) {
         requestBody.summary_prompt = null
       }
       requestBody.block_interruptions = data.block_interruptions
-      requestBody.interruption_threshold = data.interruption_threshold
+      requestBody.interruption_threshold = interruptionThreshold
       requestBody.model = data.model
       requestBody.language = data.language
       requestBody.record = data.record
@@ -765,12 +780,21 @@ export default function ManageNumberPage({ params }: ManageNumberPageProps) {
 
                 <div className="space-y-2">
                   <Label htmlFor="language">Language</Label>
-                  <Input
-                    id="language"
-                    {...register('language')}
-                    placeholder="e.g., en-US, es-419"
-                    defaultValue="en-US"
-                  />
+                  <Select
+                    value={watch("language")}
+                    onValueChange={(value) => setValue("language", value)}
+                  >
+                    <SelectTrigger id="language">
+                      <SelectValue placeholder="Select language" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[300px]">
+                      {LANGUAGE_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -779,8 +803,35 @@ export default function ManageNumberPage({ params }: ManageNumberPageProps) {
                 <Input
                   id="interruption_threshold"
                   type="number"
-                  {...register('interruption_threshold', { valueAsNumber: true, min: 50, max: 200 })}
-                  defaultValue={100}
+                  min={INTERRUPTION_THRESHOLD_MIN}
+                  max={INTERRUPTION_THRESHOLD_MAX}
+                  value={watch("interruption_threshold") ?? ""}
+                  onChange={(e) => {
+                    const raw = e.target.value
+                    if (raw === "") {
+                      setValue("interruption_threshold", INTERRUPTION_THRESHOLD_DEFAULT, { shouldValidate: true })
+                      return
+                    }
+
+                    const parsed = Number(raw)
+                    if (Number.isNaN(parsed) || parsed < 0 || parsed > INTERRUPTION_THRESHOLD_MAX) {
+                      return
+                    }
+
+                    setValue("interruption_threshold", parsed, { shouldValidate: true })
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "-" || e.key === "e" || e.key === "E") {
+                      e.preventDefault()
+                    }
+                  }}
+                  onBlur={() => {
+                    setValue(
+                      "interruption_threshold",
+                      normalizeInterruptionThreshold(watch("interruption_threshold")),
+                      { shouldValidate: true },
+                    )
+                  }}
                 />
                 <p className="text-xs text-muted-foreground">
                   Lower = faster response (50), Higher = more patient (200). Recommended: 100

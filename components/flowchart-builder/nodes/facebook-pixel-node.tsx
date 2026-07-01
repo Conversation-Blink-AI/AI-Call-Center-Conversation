@@ -75,11 +75,15 @@ export function FacebookPixelNode({ data, selected }: FacebookPixelNodeProps) {
           )}
 
           <div
-            className="text-[12px] opacity-80 text-gray-700 dark:text-gray-300 mt-0.5 overflow-hidden leading-tight"
+            className={`text-[12px] mt-0.5 overflow-hidden leading-tight ${
+              data.text || data.configNickname
+                ? 'opacity-80 text-gray-700 dark:text-gray-300'
+                : 'text-amber-600 dark:text-amber-400 italic'
+            }`}
             style={{ display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical' }}
-            title={data.text}
+            title={data.text || (data.configNickname ? `Config: ${data.configNickname}` : 'No config selected')}
           >
-            {data.text || (data.configNickname ? `Config: ${data.configNickname}` : 'Select Meta CAPI config')}
+            {data.text || (data.configNickname ? `Config: ${data.configNickname}` : 'No config selected')}
           </div>
         </div>
       </div>

@@ -14,7 +14,7 @@ export default function DocsLayout({
       <DocsSidebar />
       
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col lg:ml-64">
+      <div className="flex-1 flex flex-col lg:ml-60">
         {/* Header */}
         <DocsHeader />
         
