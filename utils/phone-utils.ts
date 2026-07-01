@@ -47,3 +47,32 @@ export function formatPhoneNumber(phoneNumber: string): string {
   // Default formatting for other numbers
   return e164
 }
+
+/** Strip input to an optional leading + followed by digits only */
+export function sanitizePhoneNumberInput(value: string): string {
+  if (!value) return ""
+
+  let sanitized = ""
+  const trimmed = value.trim()
+
+  for (const char of trimmed) {
+    if (char === "+" && sanitized.length === 0) {
+      sanitized += char
+    } else if (/\d/.test(char)) {
+      sanitized += char
+    }
+  }
+
+  return sanitized
+}
+
+/** Validate phone numbers with 10-15 digits (E.164 compatible) */
+export function isValidPhoneNumber(value: string): boolean {
+  const digits = value.replace(/\D/g, "")
+  return digits.length >= 10 && digits.length <= 15
+}
+
+export function isValidPhoneNumberOptional(value?: string): boolean {
+  if (!value?.trim()) return true
+  return isValidPhoneNumber(value)
+}

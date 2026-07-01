@@ -545,8 +545,8 @@ export default function VoicesPage() {
 
   if (loading) {
     return (
-      <div className="container mx-auto py-8">
-        <div className="mb-6">
+      <div className="p-6 space-y-6">
+        <div>
           <h1 className="text-3xl font-bold text-foreground mb-2">Voice Library</h1>
           <p className="text-muted-foreground">Loading voices...</p>
         </div>
@@ -574,13 +574,13 @@ export default function VoicesPage() {
   }
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="mb-6">
+    <div className="p-6 space-y-6">
+      <div>
         <h1 className="text-3xl font-bold text-foreground mb-2">Voice Library</h1>
       </div>
 
       {error && (
-        <Alert variant="destructive" className="mb-6">
+        <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
             <span>{error}</span>
@@ -589,7 +589,7 @@ export default function VoicesPage() {
       )}
 
       {audioError && (
-        <Alert variant="destructive" className="mb-6">
+        <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
             <span>{audioError}</span>

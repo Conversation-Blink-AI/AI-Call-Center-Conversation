@@ -47,6 +47,7 @@ export default function PathwayEditorPage({ params, searchParams }: PathwayEdito
   const [isInitialized, setIsInitialized] = useState(false)
   const [phoneNumber, setPhoneNumber] = useState<string | null>(null)
   const [isMetaConfigModalOpen, setIsMetaConfigModalOpen] = useState(false)
+  const [metaConfigsVersion, setMetaConfigsVersion] = useState(0)
   const [metaConfigs, setMetaConfigs] = useState<Array<{
     id: string
     nickname: string
@@ -261,6 +262,7 @@ export default function PathwayEditorPage({ params, searchParams }: PathwayEdito
         throw new Error(result?.error || "Failed to load Meta CAPI configs")
       }
       setMetaConfigs(result.configs || [])
+      setMetaConfigsVersion((version) => version + 1)
     } catch (error: any) {
       setMetaConfigError(error.message || "Failed to load Meta CAPI configs")
     } finally {
@@ -464,6 +466,8 @@ export default function PathwayEditorPage({ params, searchParams }: PathwayEdito
         <FlowchartBuilder
           phoneNumber={phoneNumber}
           pathwayInfo={pathwayInfo}
+          onOpenMetaCapiConfigs={() => setIsMetaConfigModalOpen(true)}
+          metaConfigsVersion={metaConfigsVersion}
         />
       </div>
 
@@ -548,7 +552,10 @@ export default function PathwayEditorPage({ params, searchParams }: PathwayEdito
               )}
 
               {!metaConfigLoading && metaConfigs.length === 0 && (
-                <p className="text-sm text-muted-foreground">No configs yet. Add your first Meta CAPI config above.</p>
+                <div className="rounded-md border border-dashed p-4 text-center space-y-1">
+                  <p className="text-sm text-muted-foreground">No configs yet.</p>
+                  <p className="text-xs text-muted-foreground">Add your first Meta CAPI config using the form above.</p>
+                </div>
               )}
 
               {!metaConfigLoading && metaConfigs.map((config) => (

@@ -9,9 +9,17 @@ interface FlowchartBuilderProps {
   className?: string
   phoneNumber?: string | null
   pathwayInfo?: any
+  onOpenMetaCapiConfigs?: () => void
+  metaConfigsVersion?: number
 }
 
-export function FlowchartBuilder({ className, phoneNumber, pathwayInfo }: FlowchartBuilderProps = {}) {
+export function FlowchartBuilder({
+  className,
+  phoneNumber,
+  pathwayInfo,
+  onOpenMetaCapiConfigs,
+  metaConfigsVersion,
+}: FlowchartBuilderProps = {}) {
   const [isPaletteCollapsed, setIsPaletteCollapsed] = useState(false)
 
   return (
@@ -27,7 +35,12 @@ export function FlowchartBuilder({ className, phoneNumber, pathwayInfo }: Flowch
 
         {/* Main Canvas - Right Side */}
         <div className="flex-1 relative transition-all duration-300 ease-in-out">
-          <FlowchartCanvas phoneNumber={phoneNumber} pathwayInfo={pathwayInfo} />
+          <FlowchartCanvas
+            phoneNumber={phoneNumber}
+            pathwayInfo={pathwayInfo}
+            onOpenMetaCapiConfigs={onOpenMetaCapiConfigs}
+            metaConfigsVersion={metaConfigsVersion}
+          />
         </div>
       </div>
     </ReactFlowProvider>

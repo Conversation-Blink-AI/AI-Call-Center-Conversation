@@ -54,10 +54,14 @@ export async function POST(request: Request) {
       externalResult = JSON.parse(responseText)
     } catch (parseError) {
       console.error("[AUTH/2FA] Failed to parse external API response:", parseError)
+      const status = externalResponse.status
+      const serviceUnavailable = status >= 500 || status === 0
       return NextResponse.json({
         success: false,
-        message: "Invalid response from authentication service"
-      }, { status: 500 })
+        message: serviceUnavailable
+          ? `Authentication service is temporarily unavailable (${status || "no response"}). The FOREX API may be down — please try again later.`
+          : "Invalid response from authentication service"
+      }, { status: serviceUnavailable ? 503 : 500 })
     }
 
     if (!externalResponse.ok || externalResult.status !== "success") {

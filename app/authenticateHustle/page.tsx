@@ -43,6 +43,11 @@ export default function AuthenticateHustlePage() {
           throw new Error(data.message || "Authentication failed")
         }
 
+        if (data.token || data.externalToken) {
+          const tokenToStore = data.token || data.externalToken
+          localStorage.setItem("auth-token", tokenToStore)
+        }
+
         router.replace("/dashboard")
       } catch (err: any) {
         console.error("[AUTHENTICATE-HUSTLE] Sign-in failed:", err)
