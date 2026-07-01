@@ -9,7 +9,7 @@ export interface User {
   created_at: string
   updated_at: string
   last_login: string | null
-  password_hash: string
+  password_hash: string | null
   is_admin?: boolean
 }
 

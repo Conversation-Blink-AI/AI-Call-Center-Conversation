@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS users (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     last_login TIMESTAMP WITH TIME ZONE,
-    password_hash VARCHAR(255) NOT NULL
+    password_hash VARCHAR(255)
 );
 
 -- Teams table
