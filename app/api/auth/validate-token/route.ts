@@ -1,11 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
-import { cookies } from "next/headers"
-import * as jwt from "jsonwebtoken"
 import { z } from "zod"
-import { decodeHustleToken } from "@/lib/hustle-token"
-import { syncUserFromHustleToken } from "@/lib/hustle-user-sync"
-
-const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
+import { buildHustleSignInResponse, completeHustleSignIn } from "@/lib/hustle-signin"
 
 const validateTokenSchema = z.object({
   token: z.string().min(1).max(8192),
@@ -25,73 +20,18 @@ export async function POST(request: NextRequest) {
 
     const { token } = parsed.data
 
-    console.log("[VALIDATE-TOKEN] Validating external token...")
+    console.log("[VALIDATE-TOKEN] Starting Forex-verified token validation...")
 
-    const decodeResult = decodeHustleToken(token)
-    if (!decodeResult.ok) {
-      console.log("[VALIDATE-TOKEN] Token decode failed:", decodeResult.message)
+    const result = await completeHustleSignIn(token)
+    if (!result.ok) {
+      console.log("[VALIDATE-TOKEN] Validation failed:", result.message)
       return NextResponse.json(
-        { success: false, message: decodeResult.message },
-        { status: decodeResult.status },
+        { success: false, message: result.message },
+        { status: result.status },
       )
     }
 
-    const decoded = decodeResult.decoded
-    const externalId = decoded.id || decoded._id
-    const userEmail = decoded.email
-
-    if (!externalId || !userEmail) {
-      return NextResponse.json(
-        { success: false, message: "Invalid user data from token" },
-        { status: 400 },
-      )
-    }
-
-    console.log("[VALIDATE-TOKEN] Token decoded for user:", userEmail)
-
-    const { user, forexAuthFields } = await syncUserFromHustleToken(token, decoded)
-
-    const sessionToken = jwt.sign(
-      {
-        userId: user.id,
-        email: user.email,
-      },
-      JWT_SECRET,
-      { expiresIn: "7d" },
-    )
-
-    const cookieStore = await cookies()
-    cookieStore.set("auth-token", sessionToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 7 * 24 * 60 * 60,
-      path: "/",
-    })
-
-    console.log("[VALIDATE-TOKEN] Local session cookie set successfully")
-
-    return NextResponse.json({
-      success: true,
-      message: "Authentication successful",
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.first_name || user.firstName || "User",
-        lastName: user.last_name || user.lastName || "",
-        company: user.company || "",
-        role: user.role || "client",
-        phoneNumber: user.phone_number || user.phoneNumber || "",
-        verified: user.verified || user.is_verified || false,
-        platforms: user.platforms || decoded.platforms || [],
-        permissions: forexAuthFields.permissions,
-        orgMemberships: forexAuthFields.orgMemberships,
-        activeOrgId: forexAuthFields.activeOrgId,
-        activeRole: forexAuthFields.activeRole,
-      },
-      token,
-      externalToken: token,
-    })
+    return NextResponse.json(buildHustleSignInResponse(result))
   } catch (error: unknown) {
     console.error("[VALIDATE-TOKEN] Error:", error)
     const isProd = process.env.NODE_ENV === "production"
