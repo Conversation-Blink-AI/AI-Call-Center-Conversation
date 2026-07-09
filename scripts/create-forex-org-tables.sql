@@ -67,3 +67,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_forex_org_memberships_org_external_user_un
 
 CREATE INDEX IF NOT EXISTS idx_forex_organizations_owner_external_user_id
   ON forex_organizations(owner_external_user_id);
+
+ALTER TABLE forex_organizations
+  ADD COLUMN IF NOT EXISTS workspace_id VARCHAR(255),
+  ADD COLUMN IF NOT EXISTS workspace_type VARCHAR(50),
+  ADD COLUMN IF NOT EXISTS hustle_plan VARCHAR(50),
+  ADD COLUMN IF NOT EXISTS owner_name VARCHAR(255);
+
+ALTER TABLE forex_org_memberships
+  ADD COLUMN IF NOT EXISTS hustle_role VARCHAR(100),
+  ADD COLUMN IF NOT EXISTS call_center_role VARCHAR(100);

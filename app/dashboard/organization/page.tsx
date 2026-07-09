@@ -20,8 +20,10 @@ type OrganizationMember = {
   firstName?: string | null
   lastName?: string | null
   role: string
+  hustleRole?: string | null
+  callCenterRole?: string | null
   status?: string | null
-  permissions?: ForexPermission[]
+  permissions?: ForexPermission[] | Record<string, boolean>
 }
 
 type LocalOrganization = {
@@ -46,6 +48,17 @@ function getPermissionLabel(permission: ForexPermission) {
   const platformName = typeof platform === "string" ? platform : platform?.name || platform?._id || "Platform"
   const access = permission.accessLevel?.join(", ") || "no access"
   return `${platformName}: ${access}`
+}
+
+function formatCallCenterPermissions(permissions: Record<string, boolean>) {
+  return Object.entries(permissions)
+    .filter(([, enabled]) => enabled)
+    .map(([key]) =>
+      key
+        .replace(/^can/, "")
+        .replace(/([A-Z])/g, " $1")
+        .trim(),
+    )
 }
 
 function fallbackOrganizations(memberships: ForexOrgMembership[] = []): LocalOrganization[] {
@@ -259,7 +272,9 @@ export default function OrganizationPage() {
                                     {member.email}
                                   </div>
                                 </div>
-                                <Badge variant="outline">{formatRole(member.role)}</Badge>
+                                <Badge variant="outline">
+                                  {formatRole(member.callCenterRole || member.role)}
+                                </Badge>
                               </div>
                             </div>
                           ))}
@@ -276,7 +291,7 @@ export default function OrganizationPage() {
                         <ShieldCheck className="h-4 w-4" />
                         Your permissions in this org
                       </div>
-                      {permissions.length > 0 ? (
+                      {Array.isArray(permissions) && permissions.length > 0 ? (
                         <div className="space-y-2">
                           {permissions.map((permission) => (
                             <div
@@ -286,6 +301,19 @@ export default function OrganizationPage() {
                               {getPermissionLabel(permission)}
                             </div>
                           ))}
+                        </div>
+                      ) : permissions &&
+                        typeof permissions === "object" &&
+                        !Array.isArray(permissions) &&
+                        Object.keys(permissions).length > 0 ? (
+                        <div className="space-y-2">
+                          {formatCallCenterPermissions(permissions as Record<string, boolean>).map(
+                            (label) => (
+                              <div key={label} className="rounded-lg border bg-card p-3 text-sm">
+                                {label}
+                              </div>
+                            ),
+                          )}
                         </div>
                       ) : (
                         <p className="rounded-lg border p-3 text-sm text-muted-foreground">

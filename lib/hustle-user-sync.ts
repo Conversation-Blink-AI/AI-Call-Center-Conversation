@@ -1,5 +1,5 @@
-import { Client } from "pg"
-import { getSSLConfig } from "@/lib/db-client"
+import type { PoolClient } from "pg"
+import { getPool } from "@/lib/db-client"
 import { normalizeEmail } from "@/lib/utils"
 import { encryptString, hashEmail, hashPhoneNumber, phoneLast4 } from "@/lib/encryption"
 import { toE164Format } from "@/utils/phone-utils"
@@ -12,7 +12,7 @@ export interface HustleUserSyncResult {
   forexAuthFields: ForexAuthFields
 }
 
-async function ensureWallet(client: Client, userId: unknown) {
+async function ensureWallet(client: PoolClient, userId: unknown) {
   try {
     const walletCheck = await client.query("SELECT id FROM wallets WHERE user_id = $1", [userId])
     if (walletCheck.rows.length === 0) {
@@ -58,16 +58,11 @@ export async function syncUserFromHustleToken(
     decoded.verified ?? false,
   ]
 
-  const client = new Client({
-    connectionString: process.env.DATABASE_URL,
-    ssl: getSSLConfig(),
-  })
+  const client = await getPool().connect()
 
   let user: Record<string, unknown>
 
   try {
-    await client.connect()
-
     let result = await client.query("SELECT * FROM users WHERE external_id = $1::text", [externalId])
 
     if (result.rows.length > 0) {
@@ -176,10 +171,14 @@ export async function syncUserFromHustleToken(
     await ensureWallet(client, user.id)
 
     if (user?.id) {
-      await syncForexOrgMemberships(client, String(user.id), decoded)
+      try {
+        await syncForexOrgMemberships(client, String(user.id), decoded)
+      } catch (orgSyncError) {
+        console.error("[HUSTLE-SIGNIN] Org membership sync failed (non-fatal):", orgSyncError)
+      }
     }
   } finally {
-    await client.end()
+    client.release()
   }
 
   return { user, forexAuthFields }

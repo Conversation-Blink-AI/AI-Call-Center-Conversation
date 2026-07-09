@@ -5,6 +5,12 @@ import {
   resolveOrgId,
   resolveOrgName,
 } from "@/lib/forex-permissions"
+import {
+  CALL_CENTER_ADMIN_PERMISSIONS,
+  type HustleMemberSyncPayload,
+  type HustleOrgSyncPayload,
+  type HustlePermissionSyncPayload,
+} from "@/lib/hustle-integration-schemas"
 
 type Queryable = {
   query: (text: string, params?: unknown[]) => Promise<QueryResult>
@@ -137,6 +143,278 @@ export async function ensureForexOrgTables(client: Queryable) {
     CREATE INDEX IF NOT EXISTS idx_forex_organizations_owner_external_user_id
       ON forex_organizations(owner_external_user_id)
   `)
+
+  await client.query(`
+    ALTER TABLE forex_organizations
+      ADD COLUMN IF NOT EXISTS workspace_id VARCHAR(255),
+      ADD COLUMN IF NOT EXISTS workspace_type VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS hustle_plan VARCHAR(50),
+      ADD COLUMN IF NOT EXISTS owner_name VARCHAR(255)
+  `)
+
+  await client.query(`
+    ALTER TABLE forex_org_memberships
+      ADD COLUMN IF NOT EXISTS hustle_role VARCHAR(100),
+      ADD COLUMN IF NOT EXISTS call_center_role VARCHAR(100)
+  `)
+}
+
+async function resolveLocalUserId(
+  client: Queryable,
+  externalUserId: string,
+): Promise<string | null> {
+  const result = await client.query(
+    "SELECT id FROM users WHERE external_id = $1 LIMIT 1",
+    [externalUserId],
+  )
+  return result.rows[0]?.id ?? null
+}
+
+async function ensureOrganizationExists(
+  client: Queryable,
+  externalOrgId: string,
+): Promise<boolean> {
+  const result = await client.query(
+    "SELECT 1 FROM forex_organizations WHERE external_org_id = $1 LIMIT 1",
+    [externalOrgId],
+  )
+  return result.rows.length > 0
+}
+
+function resolveCallCenterRole(
+  callCenterRole: string | undefined,
+  role: string | undefined,
+): string {
+  return callCenterRole || role || "no_access"
+}
+
+export async function syncHustleOrganization(
+  client: Queryable,
+  payload: HustleOrgSyncPayload,
+) {
+  await ensureForexOrgTables(client)
+
+  const localOwnerUserId = await resolveLocalUserId(client, payload.ownerUserId)
+
+  await client.query(
+    `
+      INSERT INTO forex_organizations (
+        external_org_id,
+        name,
+        workspace_id,
+        workspace_type,
+        status,
+        owner_external_user_id,
+        owner_email,
+        owner_name,
+        hustle_plan,
+        org_snapshot,
+        last_webhook_at,
+        updated_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, NOW(), NOW())
+      ON CONFLICT (external_org_id) DO UPDATE SET
+        name = EXCLUDED.name,
+        workspace_id = EXCLUDED.workspace_id,
+        workspace_type = EXCLUDED.workspace_type,
+        status = EXCLUDED.status,
+        owner_external_user_id = EXCLUDED.owner_external_user_id,
+        owner_email = EXCLUDED.owner_email,
+        owner_name = EXCLUDED.owner_name,
+        hustle_plan = EXCLUDED.hustle_plan,
+        org_snapshot = EXCLUDED.org_snapshot,
+        last_webhook_at = NOW(),
+        updated_at = NOW()
+    `,
+    [
+      payload.orgId,
+      payload.orgName,
+      payload.workspaceId ?? null,
+      payload.workspaceType ?? null,
+      payload.status,
+      payload.ownerUserId,
+      payload.ownerEmail,
+      payload.ownerName ?? null,
+      payload.hustlePlan ?? null,
+      JSON.stringify(payload),
+    ],
+  )
+
+  await client.query(
+    `
+      INSERT INTO forex_org_memberships (
+        user_id,
+        user_external_id,
+        user_email,
+        external_org_id,
+        role,
+        hustle_role,
+        call_center_role,
+        status,
+        permissions,
+        membership_snapshot,
+        updated_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, NOW())
+      ON CONFLICT (external_org_id, user_external_id) DO UPDATE SET
+        user_id = COALESCE(EXCLUDED.user_id, forex_org_memberships.user_id),
+        user_email = EXCLUDED.user_email,
+        role = EXCLUDED.role,
+        hustle_role = EXCLUDED.hustle_role,
+        call_center_role = EXCLUDED.call_center_role,
+        status = EXCLUDED.status,
+        permissions = EXCLUDED.permissions,
+        membership_snapshot = EXCLUDED.membership_snapshot,
+        updated_at = NOW()
+    `,
+    [
+      localOwnerUserId,
+      payload.ownerUserId,
+      payload.ownerEmail,
+      payload.orgId,
+      "call_center_admin",
+      "organization_admin",
+      "call_center_admin",
+      payload.status || "active",
+      JSON.stringify(CALL_CENTER_ADMIN_PERMISSIONS),
+      JSON.stringify({
+        source: "hustle_org_sync",
+        ownerName: payload.ownerName ?? null,
+        payload,
+      }),
+    ],
+  )
+
+  return {
+    externalOrgId: payload.orgId,
+    ownerExternalUserId: payload.ownerUserId,
+    localOwnerUserId,
+  }
+}
+
+export async function syncHustleMember(
+  client: Queryable,
+  payload: HustleMemberSyncPayload,
+) {
+  await ensureForexOrgTables(client)
+
+  const orgExists = await ensureOrganizationExists(client, payload.orgId)
+  if (!orgExists) {
+    const error = new Error(`Organization not found: ${payload.orgId}`)
+    ;(error as Error & { statusCode?: number }).statusCode = 404
+    throw error
+  }
+
+  const localUserId = await resolveLocalUserId(client, payload.userId)
+  const callCenterRole = resolveCallCenterRole(payload.callCenterRole, payload.role)
+
+  await client.query(
+    `
+      INSERT INTO forex_org_memberships (
+        user_id,
+        user_external_id,
+        user_email,
+        external_org_id,
+        role,
+        hustle_role,
+        call_center_role,
+        status,
+        permissions,
+        membership_snapshot,
+        updated_at
+      )
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, NOW())
+      ON CONFLICT (external_org_id, user_external_id) DO UPDATE SET
+        user_id = COALESCE(EXCLUDED.user_id, forex_org_memberships.user_id),
+        user_email = EXCLUDED.user_email,
+        role = EXCLUDED.role,
+        hustle_role = EXCLUDED.hustle_role,
+        call_center_role = EXCLUDED.call_center_role,
+        status = EXCLUDED.status,
+        permissions = EXCLUDED.permissions,
+        membership_snapshot = EXCLUDED.membership_snapshot,
+        updated_at = NOW()
+    `,
+    [
+      localUserId,
+      payload.userId,
+      payload.email,
+      payload.orgId,
+      callCenterRole,
+      payload.hustleRole,
+      callCenterRole,
+      payload.status,
+      JSON.stringify(payload.permissions),
+      JSON.stringify({
+        source: "hustle_member_sync",
+        name: payload.name ?? null,
+        workspaceId: payload.workspaceId ?? null,
+        payload,
+      }),
+    ],
+  )
+
+  return {
+    externalOrgId: payload.orgId,
+    userExternalId: payload.userId,
+    localUserId,
+    status: payload.status,
+    callCenterRole,
+  }
+}
+
+export async function syncHustleMemberPermissions(
+  client: Queryable,
+  payload: HustlePermissionSyncPayload,
+) {
+  await ensureForexOrgTables(client)
+
+  const callCenterRole = resolveCallCenterRole(payload.callCenterRole, payload.role)
+
+  const result = await client.query(
+    `
+      UPDATE forex_org_memberships
+      SET
+        role = $3,
+        call_center_role = $4,
+        status = $5,
+        permissions = $6::jsonb,
+        membership_snapshot = COALESCE(membership_snapshot, '{}'::jsonb) || $7::jsonb,
+        updated_at = NOW()
+      WHERE external_org_id = $1 AND user_external_id = $2
+      RETURNING id
+    `,
+    [
+      payload.orgId,
+      payload.userId,
+      callCenterRole,
+      callCenterRole,
+      payload.status,
+      JSON.stringify(payload.permissions),
+      JSON.stringify({
+        source: "hustle_permission_sync",
+        workspaceId: payload.workspaceId ?? null,
+        updatedAt: payload.updatedAt ?? null,
+        payload,
+      }),
+    ],
+  )
+
+  if (result.rows.length === 0) {
+    const error = new Error(
+      `Membership not found for org ${payload.orgId} and user ${payload.userId}`,
+    )
+    ;(error as Error & { statusCode?: number }).statusCode = 404
+    throw error
+  }
+
+  return {
+    externalOrgId: payload.orgId,
+    userExternalId: payload.userId,
+    membershipId: result.rows[0].id,
+    callCenterRole,
+    status: payload.status,
+  }
 }
 
 export async function syncForexOrgMemberships(

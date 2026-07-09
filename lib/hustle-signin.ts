@@ -3,6 +3,7 @@ import * as jwt from "jsonwebtoken"
 import { verifyForexAccountToken } from "@/lib/forex-verify"
 import { decodeHustleToken } from "@/lib/hustle-token"
 import { syncUserFromHustleToken } from "@/lib/hustle-user-sync"
+import { assertHustleSignInEnv } from "@/lib/hustle-signin-errors"
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
 
@@ -17,6 +18,8 @@ export type CompleteHustleSignInResult =
   | { ok: false; status: number; message: string }
 
 export async function completeHustleSignIn(token: string): Promise<CompleteHustleSignInResult> {
+  assertHustleSignInEnv()
+
   const verifyResult = await verifyForexAccountToken(token)
   if (!verifyResult.ok) {
     return { ok: false, status: verifyResult.status, message: verifyResult.message }

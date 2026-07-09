@@ -1,8 +1,6 @@
 
 "use client"
 
-import { Metadata } from 'next'
-
 export default function PublicApiDocumentationPage() {
   const handleTestPurchaseNumber = () => {
     const email = (document.getElementById('test-email') as HTMLInputElement).value;
@@ -125,6 +123,41 @@ export default function PublicApiDocumentationPage() {
       });
   };
 
+  const handleTestHustleHealth = (endpoint: string, resultId: string) => {
+    const resultDiv = document.getElementById(resultId);
+    if (resultDiv) {
+      resultDiv.innerHTML =
+        '<div style="color: #3b82f6; padding: 15px; background: #f0f9ff; border: 1px solid #7dd3fc; border-radius: 8px;">🔄 Testing GET health...</div>';
+    }
+
+    fetch(endpoint)
+      .then((response) => response.json().then((data) => ({ data, status: response.status })))
+      .then(({ data, status }) => {
+        if (resultDiv) {
+          const statusColor = status >= 200 && status < 300 ? "#10b981" : "#ef4444";
+          resultDiv.innerHTML = `
+            <div style="padding: 15px; background: #f0f9ff; border: 1px solid #7dd3fc; border-radius: 8px;">
+              <h4 style="margin: 0 0 10px 0; color: #1e40af;">
+                Health Response
+                <span style="background: ${statusColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; margin-left: 8px;">HTTP ${status}</span>
+              </h4>
+              <p style="margin: 0 0 10px 0; font-size: 13px; color: #475569;"><strong>URL:</strong> <code>${endpoint}</code></p>
+              <pre style="background: #1e293b; color: #f8fafc; padding: 15px; border-radius: 6px; overflow-x: auto; font-size: 14px; margin: 0;">${JSON.stringify(data, null, 2)}</pre>
+            </div>
+          `;
+        }
+      })
+      .catch((error) => {
+        if (resultDiv) {
+          resultDiv.innerHTML = `
+            <div style="color: #ef4444; padding: 15px; background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px;">
+              <strong>Error:</strong> ${error.message}
+            </div>
+          `;
+        }
+      });
+  };
+
   const handleMouseOver = (e: React.MouseEvent<HTMLButtonElement>) => {
     (e.target as HTMLButtonElement).style.backgroundColor = '#2563eb';
   };
@@ -186,6 +219,15 @@ export default function PublicApiDocumentationPage() {
             }
             .method {
               background: #10b981;
+              color: white;
+              padding: 4px 12px;
+              border-radius: 4px;
+              font-weight: bold;
+              display: inline-block;
+              margin-right: 10px;
+            }
+            .method-post {
+              background: #f59e0b;
               color: white;
               padding: 4px 12px;
               border-radius: 4px;
@@ -303,7 +345,10 @@ export default function PublicApiDocumentationPage() {
       </div>
       <div>
         <div className="container">
-          <h1>📚 Public API Documentation</h1>
+          <h1>📚 API Documentation</h1>
+          <p style={{ marginTop: '-10px', marginBottom: '24px', color: '#64748b' }}>
+            Public endpoints for phone numbers, call history, and plans — plus Hustle server-to-server org/member sync.
+          </p>
           
           <div className="endpoint-info">
             <h2>getPurchaseNumber Endpoint</h2>
@@ -328,7 +373,186 @@ export default function PublicApiDocumentationPage() {
             </p>
           </div>
 
-          <h2>🔧 Quick Start</h2>
+          <h2>🔗 Hustle Integration API (Server-to-Server)</h2>
+          <p>
+            These endpoints are called by the Hustle backend to sync organizations, members, and Call Center permissions into the Call Center database.
+            They require authentication and are <strong>not</strong> public — unlike the <code>/Public_api/*</code> routes above.
+          </p>
+
+          <div className="warning-box">
+            <strong>Deprecated:</strong> <code>POST /api/webhooks/forex/organization</code> now returns <strong>410 Gone</strong>.
+            Use the routes below instead.
+          </div>
+
+          <div className="endpoint-info">
+            <h3>Base URL</h3>
+            <p><span className="url">/api/v1/integrations/hustle</span></p>
+            <p>Production example: <code>https://conversation.hustleapp.co/api/v1/integrations/hustle</code></p>
+          </div>
+
+          <div className="endpoint-info">
+            <h3>Authentication headers</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Header</th>
+                  <th>Required</th>
+                  <th>Description</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>Content-Type: application/json</code></td>
+                  <td>Yes</td>
+                  <td>JSON request body</td>
+                </tr>
+                <tr>
+                  <td><code>Authorization: Bearer &lt;SUBSCRIPTION_INTERNAL_API_TOKEN&gt;</code></td>
+                  <td>Yes (prod)</td>
+                  <td>Shared internal token</td>
+                </tr>
+                <tr>
+                  <td><code>X-Hustle-Timestamp</code></td>
+                  <td>If HMAC enabled</td>
+                  <td>Unix timestamp (seconds)</td>
+                </tr>
+                <tr>
+                  <td><code>X-Hustle-Request-Id</code></td>
+                  <td>Recommended</td>
+                  <td>Unique id for tracing (logged server-side)</td>
+                </tr>
+                <tr>
+                  <td><code>X-Hustle-Signature: sha256=&lt;hmac&gt;</code></td>
+                  <td>If HMAC enabled</td>
+                  <td>HMAC-SHA256 of <code>timestamp + &quot;.&quot; + rawBody</code> when <code>SUBSCRIPTION_INTERNAL_HMAC_SECRET</code> is set</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div className="endpoint-info">
+            <h3>org-sync — Create / update organization</h3>
+            <p><span className="method-post">POST</span> <span className="url">/api/v1/integrations/hustle/org-sync</span></p>
+            <p>Event: <code>org.synced</code>. Upserts the organization and creates an owner membership with <code>call_center_admin</code> access.</p>
+            <pre>{`{
+  "event": "org.synced",
+  "orgId": "6a3fa22872bf1d9f23eabc6d",
+  "workspaceId": "org_6a3fa22872bf1d9f23eabc6d",
+  "workspaceType": "organization",
+  "ownerUserId": "507f1f77bcf86cd799439011",
+  "ownerEmail": "owner@example.com",
+  "ownerName": "Owner Name",
+  "orgName": "Acme Corp",
+  "status": "active",
+  "hustlePlan": "trial",
+  "createdAt": "2026-07-01T00:00:00.000Z",
+  "updatedAt": "2026-07-08T00:00:00.000Z"
+}`}</pre>
+          </div>
+
+          <div className="endpoint-info">
+            <h3>member-sync — Invite or accept member</h3>
+            <p><span className="method-post">POST</span> <span className="url">/api/v1/integrations/hustle/member-sync</span></p>
+            <p>Event: <code>member.synced</code>. Used when inviting a user (<code>status: pending</code>) or when they accept (<code>status: active</code>). Returns <strong>404</strong> if the org does not exist yet.</p>
+            <pre>{`{
+  "event": "member.synced",
+  "orgId": "6a3fa22872bf1d9f23eabc6d",
+  "workspaceId": "org_6a3fa22872bf1d9f23eabc6d",
+  "userId": "608a1234567890abcdef",
+  "email": "member@example.com",
+  "name": "Jane Doe",
+  "hustleRole": "organization_user",
+  "role": "no_access",
+  "callCenterRole": "no_access",
+  "status": "pending",
+  "permissions": {
+    "canBuyNumber": false,
+    "canTopUpWallet": false,
+    "canManageAgents": false,
+    "canManageCallFlows": false,
+    "canAssignNumbers": false,
+    "canUseAssignedNumbers": false,
+    "canEditAssignedFlow": false,
+    "canViewOwnCallLogs": false,
+    "canViewAllCallLogs": false,
+    "canViewOrgAnalytics": false,
+    "canViewWallet": false,
+    "canManageBilling": false
+  },
+  "createdAt": "2026-07-08T00:00:00.000Z",
+  "updatedAt": "2026-07-08T00:00:00.000Z"
+}`}</pre>
+          </div>
+
+          <div className="endpoint-info">
+            <h3>permission-sync — Update Call Center role</h3>
+            <p><span className="method-post">POST</span> <span className="url">/api/v1/integrations/hustle/permission-sync</span></p>
+            <p>Event: <code>member.permission.updated</code>. Updates an existing member&apos;s Call Center role and permissions. Returns <strong>404</strong> if membership not found.</p>
+            <p><strong>callCenterRole values:</strong></p>
+            <ul>
+              <li><code>call_center_admin</code> — full Call Center access</li>
+              <li><code>call_center_operator</code> — assigned numbers + own logs</li>
+              <li><code>no_access</code> — no Call Center access (default for invited users)</li>
+            </ul>
+            <pre>{`{
+  "event": "member.permission.updated",
+  "orgId": "6a3fa22872bf1d9f23eabc6d",
+  "workspaceId": "org_6a3fa22872bf1d9f23eabc6d",
+  "userId": "608a1234567890abcdef",
+  "role": "call_center_operator",
+  "callCenterRole": "call_center_operator",
+  "status": "active",
+  "permissions": {
+    "canBuyNumber": false,
+    "canTopUpWallet": false,
+    "canManageAgents": false,
+    "canManageCallFlows": false,
+    "canAssignNumbers": false,
+    "canUseAssignedNumbers": true,
+    "canEditAssignedFlow": true,
+    "canViewOwnCallLogs": true,
+    "canViewAllCallLogs": false,
+    "canViewOrgAnalytics": false,
+    "canViewWallet": false,
+    "canManageBilling": false
+  },
+  "updatedAt": "2026-07-08T07:30:00.000Z"
+}`}</pre>
+          </div>
+
+          <h3>Hustle integration curl example</h3>
+          <pre>{`curl -X POST "https://conversation.hustleapp.co/api/v1/integrations/hustle/org-sync" \\
+  -H "Content-Type: application/json" \\
+  -H "Authorization: Bearer $SUBSCRIPTION_INTERNAL_API_TOKEN" \\
+  -H "X-Hustle-Timestamp: $(date +%s)" \\
+  -H "X-Hustle-Request-Id: hustle_cc_test_001" \\
+  -d '{
+    "event": "org.synced",
+    "orgId": "6a3fa22872bf1d9f23eabc6d",
+    "workspaceId": "org_6a3fa22872bf1d9f23eabc6d",
+    "workspaceType": "organization",
+    "ownerUserId": "507f1f77bcf86cd799439011",
+    "ownerEmail": "owner@example.com",
+    "ownerName": "Owner Name",
+    "orgName": "Acme Corp",
+    "status": "active",
+    "hustlePlan": "trial"
+  }'`}</pre>
+
+          <h3>Success response <span className="success-badge">200 OK</span></h3>
+          <div className="response-example">
+            <pre>{`{
+  "status": "success",
+  "message": "HUSTLE-ORG-SYNC processed",
+  "data": {
+    "externalOrgId": "6a3fa22872bf1d9f23eabc6d",
+    "ownerExternalUserId": "507f1f77bcf86cd799439011",
+    "localOwnerUserId": null
+  }
+}`}</pre>
+          </div>
+
+          <h2>🔧 Quick Start (Public APIs)</h2>
           <p>Get started with a simple request:</p>
           <pre>{`curl -X GET "https://conversation.hustleapp.co/Public_api/getPurchaseNumber?email=user@example.com"`}</pre>
           <pre>{`curl -G "https://conversation.hustleapp.co/Public_api/getCallHistory" \\
@@ -1139,6 +1363,84 @@ getCallHistory("user@example.com", "uuid-from-purchase", "+1234567890").then(cal
             </div>
 
             <div id="plans-result" style={{marginTop: '20px'}}></div>
+          </div>
+
+          <div className="endpoint-info">
+            <h3>Hustle integration health checks (GET)</h3>
+            <p>
+              Each Hustle sync route exposes a <code>GET</code> handler that returns endpoint metadata without authentication.
+              Use these to verify routes are deployed. <code>POST</code> sync calls require the Bearer token (and optional HMAC) — test those with curl, not from the browser.
+            </p>
+            <div style={{display: 'flex', gap: '10px', flexWrap: 'wrap', marginTop: '16px'}}>
+              <button
+                type="button"
+                onClick={() => handleTestHustleHealth('/api/v1/integrations/hustle/org-sync', 'hustle-org-health')}
+                style={{
+                  background: '#f59e0b',
+                  color: 'white',
+                  border: 'none',
+                  padding: '10px 16px',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                }}
+              >
+                GET org-sync
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTestHustleHealth('/api/v1/integrations/hustle/member-sync', 'hustle-member-health')}
+                style={{
+                  background: '#f59e0b',
+                  color: 'white',
+                  border: 'none',
+                  padding: '10px 16px',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                }}
+              >
+                GET member-sync
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTestHustleHealth('/api/v1/integrations/hustle/permission-sync', 'hustle-permission-health')}
+                style={{
+                  background: '#f59e0b',
+                  color: 'white',
+                  border: 'none',
+                  padding: '10px 16px',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                }}
+              >
+                GET permission-sync
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTestHustleHealth('/api/webhooks/forex/organization', 'hustle-legacy-health')}
+                style={{
+                  background: '#94a3b8',
+                  color: 'white',
+                  border: 'none',
+                  padding: '10px 16px',
+                  borderRadius: '8px',
+                  fontSize: '14px',
+                  fontWeight: 'bold',
+                  cursor: 'pointer',
+                }}
+              >
+                GET legacy webhook (deprecated)
+              </button>
+            </div>
+            <div id="hustle-org-health" style={{marginTop: '16px'}}></div>
+            <div id="hustle-member-health" style={{marginTop: '16px'}}></div>
+            <div id="hustle-permission-health" style={{marginTop: '16px'}}></div>
+            <div id="hustle-legacy-health" style={{marginTop: '16px'}}></div>
           </div>
 
           <h2>🆘 Support</h2>

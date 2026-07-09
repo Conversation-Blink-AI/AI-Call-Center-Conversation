@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { z } from "zod"
 import { buildHustleSignInResponse, completeHustleSignIn } from "@/lib/hustle-signin"
+import { mapHustleSignInError } from "@/lib/hustle-signin-errors"
 
 const hustleSignInSchema = z.object({
   token: z.string().min(1).max(8192),
@@ -34,14 +35,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(buildHustleSignInResponse(result))
   } catch (error: unknown) {
     console.error("[HUSTLE-SIGNIN] Error:", error)
-    const isProd = process.env.NODE_ENV === "production"
-    const message =
-      isProd
-        ? "Internal server error"
-        : error instanceof Error
-          ? error.message
-          : "Internal server error"
-
-    return NextResponse.json({ success: false, message }, { status: 500 })
+    const { status, message } = mapHustleSignInError(error)
+    return NextResponse.json({ success: false, message }, { status })
   }
 }

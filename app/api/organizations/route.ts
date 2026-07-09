@@ -43,20 +43,24 @@ export async function GET(req: NextRequest) {
               json_build_object(
                 'userId', u.id,
                 'externalId', COALESCE(u.external_id, m.user_external_id),
-                'email', u.email,
+                'email', COALESCE(u.email, m.user_email),
                 'firstName', u.first_name,
                 'lastName', u.last_name,
                 'role', m.role,
+                'hustleRole', m.hustle_role,
+                'callCenterRole', m.call_center_role,
                 'status', m.status,
                 'permissions', m.permissions
               )
               ORDER BY
-                CASE m.role
-                  WHEN 'organization_admin' THEN 1
-                  WHEN 'organization_user' THEN 2
-                  ELSE 3
+                CASE COALESCE(m.call_center_role, m.role)
+                  WHEN 'call_center_admin' THEN 1
+                  WHEN 'organization_admin' THEN 2
+                  WHEN 'call_center_operator' THEN 3
+                  WHEN 'organization_user' THEN 4
+                  ELSE 5
                 END,
-                u.email
+                COALESCE(u.email, m.user_email)
             ) FILTER (WHERE m.id IS NOT NULL),
             '[]'::json
           ) AS members
