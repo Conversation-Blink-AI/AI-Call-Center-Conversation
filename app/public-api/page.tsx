@@ -123,6 +123,90 @@ export default function PublicApiDocumentationPage() {
       });
   };
 
+  const handleTestGetWallet = () => {
+    const email = (document.getElementById('wallet-email') as HTMLInputElement).value;
+    const userId = (document.getElementById('wallet-userid') as HTMLInputElement).value.trim();
+    const orgId = (document.getElementById('wallet-orgid') as HTMLInputElement).value.trim();
+    const resultDiv = document.getElementById('wallet-result');
+
+    if (!email || !userId || !orgId) {
+      if (resultDiv) resultDiv.innerHTML = '<div style="color: #ef4444; padding: 15px; background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px;"><strong>Error:</strong> Please enter email, userId, and orgId</div>';
+      return;
+    }
+
+    if (resultDiv) resultDiv.innerHTML = '<div style="color: #3b82f6; padding: 15px; background: #f0f9ff; border: 1px solid #7dd3fc; border-radius: 8px;">🔄 Testing API...</div>';
+
+    const query = new URLSearchParams({ email, userId, orgId });
+    fetch(`/api/Public_api/getWallet?${query.toString()}`)
+      .then((response) => response.json().then((data) => ({ data, status: response.status })))
+      .then(({ data, status }) => {
+        if (resultDiv) {
+          const statusColor = status >= 200 && status < 300 ? '#10b981' : '#ef4444';
+          resultDiv.innerHTML = `
+            <div style="padding: 15px; background: #f0f9ff; border: 1px solid #7dd3fc; border-radius: 8px;">
+              <h4 style="margin: 0 0 10px 0; color: #1e40af;">
+                API Response
+                <span style="background: ${statusColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; margin-left: 8px;">HTTP ${status}</span>
+              </h4>
+              <pre style="background: #1e293b; color: #f8fafc; padding: 15px; border-radius: 6px; overflow-x: auto; font-size: 14px; margin: 0; max-height: 600px;">${JSON.stringify(data, null, 2)}</pre>
+            </div>
+          `;
+        }
+      })
+      .catch((error) => {
+        if (resultDiv) {
+          resultDiv.innerHTML = `<div style="color: #ef4444; padding: 15px; background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px;"><strong>Error:</strong> ${error.message}</div>`;
+        }
+      });
+  };
+
+  const handleTestGetAnalytics = () => {
+    const email = (document.getElementById('analytics-email') as HTMLInputElement).value;
+    const userId = (document.getElementById('analytics-userid') as HTMLInputElement).value.trim();
+    const orgId = (document.getElementById('analytics-orgid') as HTMLInputElement).value.trim();
+    const startDate = (document.getElementById('analytics-start') as HTMLInputElement).value.trim();
+    const endDate = (document.getElementById('analytics-end') as HTMLInputElement).value.trim();
+    const allTime = (document.getElementById('analytics-alltime') as HTMLInputElement).checked;
+    const resultDiv = document.getElementById('analytics-result');
+
+    if (!email || !userId || !orgId) {
+      if (resultDiv) resultDiv.innerHTML = '<div style="color: #ef4444; padding: 15px; background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px;"><strong>Error:</strong> Please enter email, userId, and orgId</div>';
+      return;
+    }
+
+    if (resultDiv) resultDiv.innerHTML = '<div style="color: #3b82f6; padding: 15px; background: #f0f9ff; border: 1px solid #7dd3fc; border-radius: 8px;">🔄 Testing API...</div>';
+
+    const query = new URLSearchParams({ email, userId, orgId });
+    if (allTime) {
+      query.set('allTime', 'true');
+    } else {
+      if (startDate) query.set('startDate', new Date(startDate).toISOString());
+      if (endDate) query.set('endDate', new Date(endDate).toISOString());
+    }
+
+    fetch(`/api/Public_api/getAnalytics?${query.toString()}`)
+      .then((response) => response.json().then((data) => ({ data, status: response.status })))
+      .then(({ data, status }) => {
+        if (resultDiv) {
+          const statusColor = status >= 200 && status < 300 ? '#10b981' : '#ef4444';
+          resultDiv.innerHTML = `
+            <div style="padding: 15px; background: #f0f9ff; border: 1px solid #7dd3fc; border-radius: 8px;">
+              <h4 style="margin: 0 0 10px 0; color: #1e40af;">
+                API Response
+                <span style="background: ${statusColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; margin-left: 8px;">HTTP ${status}</span>
+              </h4>
+              <pre style="background: #1e293b; color: #f8fafc; padding: 15px; border-radius: 6px; overflow-x: auto; font-size: 14px; margin: 0; max-height: 600px;">${JSON.stringify(data, null, 2)}</pre>
+            </div>
+          `;
+        }
+      })
+      .catch((error) => {
+        if (resultDiv) {
+          resultDiv.innerHTML = `<div style="color: #ef4444; padding: 15px; background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px;"><strong>Error:</strong> ${error.message}</div>`;
+        }
+      });
+  };
+
   const handleTestHustleHealth = (endpoint: string, resultId: string) => {
     const resultDiv = document.getElementById(resultId);
     if (resultDiv) {
@@ -347,7 +431,7 @@ export default function PublicApiDocumentationPage() {
         <div className="container">
           <h1>📚 API Documentation</h1>
           <p style={{ marginTop: '-10px', marginBottom: '24px', color: '#64748b' }}>
-            Public endpoints for phone numbers, call history, and plans — plus Hustle server-to-server org/member sync.
+            Public endpoints for phone numbers, call history, plans, org wallet, and org analytics — plus Hustle server-to-server org/member sync.
           </p>
           
           <div className="endpoint-info">
@@ -370,6 +454,22 @@ export default function PublicApiDocumentationPage() {
             <p><span className="method">GET</span> <span className="url">/Public_api/getPlans</span></p>
             <p>
               Returns the full plan and pricing catalogue for the Call Center platform: wallet top-up tiers (<code>plans</code>), per-usage rates (<code>usagePricing</code>) for AI calls and phone numbers, supported payment providers, and product URLs. Optional query params: <code>platform</code> (currently only <code>callCenter</code>) and <code>planId</code> to fetch a single plan.
+            </p>
+          </div>
+
+          <div className="endpoint-info">
+            <h2>getWallet Endpoint</h2>
+            <p><span className="method">GET</span> <span className="url">/Public_api/getWallet</span></p>
+            <p>
+              Load the Call Center organization wallet balance (aggregated across synced members). Requires <strong>email</strong>, <strong>userId</strong> (from <code>getPurchaseNumber</code>), and <strong>orgId</strong> (Hustle organization id). The caller must be an active org member with <code>canViewWallet</code> or <code>call_center_admin</code> role.
+            </p>
+          </div>
+
+          <div className="endpoint-info">
+            <h2>getAnalytics Endpoint</h2>
+            <p><span className="method">GET</span> <span className="url">/Public_api/getAnalytics</span></p>
+            <p>
+              Load organization call analytics matching the <code>/dashboard/calls</code> metrics: total calls, duration, cost, transfer leads, timeframe counts, chart series, and Meta CAPI stats. Requires <strong>email</strong>, <strong>userId</strong>, and <strong>orgId</strong>. Optional date filters: <code>startDate</code>, <code>endDate</code>, <code>allTime=true</code>, or <code>timeframe</code> (e.g. <code>7d</code>). Admins with <code>canViewOrgAnalytics</code> see org-wide data; operators with <code>canViewOwnCallLogs</code> see only their own calls.
             </p>
           </div>
 
@@ -1363,6 +1463,44 @@ getCallHistory("user@example.com", "uuid-from-purchase", "+1234567890").then(cal
             </div>
 
             <div id="plans-result" style={{marginTop: '20px'}}></div>
+          </div>
+
+          <div className="endpoint-info">
+            <h3>Try getWallet</h3>
+            <p>Enter email, userId (from getPurchaseNumber), and orgId:</p>
+            <div style={{marginTop: '20px'}}>
+              <label htmlFor="wallet-email" style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>Email:</label>
+              <input type="email" id="wallet-email" placeholder="user@example.com" style={{width: '100%', maxWidth: '400px', padding: '12px', border: '2px solid #cbd5e1', borderRadius: '8px', fontSize: '16px', marginBottom: '15px'}} />
+              <label htmlFor="wallet-userid" style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>userId:</label>
+              <input type="text" id="wallet-userid" placeholder="uuid from getPurchaseNumber" style={{width: '100%', maxWidth: '400px', padding: '12px', border: '2px solid #cbd5e1', borderRadius: '8px', fontSize: '16px', marginBottom: '15px'}} />
+              <label htmlFor="wallet-orgid" style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>orgId:</label>
+              <input type="text" id="wallet-orgid" placeholder="Hustle organization id" style={{width: '100%', maxWidth: '400px', padding: '12px', border: '2px solid #cbd5e1', borderRadius: '8px', fontSize: '16px', marginBottom: '15px'}} />
+              <button type="button" onClick={handleTestGetWallet} style={{background: '#3b82f6', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer'}} onMouseOver={handleMouseOver} onMouseOut={handleMouseOut}>Test getWallet</button>
+            </div>
+            <div id="wallet-result" style={{marginTop: '20px'}}></div>
+          </div>
+
+          <div className="endpoint-info">
+            <h3>Try getAnalytics</h3>
+            <p>Enter email, userId, orgId, and optional date range:</p>
+            <div style={{marginTop: '20px'}}>
+              <label htmlFor="analytics-email" style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>Email:</label>
+              <input type="email" id="analytics-email" placeholder="user@example.com" style={{width: '100%', maxWidth: '400px', padding: '12px', border: '2px solid #cbd5e1', borderRadius: '8px', fontSize: '16px', marginBottom: '15px'}} />
+              <label htmlFor="analytics-userid" style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>userId:</label>
+              <input type="text" id="analytics-userid" placeholder="uuid from getPurchaseNumber" style={{width: '100%', maxWidth: '400px', padding: '12px', border: '2px solid #cbd5e1', borderRadius: '8px', fontSize: '16px', marginBottom: '15px'}} />
+              <label htmlFor="analytics-orgid" style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>orgId:</label>
+              <input type="text" id="analytics-orgid" placeholder="Hustle organization id" style={{width: '100%', maxWidth: '400px', padding: '12px', border: '2px solid #cbd5e1', borderRadius: '8px', fontSize: '16px', marginBottom: '15px'}} />
+              <label htmlFor="analytics-start" style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>startDate (optional):</label>
+              <input type="date" id="analytics-start" style={{width: '100%', maxWidth: '400px', padding: '12px', border: '2px solid #cbd5e1', borderRadius: '8px', fontSize: '16px', marginBottom: '15px'}} />
+              <label htmlFor="analytics-end" style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>endDate (optional):</label>
+              <input type="date" id="analytics-end" style={{width: '100%', maxWidth: '400px', padding: '12px', border: '2px solid #cbd5e1', borderRadius: '8px', fontSize: '16px', marginBottom: '15px'}} />
+              <label style={{display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '15px'}}>
+                <input type="checkbox" id="analytics-alltime" />
+                <span>allTime (ignore date range)</span>
+              </label>
+              <button type="button" onClick={handleTestGetAnalytics} style={{background: '#3b82f6', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer'}} onMouseOver={handleMouseOver} onMouseOut={handleMouseOut}>Test getAnalytics</button>
+            </div>
+            <div id="analytics-result" style={{marginTop: '20px'}}></div>
           </div>
 
           <div className="endpoint-info">

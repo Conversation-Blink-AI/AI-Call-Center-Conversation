@@ -411,10 +411,28 @@ export class CallDatabaseService {
     totalDuration: number
     totalCost: number
   }> {
+    return this.getCallStatsForUserIds([userId], options)
+  }
+
+  static async getCallStatsForUserIds(
+    userIds: string[],
+    options?: {
+      startDate?: string
+      endDate?: string
+    }
+  ): Promise<{
+    totalCalls: number
+    completedCalls: number
+    failedCalls: number
+    transferredCalls: number
+    totalDuration: number
+    totalCost: number
+  }> {
+    const scopedUserIds = userIds.length > 0 ? userIds : ["00000000-0000-0000-0000-000000000000"]
     const { startDate, endDate } = options || {}
 
-    const whereConditions = ['user_id = $1']
-    const values: any[] = [userId]
+    const whereConditions = ["user_id = ANY($1::uuid[])"]
+    const values: unknown[] = [scopedUserIds]
     let paramCount = 1
 
     if (startDate) {
@@ -429,7 +447,7 @@ export class CallDatabaseService {
       values.push(endDate)
     }
 
-    const whereClause = whereConditions.join(' AND ')
+    const whereClause = whereConditions.join(" AND ")
 
     const query = `
       SELECT 
@@ -455,12 +473,12 @@ export class CallDatabaseService {
     const stats = result.rows[0]
 
     return {
-      totalCalls: parseInt(stats.total_calls),
-      completedCalls: parseInt(stats.completed_calls),
-      failedCalls: parseInt(stats.failed_calls),
-      transferredCalls: parseInt(stats.transferred_calls),
-      totalDuration: parseInt(stats.total_duration),
-      totalCost: parseInt(stats.total_cost)
+      totalCalls: parseInt(stats.total_calls, 10),
+      completedCalls: parseInt(stats.completed_calls, 10),
+      failedCalls: parseInt(stats.failed_calls, 10),
+      transferredCalls: parseInt(stats.transferred_calls, 10),
+      totalDuration: parseInt(stats.total_duration, 10),
+      totalCost: parseInt(stats.total_cost, 10),
     }
   }
 }
