@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Eye, EyeOff } from "lucide-react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 
@@ -21,6 +22,7 @@ export default function LoginPage() {
   const [error, setError] = useState("")
   const { login, loading: authLoading, isAuthenticated } = useAuth()
   const { toast } = useToast()
+  const router = useRouter()
 
   const getAuthErrorMessage = (message?: string) => {
     if (!message) {
@@ -35,13 +37,12 @@ export default function LoginPage() {
 
   const isInvalidCredentials = (message: string) => message === "Invalid username or password"
 
-  // ✅ Simple redirect check - no complex logic
+  // Redirect already-authenticated users away from login
   useEffect(() => {
     if (isAuthenticated && !authLoading) {
-      console.log("🔄 [LOGIN-PAGE] User already authenticated")
-      // Let the auth context handle the redirect
+      router.replace("/dashboard")
     }
-  }, [isAuthenticated, authLoading])
+  }, [isAuthenticated, authLoading, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

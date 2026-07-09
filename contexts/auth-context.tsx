@@ -68,6 +68,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const effectivePermissions = resolveEffectivePermissions(user)
   const activeOrgMembership = getActiveOrgMembership(user)
 
+  const clearStaleAuth = async () => {
+    localStorage.removeItem("auth-token")
+    try {
+      await fetch("/api/auth/logout", { method: "POST", credentials: "include" })
+    } catch {
+      // Non-fatal — middleware will clear cookie on next navigation
+    }
+  }
+
   const checkAuth = async () => {
     authCheckAbortRef.current?.abort()
     const controller = new AbortController()
@@ -103,7 +112,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         console.log("❌ [AUTH-CONTEXT] Auth check failed:", response.status)
         setUser(null)
-        setIsAuthenticated(false) // Update isAuthenticated state
+        setIsAuthenticated(false)
+        if (response.status === 401) {
+          await clearStaleAuth()
+        }
       }
     } catch (error: unknown) {
       const err = error as { name?: string; message?: string }

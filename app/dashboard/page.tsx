@@ -116,7 +116,7 @@ export default function DashboardPage() {
   // Redirect unauthenticated users
   useEffect(() => {
     if (!loading && !user) {
-      router.push("/")
+      router.replace("/login")
     }
   }, [loading, user, router])
 
