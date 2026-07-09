@@ -4,11 +4,6 @@ import type { ZodSchema } from "zod"
 import { getSSLConfig } from "@/lib/db-client"
 import { verifyHustleIntegrationRequest } from "@/lib/hustle-integration-auth"
 
-export const hustleIntegrationRuntime = {
-  runtime: "nodejs" as const,
-  dynamic: "force-dynamic" as const,
-}
-
 type SyncHandler<T> = (client: Client, payload: T) => Promise<Record<string, unknown>>
 
 export function createHustleIntegrationGetHandler(endpoint: string, event: string) {

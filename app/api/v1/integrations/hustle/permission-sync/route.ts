@@ -4,12 +4,11 @@ import {
 import {
   createHustleIntegrationGetHandler,
   createHustleIntegrationPostHandler,
-  hustleIntegrationRuntime,
 } from "@/lib/hustle-integration-route"
 import { syncHustleMemberPermissions } from "@/lib/forex-org-sync"
 
-export const runtime = hustleIntegrationRuntime.runtime
-export const dynamic = hustleIntegrationRuntime.dynamic
+export const runtime = "nodejs"
+export const dynamic = "force-dynamic"
 
 const ENDPOINT = "/api/v1/integrations/hustle/permission-sync"
 
