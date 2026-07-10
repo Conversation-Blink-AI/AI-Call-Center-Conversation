@@ -111,9 +111,16 @@ export async function verifyOrgMembership(
   )
 
   if (orgResult.rows.length === 0) {
-    return { error: { status: 404, message: "Organization not found" } }
+    return {
+      error: {
+        status: 404,
+        message:
+          "Organization not found. Ensure Hustle org-sync has run for this orgId.",
+      },
+    }
   }
 
+  const normalizedEmail = normalizeEmail(user.email)
   const membershipResult = await pool.query(
     `SELECT
        id,
@@ -131,19 +138,44 @@ export async function verifyOrgMembership(
        AND (
          user_id = $2::uuid
          OR ($3::text IS NOT NULL AND user_external_id = $3::text)
+         OR user_external_id = $2::text
+         OR LOWER(TRIM(user_email)) = $4
        )
+     ORDER BY
+       CASE
+         WHEN user_id = $2::uuid THEN 0
+         WHEN ($3::text IS NOT NULL AND user_external_id = $3::text) THEN 1
+         WHEN user_external_id = $2::text THEN 2
+         ELSE 3
+       END
      LIMIT 1`,
-    [orgId, user.id, user.external_id],
+    [orgId, user.id, user.external_id, normalizedEmail],
   )
 
   if (membershipResult.rows.length === 0) {
-    return { error: { status: 404, message: "Organization membership not found" } }
+    return {
+      error: {
+        status: 404,
+        message:
+          "Organization membership not found. Ensure Hustle member-sync has linked this user to the org.",
+      },
+    }
   }
 
   const membership = membershipResult.rows[0] as OrgMembershipRow
 
   if (membership.status !== "active") {
     return { error: { status: 404, message: "Organization membership is not active" } }
+  }
+
+  if (!membership.user_id) {
+    await pool.query(
+      `UPDATE forex_org_memberships
+       SET user_id = $1::uuid, updated_at = NOW()
+       WHERE id = $2`,
+      [user.id, membership.id],
+    )
+    membership.user_id = user.id
   }
 
   return { membership }

@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server"
-import { getPool } from "@/lib/db-client"
 import { canViewWallet } from "@/lib/call-center-permissions"
+import { getPool } from "@/lib/db-client"
+import { ensureForexOrgTables } from "@/lib/forex-org-sync"
 import { publicApiJsonResponse, publicApiOptionsResponse } from "@/lib/public-api-cors"
 import {
   resolveOrgScopedUserIds,
@@ -35,6 +36,8 @@ export async function GET(request: NextRequest) {
     }
 
     const pool = getPool()
+    await ensureForexOrgTables(pool)
+
     const userResult = await verifyPublicApiUser(pool, emailParam, userIdParam)
     if ("error" in userResult) {
       return publicApiJsonResponse(
