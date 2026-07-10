@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -19,6 +20,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+  const router = useRouter()
   const { login, loading: authLoading, isAuthenticated } = useAuth()
   const { toast } = useToast()
 
@@ -35,13 +37,11 @@ export default function LoginPage() {
 
   const isInvalidCredentials = (message: string) => message === "Invalid username or password"
 
-  // ✅ Simple redirect check - no complex logic
   useEffect(() => {
     if (isAuthenticated && !authLoading) {
-      console.log("🔄 [LOGIN-PAGE] User already authenticated")
-      // Let the auth context handle the redirect
+      router.replace("/dashboard")
     }
-  }, [isAuthenticated, authLoading])
+  }, [isAuthenticated, authLoading, router])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -70,8 +70,8 @@ export default function LoginPage() {
     }
   }
 
-  // ✅ Show loading state while auth is being determined
-  if (authLoading) {
+  // Show loading state while auth is being determined or redirecting authenticated users
+  if (authLoading || isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#000023]">
         <div className="text-center">

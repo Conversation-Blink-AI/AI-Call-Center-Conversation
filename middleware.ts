@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { getSessionToken, validateSessionToken } from "./lib/auth-utils"
 
 const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key"
 
@@ -63,15 +62,17 @@ export async function middleware(req: NextRequest) {
 
     if (isProtectedPath) {
       if (!token) {
-        console.log("[MIDDLEWARE] ❌ No token, redirecting to home page")
-        return NextResponse.redirect(new URL("/", req.url))
+        console.log("[MIDDLEWARE] ❌ No token, redirecting to login")
+        return NextResponse.redirect(new URL("/login", req.url))
       }
 
       // Verify JWT token
       const decoded = verifyJWT(token, JWT_SECRET)
       if (!decoded) {
-        console.log("[MIDDLEWARE] ❌ Invalid token, redirecting to home page")
-        return NextResponse.redirect(new URL("/", req.url))
+        console.log("[MIDDLEWARE] ❌ Invalid token, redirecting to login")
+        const response = NextResponse.redirect(new URL("/login", req.url))
+        response.cookies.delete("auth-token")
+        return response
       }
 
       console.log("[MIDDLEWARE] ✅ Token valid for user:", decoded.userId)
