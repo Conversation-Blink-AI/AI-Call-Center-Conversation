@@ -129,14 +129,15 @@ export default function PublicApiDocumentationPage() {
     const orgId = (document.getElementById('wallet-orgid') as HTMLInputElement).value.trim();
     const resultDiv = document.getElementById('wallet-result');
 
-    if (!email || !userId || !orgId) {
-      if (resultDiv) resultDiv.innerHTML = '<div style="color: #ef4444; padding: 15px; background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px;"><strong>Error:</strong> Please enter email, userId, and orgId</div>';
+    if (!email || !userId) {
+      if (resultDiv) resultDiv.innerHTML = '<div style="color: #ef4444; padding: 15px; background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px;"><strong>Error:</strong> Please enter email and userId (orgId is optional)</div>';
       return;
     }
 
     if (resultDiv) resultDiv.innerHTML = '<div style="color: #3b82f6; padding: 15px; background: #f0f9ff; border: 1px solid #7dd3fc; border-radius: 8px;">🔄 Testing API...</div>';
 
-    const query = new URLSearchParams({ email, userId, orgId });
+    const query = new URLSearchParams({ email, userId });
+    if (orgId) query.set('orgId', orgId);
     fetch(`/api/Public_api/getWallet?${query.toString()}`)
       .then((response) => response.json().then((data) => ({ data, status: response.status })))
       .then(({ data, status }) => {
@@ -169,14 +170,15 @@ export default function PublicApiDocumentationPage() {
     const allTime = (document.getElementById('analytics-alltime') as HTMLInputElement).checked;
     const resultDiv = document.getElementById('analytics-result');
 
-    if (!email || !userId || !orgId) {
-      if (resultDiv) resultDiv.innerHTML = '<div style="color: #ef4444; padding: 15px; background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px;"><strong>Error:</strong> Please enter email, userId, and orgId</div>';
+    if (!email || !userId) {
+      if (resultDiv) resultDiv.innerHTML = '<div style="color: #ef4444; padding: 15px; background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px;"><strong>Error:</strong> Please enter email and userId (orgId is optional)</div>';
       return;
     }
 
     if (resultDiv) resultDiv.innerHTML = '<div style="color: #3b82f6; padding: 15px; background: #f0f9ff; border: 1px solid #7dd3fc; border-radius: 8px;">🔄 Testing API...</div>';
 
-    const query = new URLSearchParams({ email, userId, orgId });
+    const query = new URLSearchParams({ email, userId });
+    if (orgId) query.set('orgId', orgId);
     if (allTime) {
       query.set('allTime', 'true');
     } else {
@@ -461,16 +463,31 @@ export default function PublicApiDocumentationPage() {
             <h2>getWallet Endpoint</h2>
             <p><span className="method">GET</span> <span className="url">/Public_api/getWallet</span></p>
             <p>
-              Load the Call Center organization wallet balance (aggregated across synced members). Requires <strong>email</strong>, <strong>userId</strong> (from <code>getPurchaseNumber</code>), and <strong>orgId</strong> (Hustle organization id). The caller must be an active org member with <code>canViewWallet</code> or <code>call_center_admin</code> role.
+              Dual-mode wallet balance (wallets are per-user). Requires <strong>email</strong> and <strong>userId</strong> (from <code>getPurchaseNumber</code>).
+              Without <strong>orgId</strong>, returns the verified user&apos;s personal wallet (<code>scopedTo: &quot;self&quot;</code>).
+              With <strong>orgId</strong>, the caller must be an active org member with <code>canViewWallet</code> or <code>call_center_admin</code>, and the response is the org owner / <code>organization_admin</code> personal wallet (<code>scopedTo: &quot;organization_admin&quot;</code>).
             </p>
+            <pre>{`# Personal wallet
+curl -s "/Public_api/getWallet?email=user@example.com&userId=550e8400-e29b-41d4-a716-446655440000"
+
+# Org admin wallet
+curl -s "/Public_api/getWallet?email=user@example.com&userId=550e8400-e29b-41d4-a716-446655440000&orgId=6a3fa22872bf1d9f23eabc6d"`}</pre>
           </div>
 
           <div className="endpoint-info">
             <h2>getAnalytics Endpoint</h2>
             <p><span className="method">GET</span> <span className="url">/Public_api/getAnalytics</span></p>
             <p>
-              Load organization call analytics matching the <code>/dashboard/calls</code> metrics: total calls, duration, cost, transfer leads, timeframe counts, chart series, and Meta CAPI stats. Requires <strong>email</strong>, <strong>userId</strong>, and <strong>orgId</strong>. Optional date filters: <code>startDate</code>, <code>endDate</code>, <code>allTime=true</code>, or <code>timeframe</code> (e.g. <code>7d</code>). Admins with <code>canViewOrgAnalytics</code> see org-wide data; operators with <code>canViewOwnCallLogs</code> see only their own calls.
+              Dual-mode call analytics matching the <code>/dashboard/calls</code> metrics: total calls, duration, cost, transfer leads, timeframe counts, chart series, and Meta CAPI stats.
+              Requires <strong>email</strong> and <strong>userId</strong>. Without <strong>orgId</strong>, returns the verified user&apos;s personal analytics (<code>scopedTo: &quot;self&quot;</code>).
+              With <strong>orgId</strong>, the caller must be an active org member; admins with <code>canViewOrgAnalytics</code> see org-wide data, operators with <code>canViewOwnCallLogs</code> see only their own calls.
+              Optional date filters: <code>startDate</code>, <code>endDate</code>, <code>allTime=true</code>, or <code>timeframe</code> (e.g. <code>7d</code>).
             </p>
+            <pre>{`# Personal analytics
+curl -s "/Public_api/getAnalytics?email=user@example.com&userId=550e8400-e29b-41d4-a716-446655440000&timeframe=7d"
+
+# Org-scoped analytics
+curl -s "/Public_api/getAnalytics?email=user@example.com&userId=550e8400-e29b-41d4-a716-446655440000&orgId=6a3fa22872bf1d9f23eabc6d&timeframe=7d"`}</pre>
           </div>
 
           <h2>🔗 Hustle Integration API (Server-to-Server)</h2>
@@ -1467,14 +1484,14 @@ getCallHistory("user@example.com", "uuid-from-purchase", "+1234567890").then(cal
 
           <div className="endpoint-info">
             <h3>Try getWallet</h3>
-            <p>Enter email, userId (from getPurchaseNumber), and orgId:</p>
+            <p>Enter email and userId (from getPurchaseNumber). Leave orgId empty for personal wallet; set orgId for organization_admin wallet:</p>
             <div style={{marginTop: '20px'}}>
               <label htmlFor="wallet-email" style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>Email:</label>
               <input type="email" id="wallet-email" placeholder="user@example.com" style={{width: '100%', maxWidth: '400px', padding: '12px', border: '2px solid #cbd5e1', borderRadius: '8px', fontSize: '16px', marginBottom: '15px'}} />
               <label htmlFor="wallet-userid" style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>userId:</label>
               <input type="text" id="wallet-userid" placeholder="uuid from getPurchaseNumber" style={{width: '100%', maxWidth: '400px', padding: '12px', border: '2px solid #cbd5e1', borderRadius: '8px', fontSize: '16px', marginBottom: '15px'}} />
-              <label htmlFor="wallet-orgid" style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>orgId:</label>
-              <input type="text" id="wallet-orgid" placeholder="Hustle organization id" style={{width: '100%', maxWidth: '400px', padding: '12px', border: '2px solid #cbd5e1', borderRadius: '8px', fontSize: '16px', marginBottom: '15px'}} />
+              <label htmlFor="wallet-orgid" style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>orgId (optional):</label>
+              <input type="text" id="wallet-orgid" placeholder="Leave empty for personal wallet" style={{width: '100%', maxWidth: '400px', padding: '12px', border: '2px solid #cbd5e1', borderRadius: '8px', fontSize: '16px', marginBottom: '15px'}} />
               <button type="button" onClick={handleTestGetWallet} style={{background: '#3b82f6', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '8px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer'}} onMouseOver={handleMouseOver} onMouseOut={handleMouseOut}>Test getWallet</button>
             </div>
             <div id="wallet-result" style={{marginTop: '20px'}}></div>
@@ -1482,14 +1499,14 @@ getCallHistory("user@example.com", "uuid-from-purchase", "+1234567890").then(cal
 
           <div className="endpoint-info">
             <h3>Try getAnalytics</h3>
-            <p>Enter email, userId, orgId, and optional date range:</p>
+            <p>Enter email and userId. Leave orgId empty for personal analytics; set orgId for org-scoped analytics. Optional date range:</p>
             <div style={{marginTop: '20px'}}>
               <label htmlFor="analytics-email" style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>Email:</label>
               <input type="email" id="analytics-email" placeholder="user@example.com" style={{width: '100%', maxWidth: '400px', padding: '12px', border: '2px solid #cbd5e1', borderRadius: '8px', fontSize: '16px', marginBottom: '15px'}} />
               <label htmlFor="analytics-userid" style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>userId:</label>
               <input type="text" id="analytics-userid" placeholder="uuid from getPurchaseNumber" style={{width: '100%', maxWidth: '400px', padding: '12px', border: '2px solid #cbd5e1', borderRadius: '8px', fontSize: '16px', marginBottom: '15px'}} />
-              <label htmlFor="analytics-orgid" style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>orgId:</label>
-              <input type="text" id="analytics-orgid" placeholder="Hustle organization id" style={{width: '100%', maxWidth: '400px', padding: '12px', border: '2px solid #cbd5e1', borderRadius: '8px', fontSize: '16px', marginBottom: '15px'}} />
+              <label htmlFor="analytics-orgid" style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>orgId (optional):</label>
+              <input type="text" id="analytics-orgid" placeholder="Leave empty for personal analytics" style={{width: '100%', maxWidth: '400px', padding: '12px', border: '2px solid #cbd5e1', borderRadius: '8px', fontSize: '16px', marginBottom: '15px'}} />
               <label htmlFor="analytics-start" style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>startDate (optional):</label>
               <input type="date" id="analytics-start" style={{width: '100%', maxWidth: '400px', padding: '12px', border: '2px solid #cbd5e1', borderRadius: '8px', fontSize: '16px', marginBottom: '15px'}} />
               <label htmlFor="analytics-end" style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>endDate (optional):</label>

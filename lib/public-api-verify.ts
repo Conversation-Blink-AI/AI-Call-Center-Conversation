@@ -181,6 +181,129 @@ export async function verifyOrgMembership(
   return { membership }
 }
 
+export type OrgAdminWalletOwner = {
+  userId: string
+  email: string | null
+  externalId: string | null
+  source: "owner" | "organization_admin" | "call_center_admin"
+}
+
+/**
+ * Resolve the organization admin whose personal wallet represents the org wallet.
+ * Prefer forex_organizations.owner_external_user_id, then active membership with
+ * organization_admin / call_center_admin role.
+ */
+export async function resolveOrgAdminUserId(
+  pool: Pool,
+  orgId: string,
+): Promise<OrgAdminWalletOwner | null> {
+  const orgResult = await pool.query(
+    `SELECT owner_external_user_id, owner_email
+     FROM forex_organizations
+     WHERE external_org_id = $1
+     LIMIT 1`,
+    [orgId],
+  )
+
+  if (orgResult.rows.length === 0) {
+    return null
+  }
+
+  const ownerExternalId = orgResult.rows[0].owner_external_user_id as string | null
+  const ownerEmail = orgResult.rows[0].owner_email as string | null
+
+  if (ownerExternalId) {
+    const byExternal = await pool.query(
+      `SELECT id, email, email_enc, external_id
+       FROM users
+       WHERE external_id = $1
+       LIMIT 1`,
+      [ownerExternalId],
+    )
+    if (byExternal.rows.length > 0) {
+      const row = byExternal.rows[0]
+      return {
+        userId: row.id,
+        email: normalizeEmail(decryptMaybe(row.email, row.email_enc)) || ownerEmail,
+        externalId: row.external_id,
+        source: "owner",
+      }
+    }
+
+    const byMembership = await pool.query(
+      `SELECT m.user_id, m.user_email, m.user_external_id, u.email, u.email_enc
+       FROM forex_org_memberships m
+       LEFT JOIN users u ON u.id = m.user_id
+       WHERE m.external_org_id = $1
+         AND m.user_external_id = $2
+         AND m.status = 'active'
+         AND m.user_id IS NOT NULL
+       LIMIT 1`,
+      [orgId, ownerExternalId],
+    )
+    if (byMembership.rows.length > 0) {
+      const row = byMembership.rows[0]
+      const email =
+        normalizeEmail(decryptMaybe(row.email, row.email_enc)) ||
+        (row.user_email ? normalizeEmail(row.user_email) : null) ||
+        (ownerEmail ? normalizeEmail(ownerEmail) : null)
+      return {
+        userId: row.user_id,
+        email,
+        externalId: row.user_external_id,
+        source: "owner",
+      }
+    }
+  }
+
+  const adminMembership = await pool.query(
+    `SELECT
+       m.user_id,
+       m.user_email,
+       m.user_external_id,
+       m.role,
+       m.call_center_role,
+       u.email,
+       u.email_enc,
+       u.external_id
+     FROM forex_org_memberships m
+     LEFT JOIN users u ON u.id = m.user_id
+     WHERE m.external_org_id = $1
+       AND m.status = 'active'
+       AND m.user_id IS NOT NULL
+       AND (
+         COALESCE(m.call_center_role, m.role) = 'organization_admin'
+         OR COALESCE(m.call_center_role, m.role) = 'call_center_admin'
+       )
+     ORDER BY
+       CASE COALESCE(m.call_center_role, m.role)
+         WHEN 'organization_admin' THEN 0
+         WHEN 'call_center_admin' THEN 1
+         ELSE 2
+       END,
+       m.updated_at DESC NULLS LAST
+     LIMIT 1`,
+    [orgId],
+  )
+
+  if (adminMembership.rows.length === 0) {
+    return null
+  }
+
+  const row = adminMembership.rows[0]
+  const role = (row.call_center_role || row.role) as string
+  const email =
+    normalizeEmail(decryptMaybe(row.email, row.email_enc)) ||
+    (row.user_email ? normalizeEmail(row.user_email) : null)
+
+  return {
+    userId: row.user_id,
+    email,
+    externalId: row.external_id || row.user_external_id,
+    source: role === "call_center_admin" ? "call_center_admin" : "organization_admin",
+  }
+}
+
 export async function resolveOrgScopedUserIds(
   pool: Pool,
   orgId: string,

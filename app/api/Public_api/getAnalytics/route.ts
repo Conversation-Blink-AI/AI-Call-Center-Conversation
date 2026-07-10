@@ -23,11 +23,11 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const emailParam = searchParams.get("email")
     const userIdParam = searchParams.get("userId")
-    const orgIdParam = searchParams.get("orgId")
+    const orgIdParam = searchParams.get("orgId")?.trim() || null
 
-    if (!emailParam || !userIdParam || !orgIdParam) {
+    if (!emailParam || !userIdParam) {
       return publicApiJsonResponse(
-        { success: false, message: "email, userId, and orgId are required" },
+        { success: false, message: "email and userId are required" },
         400,
       )
     }
@@ -50,6 +50,40 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    const { start: rangeStart, end: rangeEnd } = resolveAnalyticsDateRange(searchParams)
+    const isAllTime = !rangeStart && !rangeEnd
+    const now = new Date()
+    const bounds = {
+      rangeStart,
+      rangeEnd: isAllTime ? null : (rangeEnd ?? now),
+    }
+
+    // Personal mode: email + userId only → requester's own analytics
+    if (!orgIdParam) {
+      const scopedUserIds = [userResult.user.id]
+      const [{ stats, timeframeCounts }, metaCapi] = await Promise.all([
+        getCallAnalyticsForUserIds(scopedUserIds, bounds),
+        getMetaCapiAnalyticsForUserIds(scopedUserIds, bounds),
+      ])
+
+      return publicApiJsonResponse({
+        success: true,
+        orgId: null,
+        email: userResult.user.email,
+        userId: userResult.user.id,
+        scopedTo: "self",
+        scopedUserCount: 1,
+        dateRange: {
+          start: bounds.rangeStart?.toISOString() ?? null,
+          end: bounds.rangeEnd?.toISOString() ?? null,
+        },
+        stats,
+        timeframeCounts,
+        metaCapi,
+      })
+    }
+
+    // Org mode: membership + role scope → org-wide or self within the org
     const membershipResult = await verifyOrgMembership(pool, orgIdParam, userResult.user)
     if ("error" in membershipResult) {
       return publicApiJsonResponse(
@@ -61,7 +95,10 @@ export async function GET(request: NextRequest) {
     const scope = resolveAnalyticsScope(membershipResult.membership)
     if (!scope) {
       return publicApiJsonResponse(
-        { success: false, message: "You do not have permission to view organization analytics" },
+        {
+          success: false,
+          message: "You do not have permission to view organization analytics",
+        },
         403,
       )
     }
@@ -73,14 +110,6 @@ export async function GET(request: NextRequest) {
       userResult.user.id,
       scope,
     )
-
-    const { start: rangeStart, end: rangeEnd } = resolveAnalyticsDateRange(searchParams)
-    const isAllTime = !rangeStart && !rangeEnd
-    const now = new Date()
-    const bounds = {
-      rangeStart,
-      rangeEnd: isAllTime ? null : (rangeEnd ?? now),
-    }
 
     const [{ stats, timeframeCounts }, metaCapi] = await Promise.all([
       getCallAnalyticsForUserIds(scopedUserIds, bounds),

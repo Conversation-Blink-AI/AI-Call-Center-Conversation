@@ -105,51 +105,96 @@ Pricing catalogue for the Call Center platform.
 
 ### GET `/Public_api/getWallet`
 
-Organization wallet balance (sum of member wallets). Requires active org membership with `canViewWallet` or `call_center_admin`.
+Dual-mode wallet balance. Wallets are per-user (`wallets.user_id`); there is no separate org wallet table.
+
+| Mode | Params | Behavior |
+|------|--------|----------|
+| Personal | `email` + `userId` | Verified user’s own wallet (`scopedTo: "self"`) |
+| Org | `email` + `userId` + `orgId` | Caller must be an active member with `canViewWallet` or `call_center_admin`. Returns the **organization_admin** (or org owner) personal wallet for that org (`scopedTo: "organization_admin"`) |
 
 | Query param | Required | Description |
 |-------------|----------|-------------|
 | `email` | Yes | Must match `userId` |
 | `userId` | Yes | UUID from `getPurchaseNumber` |
-| `orgId` | Yes | Hustle org id (`forex_organizations.external_org_id`) |
+| `orgId` | No | Hustle org id (`forex_organizations.external_org_id`). When set, returns org admin wallet |
 
-**Success (200)**
+**Success — personal (200)**
+
+```json
+{
+  "success": true,
+  "orgId": null,
+  "email": "user@example.com",
+  "userId": "550e8400-e29b-41d4-a716-446655440000",
+  "balanceCents": 5000,
+  "balanceDollars": "50.00",
+  "memberWalletCount": 1,
+  "scopedTo": "self",
+  "walletOwnerUserId": "550e8400-e29b-41d4-a716-446655440000",
+  "walletOwnerEmail": "user@example.com"
+}
+```
+
+**Success — org (200)**
 
 ```json
 {
   "success": true,
   "orgId": "6a3fa22872bf1d9f23eabc6d",
-  "email": "admin@example.com",
+  "email": "member@example.com",
   "userId": "550e8400-e29b-41d4-a716-446655440000",
   "balanceCents": 15000,
   "balanceDollars": "150.00",
-  "memberWalletCount": 3,
-  "scopedTo": "organization"
+  "memberWalletCount": 1,
+  "scopedTo": "organization_admin",
+  "walletOwnerUserId": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+  "walletOwnerEmail": "admin@example.com",
+  "walletOwnerSource": "owner"
 }
 ```
 
-**No permission (403):** `{ "success": false, "message": "You do not have permission to view the organization wallet" }`
+**No permission (403):** `{ "success": false, "message": "You do not have permission to view the organization wallet" }`  
+**Admin not found (404):** `{ "success": false, "message": "Organization admin wallet not found..." }`
 
 ---
 
 ### GET `/Public_api/getAnalytics`
 
-Organization call analytics (same metrics as `/dashboard/calls`). Scoped by Call Center role:
+Dual-mode call analytics (same metrics as `/dashboard/calls`).
 
-- **Org-wide:** `canViewOrgAnalytics` or `call_center_admin`
-- **Self only:** `canViewOwnCallLogs` (operator)
+| Mode | Params | Behavior |
+|------|--------|----------|
+| Personal | `email` + `userId` | Verified user’s own call/Meta analytics (`scopedTo: "self"`) |
+| Org | `email` + `userId` + `orgId` | Active member required. **Org-wide** if `canViewOrgAnalytics` / `call_center_admin`; **self within org** if only `canViewOwnCallLogs` |
 
 | Query param | Required | Description |
 |-------------|----------|-------------|
 | `email` | Yes | Must match `userId` |
 | `userId` | Yes | UUID from `getPurchaseNumber` |
-| `orgId` | Yes | Hustle org id |
+| `orgId` | No | Hustle org id. When set, returns org-scoped analytics |
 | `startDate` | No | ISO date string |
 | `endDate` | No | ISO date string |
 | `allTime` | No | `true` for all-time |
 | `timeframe` | No | e.g. `7d`, `14d`, `all` |
 
-**Success (200)**
+**Success — personal (200)**
+
+```json
+{
+  "success": true,
+  "orgId": null,
+  "email": "user@example.com",
+  "userId": "550e8400-e29b-41d4-a716-446655440000",
+  "scopedTo": "self",
+  "scopedUserCount": 1,
+  "dateRange": { "start": "2026-07-01T00:00:00.000Z", "end": "2026-07-07T23:59:59.999Z" },
+  "stats": { "totalCalls": 12, "completedCalls": 10 },
+  "timeframeCounts": { "today": 1, "thisWeek": 5 },
+  "metaCapi": { "stats": { "eventsFired": 3 }, "series": [] }
+}
+```
+
+**Success — org (200)**
 
 ```json
 {
@@ -200,6 +245,8 @@ Organization call analytics (same metrics as `/dashboard/calls`). Scoped by Call
   }
 }
 ```
+
+**No permission (403):** `{ "success": false, "message": "You do not have permission to view organization analytics" }`
 
 Does **not** return individual call rows — use `getCallHistory` for that.
 
@@ -409,11 +456,11 @@ Replaced by the Hustle integration routes above. GET returns migration pointers.
 2. GET /Public_api/getCallHistory?email=&userId=&phoneNumber=...
    → call logs for a purchased number
 
-3. GET /Public_api/getWallet?email=&userId=&orgId=...
-   → org wallet (requires org membership sync + permission)
+3. GET /Public_api/getWallet?email=&userId=
+   → personal wallet; add &orgId= for organization_admin wallet
 
-4. GET /Public_api/getAnalytics?email=&userId=&orgId=&startDate=&endDate=...
-   → dashboard-style analytics for the org
+4. GET /Public_api/getAnalytics?email=&userId=&startDate=&endDate=...
+   → personal analytics; add &orgId= for org-scoped analytics
 ```
 
-Org/member data must be synced first via Hustle `org-sync` and `member-sync` webhooks.
+Org/member data must be synced first via Hustle `org-sync` and `member-sync` webhooks when using `orgId`.
