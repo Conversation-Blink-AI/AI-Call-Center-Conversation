@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { useAuth } from "@/contexts/auth-context"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,7 +11,6 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Loader2, Eye, EyeOff } from "lucide-react"
-import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
 
@@ -20,9 +20,9 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
+  const router = useRouter()
   const { login, loading: authLoading, isAuthenticated } = useAuth()
   const { toast } = useToast()
-  const router = useRouter()
 
   const getAuthErrorMessage = (message?: string) => {
     if (!message) {
@@ -71,8 +71,8 @@ export default function LoginPage() {
     }
   }
 
-  // ✅ Show loading state while auth is being determined
-  if (authLoading) {
+  // Show loading state while auth is being determined or redirecting authenticated users
+  if (authLoading || isAuthenticated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#000023]">
         <div className="text-center">
