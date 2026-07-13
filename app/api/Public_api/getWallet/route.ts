@@ -1,11 +1,9 @@
 import { NextRequest } from "next/server"
-import { canViewWallet } from "@/lib/call-center-permissions"
 import { getPool } from "@/lib/db-client"
 import { ensureForexOrgTables } from "@/lib/forex-org-sync"
 import { publicApiJsonResponse, publicApiOptionsResponse } from "@/lib/public-api-cors"
 import {
-  resolveOrgAdminUserId,
-  verifyOrgMembership,
+  resolveOrgAdminContext,
   verifyPublicApiUser,
 } from "@/lib/public-api-verify"
 
@@ -90,38 +88,17 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Org mode: return organization_admin's personal wallet for this org
-    const membershipResult = await verifyOrgMembership(pool, orgIdParam, userResult.user)
-    if ("error" in membershipResult) {
+    // Org mode: any active member (including organization_user) → admin wallet
+    const orgContext = await resolveOrgAdminContext(pool, orgIdParam, userResult.user)
+    if ("error" in orgContext) {
       return publicApiJsonResponse(
-        { success: false, message: membershipResult.error.message },
-        membershipResult.error.status,
+        { success: false, message: orgContext.error.message },
+        orgContext.error.status,
       )
     }
 
-    if (!canViewWallet(membershipResult.membership)) {
-      return publicApiJsonResponse(
-        {
-          success: false,
-          message: "You do not have permission to view the organization wallet",
-        },
-        403,
-      )
-    }
-
-    const adminOwner = await resolveOrgAdminUserId(pool, orgIdParam)
-    if (!adminOwner) {
-      return publicApiJsonResponse(
-        {
-          success: false,
-          message:
-            "Organization admin wallet not found. Ensure the org has an owner or organization_admin membership with a linked user.",
-        },
-        404,
-      )
-    }
-
-    const { balanceCents, walletCount } = await loadWalletBalance(pool, adminOwner.userId)
+    const { admin } = orgContext
+    const { balanceCents, walletCount } = await loadWalletBalance(pool, admin.userId)
 
     return publicApiJsonResponse({
       success: true,
@@ -132,9 +109,11 @@ export async function GET(request: NextRequest) {
       balanceDollars: (balanceCents / 100).toFixed(2),
       memberWalletCount: walletCount,
       scopedTo: "organization_admin",
-      walletOwnerUserId: adminOwner.userId,
-      walletOwnerEmail: adminOwner.email,
-      walletOwnerSource: adminOwner.source,
+      walletOwnerUserId: admin.userId,
+      walletOwnerEmail: admin.email,
+      walletOwnerSource: admin.source,
+      requesterRole:
+        orgContext.membership.call_center_role || orgContext.membership.role,
     })
   } catch (error: unknown) {
     console.error("[GET-WALLET] Error:", error)

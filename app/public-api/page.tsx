@@ -4,22 +4,36 @@
 export default function PublicApiDocumentationPage() {
   const handleTestPurchaseNumber = () => {
     const email = (document.getElementById('test-email') as HTMLInputElement).value;
+    const userId = (document.getElementById('test-userid') as HTMLInputElement)?.value.trim() || '';
+    const orgId = (document.getElementById('test-orgid') as HTMLInputElement)?.value.trim() || '';
     const resultDiv = document.getElementById('test-result');
     
     if (!email) {
       if (resultDiv) resultDiv.innerHTML = '<div style="color: #ef4444; padding: 15px; background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px;"><strong>Error:</strong> Please enter an email address</div>';
       return;
     }
+
+    if (orgId && !userId) {
+      if (resultDiv) resultDiv.innerHTML = '<div style="color: #ef4444; padding: 15px; background: #fef2f2; border: 1px solid #fca5a5; border-radius: 8px;"><strong>Error:</strong> userId is required when orgId is provided</div>';
+      return;
+    }
     
     if (resultDiv) resultDiv.innerHTML = '<div style="color: #3b82f6; padding: 15px; background: #f0f9ff; border: 1px solid #7dd3fc; border-radius: 8px;">🔄 Testing API...</div>';
     
-    fetch(`/api/Public_api/getPurchaseNumber?email=${encodeURIComponent(email)}`)
-      .then(response => response.json())
-      .then(data => {
+    const query = new URLSearchParams({ email });
+    if (userId) query.set('userId', userId);
+    if (orgId) query.set('orgId', orgId);
+    fetch(`/api/Public_api/getPurchaseNumber?${query.toString()}`)
+      .then(response => response.json().then((data) => ({ data, status: response.status })))
+      .then(({ data, status }) => {
         if (resultDiv) {
+          const statusColor = status >= 200 && status < 300 ? '#10b981' : '#ef4444';
           resultDiv.innerHTML = `
             <div style="padding: 15px; background: #f0f9ff; border: 1px solid #7dd3fc; border-radius: 8px;">
-              <h4 style="margin: 0 0 10px 0; color: #1e40af;">API Response:</h4>
+              <h4 style="margin: 0 0 10px 0; color: #1e40af;">
+                API Response
+                <span style="background: ${statusColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.75rem; margin-left: 8px;">HTTP ${status}</span>
+              </h4>
               <pre style="background: #1e293b; color: #f8fafc; padding: 15px; border-radius: 6px; overflow-x: auto; font-size: 14px; margin: 0;">${JSON.stringify(data, null, 2)}</pre>
             </div>
           `;
@@ -439,7 +453,15 @@ export default function PublicApiDocumentationPage() {
           <div className="endpoint-info">
             <h2>getPurchaseNumber Endpoint</h2>
             <p><span className="method">GET</span> <span className="url">/Public_api/getPurchaseNumber</span></p>
-            <p>Retrieve all purchased phone numbers for a specific user by providing their email address. This is a public API endpoint that doesn't require authentication.</p>
+            <p>
+              Dual-mode purchased phone numbers. With <strong>email</strong> only, returns that user&apos;s numbers (<code>scopedTo: &quot;self&quot;</code>).
+              With <strong>email</strong> + <strong>userId</strong> + <strong>orgId</strong> (<code>forex_organizations.external_org_id</code>), any active org member — including <code>organization_user</code> — receives the <code>organization_admin</code>&apos;s purchased numbers (<code>scopedTo: &quot;organization_admin&quot;</code>).
+            </p>
+            <pre>{`# Personal numbers
+curl -s "/Public_api/getPurchaseNumber?email=user@example.com"
+
+# Org admin numbers (organization_user proxies to admin)
+curl -s "/Public_api/getPurchaseNumber?email=user@example.com&userId=550e8400-e29b-41d4-a716-446655440000&orgId=6a3fa22872bf1d9f23eabc6d"`}</pre>
           </div>
 
           <div className="endpoint-info">
@@ -465,12 +487,12 @@ export default function PublicApiDocumentationPage() {
             <p>
               Dual-mode wallet balance (wallets are per-user). Requires <strong>email</strong> and <strong>userId</strong> (from <code>getPurchaseNumber</code>).
               Without <strong>orgId</strong>, returns the verified user&apos;s personal wallet (<code>scopedTo: &quot;self&quot;</code>).
-              With <strong>orgId</strong>, the caller must be an active org member with <code>canViewWallet</code> or <code>call_center_admin</code>, and the response is the org owner / <code>organization_admin</code> personal wallet (<code>scopedTo: &quot;organization_admin&quot;</code>).
+              With <strong>orgId</strong> (<code>forex_organizations.external_org_id</code>), any active org member — including <code>organization_user</code> — receives the org owner / <code>organization_admin</code> personal wallet (<code>scopedTo: &quot;organization_admin&quot;</code>). No <code>canViewWallet</code> gate.
             </p>
             <pre>{`# Personal wallet
 curl -s "/Public_api/getWallet?email=user@example.com&userId=550e8400-e29b-41d4-a716-446655440000"
 
-# Org admin wallet
+# Org admin wallet (organization_user proxies to admin)
 curl -s "/Public_api/getWallet?email=user@example.com&userId=550e8400-e29b-41d4-a716-446655440000&orgId=6a3fa22872bf1d9f23eabc6d"`}</pre>
           </div>
 
@@ -480,13 +502,13 @@ curl -s "/Public_api/getWallet?email=user@example.com&userId=550e8400-e29b-41d4-
             <p>
               Dual-mode call analytics matching the <code>/dashboard/calls</code> metrics: total calls, duration, cost, transfer leads, timeframe counts, chart series, and Meta CAPI stats.
               Requires <strong>email</strong> and <strong>userId</strong>. Without <strong>orgId</strong>, returns the verified user&apos;s personal analytics (<code>scopedTo: &quot;self&quot;</code>).
-              With <strong>orgId</strong>, the caller must be an active org member; admins with <code>canViewOrgAnalytics</code> see org-wide data, operators with <code>canViewOwnCallLogs</code> see only their own calls.
+              With <strong>orgId</strong>, any active org member (including <code>organization_user</code>) receives analytics for the <code>organization_admin</code> only (<code>scopedTo: &quot;organization_admin&quot;</code>).
               Optional date filters: <code>startDate</code>, <code>endDate</code>, <code>allTime=true</code>, or <code>timeframe</code> (e.g. <code>7d</code>).
             </p>
             <pre>{`# Personal analytics
 curl -s "/Public_api/getAnalytics?email=user@example.com&userId=550e8400-e29b-41d4-a716-446655440000&timeframe=7d"
 
-# Org-scoped analytics
+# Org admin analytics (organization_user proxies to admin)
 curl -s "/Public_api/getAnalytics?email=user@example.com&userId=550e8400-e29b-41d4-a716-446655440000&orgId=6a3fa22872bf1d9f23eabc6d&timeframe=7d"`}</pre>
           </div>
 
@@ -1195,7 +1217,7 @@ getCallHistory("user@example.com", "uuid-from-purchase", "+1234567890").then(cal
           <h2>🧪 Test the API</h2>
           <div className="endpoint-info">
             <h3>Try it yourself</h3>
-            <p>Enter an email address to test the getPurchaseNumber endpoint:</p>
+            <p>Enter email for personal numbers. For org admin numbers, also pass userId + orgId:</p>
             
             <div style={{marginTop: '20px'}}>
               <label htmlFor="test-email" style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>Email Address:</label>
@@ -1203,6 +1225,36 @@ getCallHistory("user@example.com", "uuid-from-purchase", "+1234567890").then(cal
                 type="email" 
                 id="test-email" 
                 placeholder="user@example.com"
+                style={{
+                  width: '100%',
+                  maxWidth: '400px',
+                  padding: '12px',
+                  border: '2px solid #cbd5e1',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  marginBottom: '15px'
+                }}
+              />
+              <label htmlFor="test-userid" style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>userId (required with orgId):</label>
+              <input
+                type="text"
+                id="test-userid"
+                placeholder="uuid from personal getPurchaseNumber"
+                style={{
+                  width: '100%',
+                  maxWidth: '400px',
+                  padding: '12px',
+                  border: '2px solid #cbd5e1',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  marginBottom: '15px'
+                }}
+              />
+              <label htmlFor="test-orgid" style={{display: 'block', marginBottom: '8px', fontWeight: 'bold'}}>orgId (optional):</label>
+              <input
+                type="text"
+                id="test-orgid"
+                placeholder="Leave empty for personal numbers"
                 style={{
                   width: '100%',
                   maxWidth: '400px',

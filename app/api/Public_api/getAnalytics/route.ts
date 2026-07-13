@@ -1,6 +1,5 @@
 import { NextRequest } from "next/server"
 import { resolveAnalyticsDateRange } from "@/lib/analytics-date-range"
-import { resolveAnalyticsScope } from "@/lib/call-center-permissions"
 import { getPool } from "@/lib/db-client"
 import { ensureForexOrgTables } from "@/lib/forex-org-sync"
 import {
@@ -9,8 +8,7 @@ import {
 } from "@/lib/org-analytics"
 import { publicApiJsonResponse, publicApiOptionsResponse } from "@/lib/public-api-cors"
 import {
-  resolveOrgScopedUserIds,
-  verifyOrgMembership,
+  resolveOrgAdminContext,
   verifyPublicApiUser,
 } from "@/lib/public-api-verify"
 
@@ -83,34 +81,16 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Org mode: membership + role scope → org-wide or self within the org
-    const membershipResult = await verifyOrgMembership(pool, orgIdParam, userResult.user)
-    if ("error" in membershipResult) {
+    // Org mode: any active member → organization_admin analytics only
+    const orgContext = await resolveOrgAdminContext(pool, orgIdParam, userResult.user)
+    if ("error" in orgContext) {
       return publicApiJsonResponse(
-        { success: false, message: membershipResult.error.message },
-        membershipResult.error.status,
+        { success: false, message: orgContext.error.message },
+        orgContext.error.status,
       )
     }
 
-    const scope = resolveAnalyticsScope(membershipResult.membership)
-    if (!scope) {
-      return publicApiJsonResponse(
-        {
-          success: false,
-          message: "You do not have permission to view organization analytics",
-        },
-        403,
-      )
-    }
-
-    const scopedUserIds = await resolveOrgScopedUserIds(
-      pool,
-      orgIdParam,
-      membershipResult.membership,
-      userResult.user.id,
-      scope,
-    )
-
+    const scopedUserIds = [orgContext.admin.userId]
     const [{ stats, timeframeCounts }, metaCapi] = await Promise.all([
       getCallAnalyticsForUserIds(scopedUserIds, bounds),
       getMetaCapiAnalyticsForUserIds(scopedUserIds, bounds),
@@ -121,8 +101,13 @@ export async function GET(request: NextRequest) {
       orgId: orgIdParam,
       email: userResult.user.email,
       userId: userResult.user.id,
-      scopedTo: scope,
-      scopedUserCount: scopedUserIds.length,
+      scopedTo: "organization_admin",
+      scopedUserCount: 1,
+      analyticsOwnerUserId: orgContext.admin.userId,
+      analyticsOwnerEmail: orgContext.admin.email,
+      analyticsOwnerSource: orgContext.admin.source,
+      requesterRole:
+        orgContext.membership.call_center_role || orgContext.membership.role,
       dateRange: {
         start: bounds.rangeStart?.toISOString() ?? null,
         end: bounds.rangeEnd?.toISOString() ?? null,

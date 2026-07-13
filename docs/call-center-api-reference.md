@@ -14,17 +14,25 @@ All public routes support CORS (`Access-Control-Allow-Origin: *`). Auth is via q
 
 ### GET `/Public_api/getPurchaseNumber`
 
-Look up a user and their purchased phone numbers.
+Dual-mode purchased phone numbers.
+
+| Mode | Params | Behavior |
+|------|--------|----------|
+| Personal | `email` | Verified user’s own purchased numbers (`scopedTo: "self"`) |
+| Org | `email` + `userId` + `orgId` | Any **active** org member (including `organization_user`) receives the **organization_admin**’s purchased numbers (`scopedTo: "organization_admin"`). `orgId` = `forex_organizations.external_org_id`. |
 
 | Query param | Required | Description |
 |-------------|----------|-------------|
 | `email` | Yes | User email |
+| `userId` | When `orgId` set | UUID matching `email` (from personal `getPurchaseNumber`) |
+| `orgId` | No | Hustle org id; when set, returns admin’s numbers |
 
-**Success (200)**
+**Success — personal (200)**
 
 ```json
 {
   "success": true,
+  "orgId": null,
   "userId": "550e8400-e29b-41d4-a716-446655440000",
   "email": "user@example.com",
   "user_name": "John Doe",
@@ -39,12 +47,38 @@ Look up a user and their purchased phone numbers.
       "monthly_fee": 1.5
     }
   ],
-  "count": 1
+  "count": 1,
+  "scopedTo": "self",
+  "numbersOwnerUserId": "550e8400-e29b-41d4-a716-446655440000"
+}
+```
+
+**Success — org (200)**
+
+```json
+{
+  "success": true,
+  "orgId": "6a13dad2ae03e4e5ab27aa84",
+  "email": "member@example.com",
+  "userId": "802fe83b-5f98-4164-8182-3fe7b6264bef",
+  "phoneNumbers": [
+    {
+      "id": "abc",
+      "number": "+14152238427",
+      "status": "Active"
+    }
+  ],
+  "count": 1,
+  "scopedTo": "organization_admin",
+  "numbersOwnerUserId": "01fde962-d144-42d0-ba53-ba0beb130950",
+  "numbersOwnerEmail": "admin@example.com",
+  "requesterRole": "organization_user"
 }
 ```
 
 **User not found (200):** `{ "success": false, "message": "User not found", "phoneNumbers": [], "count": 0 }`  
-**Missing email (400):** `{ "success": false, "message": "Email parameter is required" }`
+**Missing email (400):** `{ "success": false, "message": "Email parameter is required" }`  
+**Missing userId with orgId (400):** `{ "success": false, "message": "userId is required when orgId is provided" }`
 
 ---
 
@@ -110,7 +144,7 @@ Dual-mode wallet balance. Wallets are per-user (`wallets.user_id`); there is no 
 | Mode | Params | Behavior |
 |------|--------|----------|
 | Personal | `email` + `userId` | Verified user’s own wallet (`scopedTo: "self"`) |
-| Org | `email` + `userId` + `orgId` | Caller must be an active member with `canViewWallet` or `call_center_admin`. Returns the **organization_admin** (or org owner) personal wallet for that org (`scopedTo: "organization_admin"`) |
+| Org | `email` + `userId` + `orgId` | Any **active** org member (including `organization_user`) is allowed. Returns the **organization_admin** (or org owner) personal wallet (`scopedTo: "organization_admin"`). `orgId` must be `forex_organizations.external_org_id` (not `membership_external_id`). |
 
 | Query param | Required | Description |
 |-------------|----------|-------------|
@@ -149,12 +183,13 @@ Dual-mode wallet balance. Wallets are per-user (`wallets.user_id`); there is no 
   "scopedTo": "organization_admin",
   "walletOwnerUserId": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
   "walletOwnerEmail": "admin@example.com",
-  "walletOwnerSource": "owner"
+  "walletOwnerSource": "owner",
+  "requesterRole": "organization_user"
 }
 ```
 
-**No permission (403):** `{ "success": false, "message": "You do not have permission to view the organization wallet" }`  
-**Admin not found (404):** `{ "success": false, "message": "Organization admin wallet not found..." }`
+**Admin not found (404):** `{ "success": false, "message": "Organization admin not found..." }`  
+**Membership not found (404):** `{ "success": false, "message": "Organization membership not found..." }`
 
 ---
 
@@ -165,13 +200,13 @@ Dual-mode call analytics (same metrics as `/dashboard/calls`).
 | Mode | Params | Behavior |
 |------|--------|----------|
 | Personal | `email` + `userId` | Verified user’s own call/Meta analytics (`scopedTo: "self"`) |
-| Org | `email` + `userId` + `orgId` | Active member required. **Org-wide** if `canViewOrgAnalytics` / `call_center_admin`; **self within org** if only `canViewOwnCallLogs` |
+| Org | `email` + `userId` + `orgId` | Any **active** org member (including `organization_user`) is allowed. Returns analytics for the **organization_admin** only (`scopedTo: "organization_admin"`). |
 
 | Query param | Required | Description |
 |-------------|----------|-------------|
 | `email` | Yes | Must match `userId` |
 | `userId` | Yes | UUID from `getPurchaseNumber` |
-| `orgId` | No | Hustle org id. When set, returns org-scoped analytics |
+| `orgId` | No | Hustle org id (`forex_organizations.external_org_id`). When set, returns admin analytics |
 | `startDate` | No | ISO date string |
 | `endDate` | No | ISO date string |
 | `allTime` | No | `true` for all-time |
@@ -200,10 +235,14 @@ Dual-mode call analytics (same metrics as `/dashboard/calls`).
 {
   "success": true,
   "orgId": "6a3fa22872bf1d9f23eabc6d",
-  "email": "admin@example.com",
+  "email": "member@example.com",
   "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "scopedTo": "organization",
-  "scopedUserCount": 5,
+  "scopedTo": "organization_admin",
+  "scopedUserCount": 1,
+  "analyticsOwnerUserId": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+  "analyticsOwnerEmail": "admin@example.com",
+  "analyticsOwnerSource": "owner",
+  "requesterRole": "organization_user",
   "dateRange": { "start": "2026-07-01T00:00:00.000Z", "end": "2026-07-07T23:59:59.999Z" },
   "stats": {
     "totalCalls": 42,
@@ -246,7 +285,7 @@ Dual-mode call analytics (same metrics as `/dashboard/calls`).
 }
 ```
 
-**No permission (403):** `{ "success": false, "message": "You do not have permission to view organization analytics" }`
+**Admin not found (404):** `{ "success": false, "message": "Organization admin not found..." }`
 
 Does **not** return individual call rows — use `getCallHistory` for that.
 
@@ -451,16 +490,16 @@ Replaced by the Hustle integration routes above. GET returns migration pointers.
 
 ```
 1. GET /Public_api/getPurchaseNumber?email=...
-   → save userId + phoneNumbers
+   → personal numbers; add &userId=&orgId= for organization_admin numbers
 
 2. GET /Public_api/getCallHistory?email=&userId=&phoneNumber=...
    → call logs for a purchased number
 
 3. GET /Public_api/getWallet?email=&userId=
-   → personal wallet; add &orgId= for organization_admin wallet
+   → personal wallet; add &orgId= for organization_admin wallet (any active member)
 
 4. GET /Public_api/getAnalytics?email=&userId=&startDate=&endDate=...
-   → personal analytics; add &orgId= for org-scoped analytics
+   → personal analytics; add &orgId= for organization_admin analytics (any active member)
 ```
 
-Org/member data must be synced first via Hustle `org-sync` and `member-sync` webhooks when using `orgId`.
+Org/member data must be synced first via Hustle `org-sync` and `member-sync` webhooks when using `orgId`. Pass `external_org_id`, not `membership_external_id`.

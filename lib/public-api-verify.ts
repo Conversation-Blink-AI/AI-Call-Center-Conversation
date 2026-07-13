@@ -304,6 +304,37 @@ export async function resolveOrgAdminUserId(
   }
 }
 
+/**
+ * Org-mode public API context: any active org member (including organization_user)
+ * may proxy to the organization_admin. No canViewWallet / analytics permission gate.
+ */
+export async function resolveOrgAdminContext(
+  pool: Pool,
+  orgId: string,
+  requester: PublicApiUser,
+): Promise<
+  | { membership: OrgMembershipRow; admin: OrgAdminWalletOwner }
+  | { error: PublicApiVerifyError }
+> {
+  const membershipResult = await verifyOrgMembership(pool, orgId, requester)
+  if ("error" in membershipResult) {
+    return membershipResult
+  }
+
+  const admin = await resolveOrgAdminUserId(pool, orgId)
+  if (!admin) {
+    return {
+      error: {
+        status: 404,
+        message:
+          "Organization admin not found. Ensure the org has an owner or organization_admin membership with a linked user.",
+      },
+    }
+  }
+
+  return { membership: membershipResult.membership, admin }
+}
+
 export async function resolveOrgScopedUserIds(
   pool: Pool,
   orgId: string,
