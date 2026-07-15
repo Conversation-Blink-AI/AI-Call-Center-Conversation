@@ -46,14 +46,6 @@ export async function middleware(req: NextRequest) {
     return res
   }
 
-  // Serve FAQ under both /faq and /FAQ (and any other casing)
-  const pathname = req.nextUrl.pathname
-  if (pathname.toLowerCase() === "/faq" && pathname !== "/faq") {
-    const url = req.nextUrl.clone()
-    url.pathname = "/faq"
-    return NextResponse.rewrite(url)
-  }
-
   try {
     // Get token from cookies
     const token = req.cookies.get("auth-token")?.value
