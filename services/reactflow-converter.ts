@@ -152,6 +152,22 @@ export function convertReactFlowToBland(reactFlowData: ReactFlowData): BlandFlow
       return nodeWithPosition
     }
     
+    // Special handling for Knowledge Base nodes
+    if (node.type === 'knowledgeBaseNode' || node.type === 'Knowledge Base') {
+      nodeWithPosition.type = 'Knowledge Base'
+      nodeWithPosition.data = {
+        name: cleanData.name || 'Knowledge Base',
+        prompt:
+          cleanData.prompt ||
+          'Answer any questions the user has by referring to the knowledge base.',
+        kb: cleanData.kb || '',
+        knowledgeBaseId: cleanData.knowledgeBaseId || '',
+        kbName: cleanData.kbName || '',
+        __reactFlowType: 'knowledgeBaseNode',
+      }
+      return nodeWithPosition
+    }
+
     // Special handling for End Call nodes
     if (node.type === 'endCallNode') {
       nodeWithPosition.type = 'End Call'
@@ -254,7 +270,8 @@ export function convertBlandToReactFlow(blandData: BlandFlowData): ReactFlowData
     'Webhook': 'webhookNode',
     'Transfer': 'transferNode',
     'Transfer Call': 'transferNode', // Handle both "Transfer" and "Transfer Call" for backward compatibility
-    'End Call': 'endCallNode'
+    'End Call': 'endCallNode',
+    'Knowledge Base': 'knowledgeBaseNode',
   }
   
   // Add UI properties to nodes

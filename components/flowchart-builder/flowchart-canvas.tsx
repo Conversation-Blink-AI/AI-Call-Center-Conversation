@@ -23,6 +23,7 @@ import { EndCallNode } from './nodes/end-call-node'
 import { TransferNode } from './nodes/transfer-node'
 import { WebhookNode } from './nodes/webhook-node'
 import { FacebookPixelNode } from './nodes/facebook-pixel-node'
+import { KnowledgeBaseNode } from './nodes/knowledge-base-node'
 import { NodeEditorDrawer } from './node-editor-drawer'
 import { CustomEdge } from './edges/custom-edge'
 import { EdgeEditorDrawer } from './edge-editor-drawer'
@@ -105,11 +106,13 @@ export function FlowchartCanvas({
       questionNode: (props: any) => <QuestionNode {...props} />,
       customerResponseNode: (props: any) => <CustomerResponseNode {...props} />,
       webhookNode: (props: any) => <WebhookNode {...props} />,
+      knowledgeBaseNode: (props: any) => <KnowledgeBaseNode {...props} />,
       facebookPixelNode: (props: any) => <FacebookPixelNode {...props} />,
       transferNode: (props: any) => <TransferNode {...props} />,
       endCallNode: (props: any) => <EndCallNode {...props} />,
       Default: (props: any) => <CustomerResponseNode {...props} />,
       'End Call': (props: any) => <EndCallNode {...props} />,
+      'Knowledge Base': (props: any) => <KnowledgeBaseNode {...props} />,
     }),
     [],
   )
@@ -439,6 +442,15 @@ export function FlowchartCanvas({
           userDataMappings: [],
           actionSource: 'phone_call',
           eventData: {},
+        }
+      case 'knowledgeBaseNode':
+        return {
+          name: 'Knowledge Base',
+          prompt:
+            'Answer any questions the user has by referring to the knowledge base. Keep answers concise, then ask if they have more questions.',
+          kb: '',
+          knowledgeBaseId: '',
+          kbName: '',
         }
       default:
         return { name: 'Unknown Node' }
