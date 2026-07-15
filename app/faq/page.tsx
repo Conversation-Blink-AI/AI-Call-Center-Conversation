@@ -590,6 +590,28 @@ export default function FaqPage() {
                   : `${matchCount} result${matchCount === 1 ? "" : "s"} for “${searchQuery.trim()}”`}
               </p>
             )}
+
+            <div className="mt-8 mx-auto max-w-2xl rounded-2xl border border-purple-500/30 bg-gradient-to-r from-purple-900/40 via-blue-900/30 to-purple-900/20 px-6 py-6 text-center">
+              <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-purple-500/20 text-purple-300">
+                <Phone className="h-5 w-5" />
+              </div>
+              <h2 className="text-xl font-semibold text-white mb-2">Talk to our AI Call Center</h2>
+              <p className="text-sm text-gray-300 max-w-lg mx-auto mb-4">
+                Have a question about pricing, phone numbers, features, or getting started? Call our AI
+                assistant anytime — it answers live and can help with common Conversation queries.
+              </p>
+              <p className="text-sm text-gray-400 mb-4">+1 (415) 915-3078</p>
+              <Button
+                asChild
+                size="lg"
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg shadow-purple-900/30"
+              >
+                <a href="tel:+14159153078">
+                  <Phone className="mr-2 h-4 w-4" />
+                  Call Now
+                </a>
+              </Button>
+            </div>
           </header>
 
           {filteredSections.length > 0 && (
@@ -630,6 +652,15 @@ export default function FaqPage() {
                   search to browse all topics, or visit the Help Center.
                 </p>
                 <div className="flex flex-wrap items-center justify-center gap-3">
+                  <Button
+                    asChild
+                    className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white"
+                  >
+                    <a href="tel:+14159153078">
+                      <Phone className="mr-2 h-4 w-4" />
+                      Call Now
+                    </a>
+                  </Button>
                   <Button
                     asChild
                     className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white"
@@ -691,9 +722,19 @@ export default function FaqPage() {
             <Workflow className="mx-auto mb-4 h-8 w-8 text-purple-300" />
             <h2 className="text-2xl font-semibold mb-2">Still need help?</h2>
             <p className="text-gray-300 mb-6 max-w-xl mx-auto">
-              Browse the Help Center, review public API docs, or contact support.
+              Call our AI at +1 (415) 915-3078 for live answers, browse the Help Center, review API
+              docs, or email support.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-3">
+              <Button
+                asChild
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white"
+              >
+                <a href="tel:+14159153078">
+                  <Phone className="mr-2 h-4 w-4" />
+                  Call Now
+                </a>
+              </Button>
               <Button
                 asChild
                 className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white"

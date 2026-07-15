@@ -19,8 +19,7 @@ export async function middleware(req: NextRequest) {
   const res = NextResponse.next()
   const pathname = req.nextUrl.pathname
 
-  // Normalize FAQ casing without a browser redirect loop (macOS FS is case-insensitive,
-  // so a next.config redirect from /FAQ → /faq can infinite-loop).
+  // Canonical FAQ route is /faq. Rewrite other casings so /FAQ works too.
   if (pathname.toLowerCase() === "/faq" && pathname !== "/faq") {
     const url = req.nextUrl.clone()
     url.pathname = "/faq"
