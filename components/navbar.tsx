@@ -74,7 +74,7 @@ export function Navbar() {
             <Link href="/resources" className="text-gray-300 hover:text-white transition-colors">
               Resources
             </Link>
-            <Link href="/FAQ" className="text-gray-300 hover:text-white transition-colors">
+            <Link href="/faq" className="text-gray-300 hover:text-white transition-colors">
               FAQ
             </Link>
             {!user ? (
@@ -136,7 +136,7 @@ export function Navbar() {
               Resources
             </Link>
             <Link
-              href="/FAQ"
+              href="/faq"
               className="block px-3 py-2 text-base font-medium text-gray-300 hover:text-white hover:bg-gray-800 rounded-md"
               onClick={() => setIsMenuOpen(false)}
             >
