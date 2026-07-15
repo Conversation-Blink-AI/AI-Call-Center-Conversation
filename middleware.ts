@@ -17,23 +17,32 @@ function clearAuthCookie(response: NextResponse) {
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next()
+  const pathname = req.nextUrl.pathname
+
+  // Normalize FAQ casing without a browser redirect loop (macOS FS is case-insensitive,
+  // so a next.config redirect from /FAQ → /faq can infinite-loop).
+  if (pathname.toLowerCase() === "/faq" && pathname !== "/faq") {
+    const url = req.nextUrl.clone()
+    url.pathname = "/faq"
+    return NextResponse.rewrite(url)
+  }
 
   // Skip middleware for static files and API routes that don't need auth
   if (
-    req.nextUrl.pathname.startsWith("/_next") ||
-    req.nextUrl.pathname.startsWith("/api/auth") ||
-    req.nextUrl.pathname.startsWith("/api/debug") ||
-    req.nextUrl.pathname.startsWith("/api/webhooks") || // Allow webhooks without auth
-    req.nextUrl.pathname.startsWith("/api/v1/integrations/hustle") || // Hustle org/member sync
-    req.nextUrl.pathname.startsWith("/api/Public_api") || // Public API (getCallHistory, getPurchaseNumber) - no auth
-    req.nextUrl.pathname.includes(".")
+    pathname.startsWith("/_next") ||
+    pathname.startsWith("/api/auth") ||
+    pathname.startsWith("/api/debug") ||
+    pathname.startsWith("/api/webhooks") || // Allow webhooks without auth
+    pathname.startsWith("/api/v1/integrations/hustle") || // Hustle org/member sync
+    pathname.startsWith("/api/Public_api") || // Public API (getCallHistory, getPurchaseNumber) - no auth
+    pathname.includes(".")
   ) {
     return res
   }
 
   // Skip middleware check for generate-pathway - let the route handler handle auth
   // The route handler has better error handling and debugging
-  if (req.nextUrl.pathname === "/api/generate-pathway") {
+  if (pathname === "/api/generate-pathway") {
     console.log("[MIDDLEWARE] ⏭️ generate-pathway: Skipping middleware, route handler will verify auth")
     return res
   }
@@ -51,14 +60,14 @@ export async function middleware(req: NextRequest) {
     const token = req.cookies.get("auth-token")?.value
 
     console.log("[MIDDLEWARE] 🔍 Auth check:", {
-      path: req.nextUrl.pathname,
+      path: pathname,
       hasToken: !!token,
     })
 
     // Protect /dashboard, /database, and /admin routes
-    const isProtectedPath = req.nextUrl.pathname.startsWith("/dashboard") || 
-                            req.nextUrl.pathname.startsWith("/database") ||
-                            req.nextUrl.pathname.startsWith("/admin")
+    const isProtectedPath = pathname.startsWith("/dashboard") || 
+                            pathname.startsWith("/database") ||
+                            pathname.startsWith("/admin")
 
     if (isProtectedPath) {
       if (!token) {
@@ -78,13 +87,13 @@ export async function middleware(req: NextRequest) {
       
       // For /admin routes, we'll check is_admin in the layout/page components
       // since middleware runs in Edge Runtime and database queries are limited
-      if (req.nextUrl.pathname.startsWith("/admin")) {
+      if (pathname.startsWith("/admin")) {
         console.log("[MIDDLEWARE] 🔒 Admin route access - will verify is_admin in route handler")
       }
     }
 
     // If user is authenticated and on login page, redirect to dashboard
-    if (token && req.nextUrl.pathname === "/login") {
+    if (token && pathname === "/login") {
       const decoded = await verifyJwtEdge(token, JWT_SECRET)
       if (decoded) {
         console.log("[MIDDLEWARE] ✅ Redirecting authenticated user to dashboard")

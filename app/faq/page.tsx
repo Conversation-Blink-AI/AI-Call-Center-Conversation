@@ -78,7 +78,7 @@ const FAQ_SECTIONS: FaqSection[] = [
   {
     id: "call-flows",
     title: "AI Call Flows",
-    description: "Inbound, outbound, and what you can automate.",
+    description: "Inbound answering and what you can automate.",
     icon: Phone,
     items: [
       {
@@ -97,9 +97,19 @@ const FAQ_SECTIONS: FaqSection[] = [
           "Yes. Purchase a number, assign a pathway, and configure inbound settings so callers reach your AI agent when they dial that number.",
       },
       {
-        question: "Can I create outbound call flows?",
+        question: "Does it support call transfer?",
         answer:
-          "Yes. Use Send Call to place outbound AI calls with a selected number and pathway. You can call one recipient or run campaign-style outbound workflows from the dashboard.",
+          "Yes. Add a Transfer node to your pathway and set the destination number. The AI can hand off the call to a human agent when conditions you define are met.",
+      },
+      {
+        question: "Does it support IVR?",
+        answer:
+          "Conversation uses conversational AI pathways rather than classic keypad IVR menus. You build branching voice dialogs that understand natural speech instead of relying only on DTMF button presses.",
+      },
+      {
+        question: "Can it schedule callbacks?",
+        answer:
+          "There is no built-in callback scheduler today. You can design pathways that discuss scheduling, and use webhooks or your own systems to book follow-ups after the call.",
       },
       {
         question: "Can I automate lead qualification calls?",
@@ -112,9 +122,19 @@ const FAQ_SECTIONS: FaqSection[] = [
           "Inbound numbers with an assigned pathway can answer whenever someone calls, so your AI agent is available around the clock without staffing a live queue.",
       },
       {
-        question: "Can AI transfer calls to a human agent?",
+        question: "How many simultaneous calls can I make?",
         answer:
-          "Yes. Add a Transfer node to your pathway and set the destination number. The AI can hand off the call when conditions you define are met.",
+          "There is no fixed concurrent-call cap published in the product. Capacity depends on your account usage and wallet balance. Contact support@hustleapp.co if you need higher concurrency for production traffic.",
+      },
+      {
+        question: "Can I increase concurrent calls later?",
+        answer:
+          "Yes. As your volume grows, reach out to support@hustleapp.co and we can help scale concurrent capacity for your account.",
+      },
+      {
+        question: "Is there any limit on daily calls?",
+        answer:
+          "There is no daily call limit in the product. Practical limits are your prepaid wallet balance and any account-level capacity agreed with support.",
       },
     ],
   },
@@ -149,7 +169,7 @@ const FAQ_SECTIONS: FaqSection[] = [
   {
     id: "phone-numbers",
     title: "Phone Numbers",
-    description: "Buying and managing numbers for your flows.",
+    description: "Buying, renting, and availability by country or city.",
     icon: Phone,
     items: [
       {
@@ -158,9 +178,44 @@ const FAQ_SECTIONS: FaqSection[] = [
           "Yes. Go to Phone Numbers → Purchase Number, choose a country and area code, then complete checkout. Numbers cost $15 each and are billed at $15 per month.",
       },
       {
-        question: "Can I manage multiple phone numbers?",
+        question: "How much does a phone number cost per month?",
         answer:
-          "Yes. Buy and manage as many numbers as you need from the Phone Numbers area, each with its own status, pathway, and settings.",
+          "Virtual phone numbers cost $15 to purchase and $15 per month thereafter on a recurring monthly cycle.",
+      },
+      {
+        question: "Can I buy a permanent number?",
+        answer:
+          "Yes. You purchase a dedicated virtual number and keep it as long as the $15/month rental remains active on your account.",
+      },
+      {
+        question: "Can I port my existing number?",
+        answer:
+          "Number porting is not available today. You purchase a new virtual number from Conversation and assign your pathway to it.",
+      },
+      {
+        question: "What number types are available (Local, Mobile, Toll-Free)?",
+        answer:
+          "Purchase currently focuses on local numbers by area code in the United States and Canada. Mobile and toll-free inventory is not offered in the purchase flow today.",
+      },
+      {
+        question: "Can I have multiple numbers? What is the max number limit?",
+        answer:
+          "Yes. Buy and manage as many numbers as you need from the Phone Numbers area. There is no fixed product maximum — you can scale with your wallet and business needs.",
+      },
+      {
+        question: "Is this service available in India?",
+        answer:
+          "You cannot purchase Indian (+91) phone numbers today. Number purchase supports the United States and Canada only. Contact support@hustleapp.co if you need other regions.",
+      },
+      {
+        question: "Which cities are supported?",
+        answer:
+          "There is no fixed city list. For the United States and Canada, search by area code for the city you need (for example 415 for San Francisco or 213 for Los Angeles). Availability depends on current inventory at purchase time.",
+      },
+      {
+        question: "Is it available in California or my city?",
+        answer:
+          "For U.S. cities including California, search available local numbers by area code on the Purchase Number page. If inventory exists for that area code, you can buy it for $15 plus $15/month. City availability changes with stock.",
       },
       {
         question: "Which countries are supported?",
@@ -196,9 +251,19 @@ const FAQ_SECTIONS: FaqSection[] = [
           "Yes. Capture details into variables during the call (for example name, phone, ZIP, or custom fields) and use them later in the flow or via webhooks.",
       },
       {
-        question: "Can AI speak multiple languages?",
+        question: "Which languages are supported?",
         answer:
-          "Yes. You can configure language settings on your phone number / pathway setup from a large list of supported languages.",
+          "Many languages are supported, including English (US, UK, Australia, India), Hindi, Spanish, French, German, Chinese, Japanese, Korean, Portuguese, Italian, Dutch, and more, plus Auto Detect. Set the language on your phone number / inbound settings.",
+      },
+      {
+        question: "Can it switch languages during a call?",
+        answer:
+          "Language is configured per number or inbound settings for the conversation. Mid-call language switching is not available as a separate feature today.",
+      },
+      {
+        question: "Can I use my own AI voice?",
+        answer:
+          "You can choose from the Voices library, preview options, and assign a voice that matches your brand. Uploading or cloning a custom personal voice is not supported today.",
       },
       {
         question: "Can I customize the AI voice?",
@@ -224,12 +289,17 @@ const FAQ_SECTIONS: FaqSection[] = [
           "The Analytics and Calls areas show totals, completion rates, duration, outcomes, and related metrics. You can filter by date range and drill into individual calls.",
       },
       {
-        question: "Are call recordings available?",
+        question: "Does it record calls?",
         answer:
-          "Yes. Where recordings are available for a call, you can review them from Call History alongside other call details.",
+          "Yes. You can enable call recording on your inbound number settings. When recording is available for a call, you can review it from Call History.",
       },
       {
-        question: "Can I view call transcripts?",
+        question: "Can I download recordings?",
+        answer:
+          "Yes. When a recording is available, Call History provides a recording link so you can open or save the audio from that call.",
+      },
+      {
+        question: "Do you provide call transcripts?",
         answer:
           "Yes. Call History includes transcripts for calls when they are available, so you can review what was said and improve your pathways.",
       },
@@ -248,13 +318,33 @@ const FAQ_SECTIONS: FaqSection[] = [
   {
     id: "integrations",
     title: "Integrations",
-    description: "APIs, webhooks, and connecting other systems.",
+    description: "APIs, webhooks, CRM, and messaging channels.",
     icon: Plug,
     items: [
       {
-        question: "Does it support Webhooks and APIs?",
+        question: "Can I use webhooks?",
         answer:
-          "Yes. Pathways can include webhook nodes, outbound calls can send post-call webhooks, and the public REST API covers numbers, call history, wallet, analytics, and plans. See /public-api for docs.",
+          "Yes. Pathways can include webhook nodes, and you can send post-call webhooks so external systems receive events when a call completes. See /public-api for REST API docs.",
+      },
+      {
+        question: "Does it integrate with HubSpot?",
+        answer:
+          "There is no built-in HubSpot connector. You can push call data into HubSpot using pathway webhooks, post-call webhooks, or the public API.",
+      },
+      {
+        question: "Does it integrate with Salesforce?",
+        answer:
+          "There is no built-in Salesforce connector. Connect Salesforce via webhooks or the public API using your own integration or middleware.",
+      },
+      {
+        question: "Can it send SMS after a call?",
+        answer:
+          "Sending SMS automatically after a call is not a built-in pathway feature today. Use webhooks to trigger SMS from your own messaging provider after the call ends.",
+      },
+      {
+        question: "Does it support WhatsApp?",
+        answer:
+          "WhatsApp is not supported today. Conversation focuses on AI voice calls over virtual phone numbers.",
       },
       {
         question: "Can I trigger workflows after a call ends?",
@@ -276,9 +366,54 @@ const FAQ_SECTIONS: FaqSection[] = [
   {
     id: "pricing",
     title: "Pricing",
-    description: "Wallet top-ups, call rates, and number fees.",
+    description: "Call rates, number fees, wallet, and billing.",
     icon: CreditCard,
     items: [
+      {
+        question: "What are the per-minute call charges?",
+        answer:
+          "Inbound AI call usage is billed at $0.11 per minute (USD), with a 30-second minimum and partial minutes rounded up.",
+      },
+      {
+        question: "Do you charge per second or per minute?",
+        answer:
+          "Billing is per minute at $0.11/min. There is a 30-second minimum, and partial minutes are rounded up — not billed per second.",
+      },
+      {
+        question: "Are inbound and outbound charges different?",
+        answer:
+          "Inbound AI answering is available and charged at $0.11 per minute (30-second minimum, rounded up). That is the call usage rate applied to inbound conversations.",
+      },
+      {
+        question: "Is there any setup fee?",
+        answer:
+          "No. There is no separate setup fee. You pay for wallet top-ups, $15 phone-number purchase/rental, and $0.11 per minute of inbound AI call usage.",
+      },
+      {
+        question: "Is onboarding free?",
+        answer:
+          "Yes. Creating an account and getting started has no onboarding fee. New accounts may also receive free trial wallet credit to test the platform. You only pay when you purchase numbers or use billable call minutes.",
+      },
+      {
+        question: "How am I billed?",
+        answer:
+          "You top up a prepaid wallet, then inbound AI call minutes and phone number fees are charged against that balance. Stripe and PayPal are supported for top-ups.",
+      },
+      {
+        question: "Is billing prepaid or postpaid?",
+        answer:
+          "Billing is prepaid. Add funds to your wallet first, then usage and number fees deduct from that balance.",
+      },
+      {
+        question: "Can I recharge my wallet?",
+        answer:
+          "Yes. Open Dashboard → Billing and top up whenever you need more credit. Tiers include amounts such as $25, $50, $100, and $250.",
+      },
+      {
+        question: "Do unused credits expire?",
+        answer:
+          "No. Wallet funds do not expire.",
+      },
       {
         question: "How does pay-as-you-go pricing work?",
         answer:
@@ -290,32 +425,32 @@ const FAQ_SECTIONS: FaqSection[] = [
           "Call usage is pay-as-you-go from your wallet — there is no required platform subscription for minutes. Phone numbers are $15/month each on a recurring cycle after purchase.",
       },
       {
-        question: "How are AI call charges calculated?",
-        answer:
-          "AI calls are billed at $0.11 per minute, with a 30-second minimum and partial minutes rounded up. Charges appear in your call and billing history.",
-      },
-      {
         question: "How much do phone numbers cost?",
         answer:
           "Virtual phone numbers cost $15 to purchase and $15 per month thereafter, charged on a recurring monthly cycle.",
-      },
-      {
-        question: "Can I add wallet balance anytime?",
-        answer:
-          "Yes. Open Dashboard → Billing and top up whenever you need more credit. Tiers include amounts such as $25, $50, $100, and $250. Stripe and PayPal are supported.",
       },
     ],
   },
   {
     id: "security-team",
     title: "Security & Team",
-    description: "Data protection, roles, and collaboration.",
+    description: "Data protection, compliance, roles, and collaboration.",
     icon: Shield,
     items: [
       {
-        question: "Are my calls and customer data secure?",
+        question: "Is customer data encrypted?",
         answer:
-          "Sensitive fields such as emails and phone numbers are encrypted at rest using AES-256-GCM. Access to the dashboard requires authentication, and org roles limit what members can see.",
+          "Yes. Sensitive fields such as emails and phone numbers are encrypted at rest using AES-256-GCM. Access to the dashboard requires authentication, and org roles limit what members can see.",
+      },
+      {
+        question: "Is call recording legal?",
+        answer:
+          "Conversation can record calls when you enable recording. Whether recording is legal depends on local consent laws (for example one-party vs two-party consent). You are responsible for complying with the laws in the regions where you operate.",
+      },
+      {
+        question: "Does it support DND compliance?",
+        answer:
+          "There is no built-in Do Not Disturb (DND) / Do-Not-Call registry module today. You should apply your own compliance processes and contact lists for the markets you call or serve.",
       },
       {
         question: "Who can access call recordings?",
@@ -341,6 +476,11 @@ const FAQ_SECTIONS: FaqSection[] = [
     icon: HelpCircle,
     items: [
       {
+        question: "Do you offer technical support email or contact number?",
+        answer:
+          "Yes. Email support@hustleapp.co for technical help. You can also use the Help Center and the Report Issue form. A public support phone number is not listed — email is the primary contact channel.",
+      },
+      {
         question: "How long does it take to deploy a call flow?",
         answer:
           "After you save and update a pathway and assign it to a number, it can handle calls right away. Simple flows often go live the same day you build them.",
@@ -353,7 +493,7 @@ const FAQ_SECTIONS: FaqSection[] = [
       {
         question: "Is technical support included?",
         answer:
-          "Yes. Use the in-app Help Center, report issues from Help, or email support@hustleapp.co. Higher top-up tiers note priority support for production teams.",
+          "Yes. Use the Help Center at /help, report issues from Help, or email support@hustleapp.co. Higher top-up tiers note priority support for production teams.",
       },
       {
         question: "Where can I find more documentation?",
@@ -414,8 +554,8 @@ export default function FaqPage() {
               </span>
             </h1>
             <p className="text-lg text-gray-300 max-w-2xl mx-auto mb-8">
-              Learn how Conversation works — call flows, phone numbers, AI features, analytics,
-              integrations, and pricing — based on what the platform actually supports.
+              Learn how Conversation works — inbound call flows, phone numbers, AI features, pricing,
+              recordings, integrations, and support — based on what the platform actually supports.
             </p>
 
             <div className="relative mx-auto max-w-xl text-left">

@@ -81,6 +81,14 @@ export function NodeEditorDrawer({
   }>>([]);
   const [metaConfigsLoading, setMetaConfigsLoading] = React.useState(false);
   const [metaConfigsError, setMetaConfigsError] = React.useState<string>('');
+  const [knowledgeBases, setKnowledgeBases] = React.useState<Array<{
+    id: string
+    name: string
+    status: string
+    kb_text: string | null
+  }>>([]);
+  const [knowledgeBasesLoading, setKnowledgeBasesLoading] = React.useState(false);
+  const [knowledgeBasesError, setKnowledgeBasesError] = React.useState('');
   const metaUserDataKeys = [
     'em',
     'ph',
@@ -151,6 +159,37 @@ export function NodeEditorDrawer({
   }, [selectedNode?.id, selectedNode?.type, metaConfigsVersion])
 
   React.useEffect(() => {
+    const loadKnowledgeBases = async () => {
+      if (
+        !selectedNode ||
+        (selectedNode.type !== 'knowledgeBaseNode' && selectedNode.type !== 'Knowledge Base')
+      ) {
+        return
+      }
+
+      setKnowledgeBasesLoading(true)
+      setKnowledgeBasesError('')
+      try {
+        const response = await fetch('/api/knowledge-bases', {
+          credentials: 'include',
+          cache: 'no-store',
+        })
+        const result = await response.json()
+        if (!response.ok) {
+          throw new Error(result?.error || 'Failed to load knowledge bases')
+        }
+        setKnowledgeBases(result.knowledgeBases || [])
+      } catch (error: any) {
+        setKnowledgeBasesError(error.message || 'Failed to load knowledge bases')
+      } finally {
+        setKnowledgeBasesLoading(false)
+      }
+    }
+
+    void loadKnowledgeBases()
+  }, [selectedNode?.id, selectedNode?.type])
+
+  React.useEffect(() => {
     if (!selectedNode) return
 
     const sanitizedModelOptions = sanitizeModelOptions(selectedNode.data?.modelOptions)
@@ -214,6 +253,19 @@ export function NodeEditorDrawer({
         configNickname: selectedConfig?.nickname || '',
         eventName: selectedConfig?.event_name || selectedNode?.data?.eventName || ''
       }
+    }
+    onUpdateNode(selectedNode.id, updates)
+  }
+
+  const handleKnowledgeBaseSelect = (knowledgeBaseId: string) => {
+    const selectedKb = knowledgeBases.find((kb) => kb.id === knowledgeBaseId)
+    const updates = {
+      data: {
+        ...selectedNode.data,
+        knowledgeBaseId,
+        kbName: selectedKb?.name || '',
+        kb: selectedKb?.kb_text || selectedNode.data.kb || '',
+      },
     }
     onUpdateNode(selectedNode.id, updates)
   }
@@ -967,6 +1019,92 @@ export function NodeEditorDrawer({
             </div>
           </div>
         )
+
+      case 'knowledgeBaseNode':
+      case 'Knowledge Base': {
+        const completedKnowledgeBases = knowledgeBases.filter(
+          (kb) => kb.status === 'COMPLETED' || Boolean(kb.kb_text),
+        )
+
+        return (
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="name">Node Name</Label>
+              <Input
+                id="name"
+                value={selectedNode.data.name || ''}
+                onChange={(e) => handleFieldChange('name', e.target.value)}
+                placeholder="Knowledge Base"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="knowledgeBaseId">Knowledge Base</Label>
+              {knowledgeBasesLoading ? (
+                <p className="text-sm text-muted-foreground mt-2">Loading knowledge bases...</p>
+              ) : knowledgeBasesError ? (
+                <p className="text-sm text-destructive mt-2">{knowledgeBasesError}</p>
+              ) : completedKnowledgeBases.length === 0 ? (
+                <div className="mt-2 rounded-md border border-dashed p-3 text-sm text-muted-foreground">
+                  No ready knowledge bases found. Create one under Knowledge Base in the sidebar,
+                  wait until processing finishes, then select it here.
+                </div>
+              ) : (
+                <Select
+                  value={selectedNode.data.knowledgeBaseId || undefined}
+                  onValueChange={handleKnowledgeBaseSelect}
+                >
+                  <SelectTrigger id="knowledgeBaseId" className="mt-1">
+                    <SelectValue placeholder="Select a knowledge base" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {completedKnowledgeBases.map((kb) => (
+                      <SelectItem key={kb.id} value={kb.id}>
+                        {kb.name}
+                        {kb.status !== 'COMPLETED' ? ` (${kb.status})` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {selectedNode.data.kbName ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Attached: {selectedNode.data.kbName}
+                </p>
+              ) : null}
+            </div>
+
+            <div>
+              <Label htmlFor="prompt">Prompt</Label>
+              <Textarea
+                id="prompt"
+                value={selectedNode.data.prompt || ''}
+                onChange={(e) => handleFieldChange('prompt', e.target.value)}
+                placeholder="Tell the agent how to use this knowledge base"
+                rows={4}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="kb">Knowledge Base Text (kb)</Label>
+              <Textarea
+                id="kb"
+                value={selectedNode.data.kb || ''}
+                onChange={(e) => handleFieldChange('kb', e.target.value)}
+                placeholder="Distilled knowledge base content injected into Bland on export"
+                rows={8}
+                className="font-mono text-xs"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Selecting a knowledge base fills this from its pathway snippet. You can edit it
+                before saving the pathway.
+              </p>
+            </div>
+
+            {renderExtractVars()}
+          </div>
+        )
+      }
 
       default:
         return (
