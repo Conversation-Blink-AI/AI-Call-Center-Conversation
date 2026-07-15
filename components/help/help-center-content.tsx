@@ -311,7 +311,7 @@ export function HelpCenterContent({ isPublic = false }: HelpCenterContentProps) 
               <>
                 <li>
                   Browse the{" "}
-                  <Link href="/FAQ" className="text-primary hover:underline">
+                  <Link href="/faq" className="text-primary hover:underline">
                     FAQ
                   </Link>{" "}
                   for common questions
@@ -354,7 +354,7 @@ export function HelpCenterContent({ isPublic = false }: HelpCenterContentProps) 
                 </li>
                 <li>
                   Browse the{" "}
-                  <Link href="/FAQ" className="text-primary hover:underline">
+                  <Link href="/faq" className="text-primary hover:underline">
                     FAQ
                   </Link>{" "}
                   for common questions

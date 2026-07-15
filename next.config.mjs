@@ -32,6 +32,11 @@ const nextConfig = {
         source: '/Public_api/:path*',
         destination: '/api/Public_api/:path*',
       },
+      // Case-sensitive hosts: allow both /FAQ and /faq
+      {
+        source: '/FAQ',
+        destination: '/faq',
+      },
     ]
   },
 }
