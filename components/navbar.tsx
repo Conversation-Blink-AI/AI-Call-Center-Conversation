@@ -74,6 +74,9 @@ export function Navbar() {
             <Link href="/resources" className="text-gray-300 hover:text-white transition-colors">
               Resources
             </Link>
+            <Link href="/FAQ" className="text-gray-300 hover:text-white transition-colors">
+              FAQ
+            </Link>
             {!user ? (
               <>
                 <Link href="/login" className="text-gray-300 hover:text-white transition-colors">
@@ -131,6 +134,13 @@ export function Navbar() {
               onClick={() => setIsMenuOpen(false)}
             >
               Resources
+            </Link>
+            <Link
+              href="/FAQ"
+              className="block px-3 py-2 text-base font-medium text-gray-300 hover:text-white hover:bg-gray-800 rounded-md"
+              onClick={() => setIsMenuOpen(false)}
+            >
+              FAQ
             </Link>
             {!user ? (
               <>

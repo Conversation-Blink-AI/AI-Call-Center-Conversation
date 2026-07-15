@@ -47,8 +47,8 @@ export async function POST() {
     })
 
     const phoneSeed = [
-      { id: 'bb0e8400-e29b-41d4-a716-446655440001', phone: '+1-555-1001', userId: '550e8400-e29b-41d4-a716-446655440001', pathwayId: '880e8400-e29b-41d4-a716-446655440001', location: 'New York, NY', type: 'Local', status: 'Active', fee: 1.50, assigned: 'Customer Onboarding' },
-      { id: 'bb0e8400-e29b-41d4-a716-446655440002', phone: '+1-555-1002', userId: '550e8400-e29b-41d4-a716-446655440002', pathwayId: '880e8400-e29b-41d4-a716-446655440002', location: 'San Francisco, CA', type: 'Local', status: 'Active', fee: 1.50, assigned: 'Sales Team' },
+      { id: 'bb0e8400-e29b-41d4-a716-446655440001', phone: '+1-555-1001', userId: '550e8400-e29b-41d4-a716-446655440001', pathwayId: '880e8400-e29b-41d4-a716-446655440001', location: 'New York, NY', type: 'Local', status: 'Active', fee: 15.0, assigned: 'Customer Onboarding' },
+      { id: 'bb0e8400-e29b-41d4-a716-446655440002', phone: '+1-555-1002', userId: '550e8400-e29b-41d4-a716-446655440002', pathwayId: '880e8400-e29b-41d4-a716-446655440002', location: 'San Francisco, CA', type: 'Local', status: 'Active', fee: 15.0, assigned: 'Sales Team' },
       { id: 'bb0e8400-e29b-41d4-a716-446655440003', phone: '+1-800-555-0123', userId: '550e8400-e29b-41d4-a716-446655440001', pathwayId: null, location: 'Toll-Free', type: 'Toll-Free', status: 'Active', fee: 3.00, assigned: 'General Inquiries' }
     ].map((phone) => {
       const normalizedPhone = toE164Format(phone.phone)

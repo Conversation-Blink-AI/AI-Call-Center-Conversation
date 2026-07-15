@@ -33,7 +33,7 @@ function mapPhoneNumbers(rows: PhoneNumberRow[]) {
       type: row.type || "Local",
       purchased_at: row.purchased_at,
       user_id: row.pn_user_id,
-      monthly_fee: row.monthly_fee != null ? parseFloat(String(row.monthly_fee)) : 1.5,
+      monthly_fee: row.monthly_fee != null ? parseFloat(String(row.monthly_fee)) : 15,
       pathway_id: null,
       pathway_name: null,
     }))

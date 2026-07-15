@@ -67,7 +67,7 @@ export async function GET(request: NextRequest) {
         type: 'Local',
         purchased_at: row.purchased_at,
         user_id: row.user_id,
-        monthly_fee: parseFloat(row.subscription_plan) || 1.50,
+        monthly_fee: parseFloat(row.subscription_plan) || 15.0,
         pathway_id: row.pathway_id,
         pathway_name: row.pathway_id ? `Pathway ${row.pathway_id}` : null
       }))
