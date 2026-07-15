@@ -75,7 +75,7 @@ export async function GET(request: Request) {
           created_at: row.created_at,
           purchased_at: row.created_at,
           user_id: row.user_id,
-          monthly_fee: parseFloat(row.monthly_fee) || 1.50,
+          monthly_fee: parseFloat(row.monthly_fee) || 15.0,
           assigned_to: row.assigned_to || 'Unassigned',
           pathway_id: blandPathwayId,
           local_pathway_id: row.local_pathway_id || null,

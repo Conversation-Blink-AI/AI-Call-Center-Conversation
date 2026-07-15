@@ -14,7 +14,7 @@ export async function GET() {
         type: "Voice",
         status: "Active",
         purchaseDate: "2025-04-10",
-        monthlyFee: "$1.00",
+        monthlyFee: "$15.00",
         assignedTo: "My Pathway",
       },
       // You can add more purchased numbers here if needed

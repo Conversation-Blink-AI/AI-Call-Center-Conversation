@@ -210,7 +210,7 @@ export async function POST(request: Request) {
       location: "New York, NY",
       type: "Local",
       status: "Active",
-      monthlyFee: 1.50,
+      monthlyFee: 15.0,
       assignedTo: "Customer Onboarding"
     })
 
@@ -221,7 +221,7 @@ export async function POST(request: Request) {
       location: "San Francisco, CA",
       type: "Local",
       status: "Active",
-      monthlyFee: 1.50,
+      monthlyFee: 15.0,
       assignedTo: "Sales Team"
     })
 

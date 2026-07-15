@@ -102,9 +102,9 @@ Free / Pro / Enterprise subscription. The response reflects that:
 |---|---|---|
 | Wallet top-up tiers | `plans[]` | $25 Starter, $50 Growth, $100 Pro, $250 Scale. `billingCycle: "one_time"` — funds never expire. |
 | Per-minute call cost | `usagePricing.callRate` | $0.11/min, 30-second minimum, partial minutes rounded up. |
-| Phone number rental | `usagePricing.phoneNumber` | $1.50/month per virtual number, recurring monthly. |
+| Phone number rental | `usagePricing.phoneNumber` | $15/month per virtual number (also $15 to purchase), recurring monthly. |
 
-So a typical user pays: **(top-up amount) + ($1.50/mo × number of phone numbers) + ($0.11/min × call minutes)**, drawn from their wallet balance.
+So a typical user pays: **(top-up amount) + ($15/mo × number of phone numbers) + ($0.11/min × call minutes)**, drawn from their wallet balance.
 
 ---
 
@@ -136,7 +136,7 @@ So a typical user pays: **(top-up amount) + ($1.50/mo × number of phone numbers
       "features": [
         "Wallet top-up of $25",
         "≈ 227 minutes of AI calls",
-        "1 virtual phone number ($1.50/mo)",
+        "1 virtual phone number ($15/mo)",
         "Conversational AI pathways",
         "Stripe & PayPal checkout"
       ],
@@ -191,10 +191,10 @@ So a typical user pays: **(top-up amount) + ($1.50/mo × number of phone numbers
       "description": "AI calls are billed at $0.11/minute, with a 30-second minimum and partial minutes rounded up."
     },
     "phoneNumber": {
-      "defaultMonthlyFee": 1.5,
+      "defaultMonthlyFee": 15,
       "currency": "USD",
       "billingCycle": "monthly",
-      "description": "Each virtual phone number is billed at $1.50/month, charged on a recurring monthly cycle."
+      "description": "Each virtual phone number costs $15 to purchase and is billed at $15/month on a recurring monthly cycle."
     }
   },
   "features": [
@@ -284,7 +284,7 @@ So a typical user pays: **(top-up amount) + ($1.50/mo × number of phone numbers
 
 | Field | Type | Description |
 |---|---|---|
-| `defaultMonthlyFee` | number | Default per-number monthly cost (e.g. `1.5`). |
+| `defaultMonthlyFee` | number | Default per-number monthly cost (e.g. `15`). |
 | `currency` | string | ISO 4217. |
 | `billingCycle` | string | Always `"monthly"`. |
 | `description` | string | Human-readable summary. |

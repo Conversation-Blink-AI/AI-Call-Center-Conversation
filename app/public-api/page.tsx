@@ -555,7 +555,7 @@ getCallHistory("user@example.com", "uuid-from-purchase", "+1234567890").then(cal
       "type": "Local",
       "purchased_at": "2024-01-15T10:30:00.000Z",
       "user_id": "user-123",
-      "monthly_fee": 1.50,
+      "monthly_fee": 15.00,
       "pathway_id": "pathway-456",
       "pathway_name": "Pathway 456"
     }

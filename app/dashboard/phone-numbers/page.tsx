@@ -70,7 +70,7 @@ export default function PhoneNumbersPage() {
           type: row.type || 'Local', 
           purchased_at: row.created_at || row.purchased_at,
           user_id: row.user_id,
-          monthly_fee: row.monthly_fee || 1.50,
+          monthly_fee: row.monthly_fee || 15.0,
           assigned_to: row.assigned_to || 'Unassigned'
         }));
         setPhoneNumbers(phoneNumbers)
@@ -208,7 +208,7 @@ export default function PhoneNumbersPage() {
 
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-600">Monthly Fee</span>
-                    <span className="font-medium">${phoneNumber.monthly_fee?.toFixed(2) || '1.50'}</span>
+                    <span className="font-medium">${phoneNumber.monthly_fee?.toFixed(2) || '15.00'}</span>
                   </div>
 
                   <div className="flex items-center justify-between text-sm">

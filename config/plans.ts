@@ -110,7 +110,7 @@ export const CALL_CENTER_PLANS: PlatformPlans = {
       features: [
         "Wallet top-up of $25",
         "≈ 227 minutes of AI calls",
-        "1 virtual phone number ($1.50/mo)",
+        "1 virtual phone number ($15/mo)",
         "Conversational AI pathways",
         "Stripe & PayPal checkout",
       ],
@@ -245,11 +245,11 @@ export const CALL_CENTER_PLANS: PlatformPlans = {
         "AI calls are billed at $0.11/minute, with a 30-second minimum and partial minutes rounded up.",
     },
     phoneNumber: {
-      defaultMonthlyFee: 1.5,
+      defaultMonthlyFee: 15,
       currency: "USD",
       billingCycle: "monthly",
       description:
-        "Each virtual phone number is billed at $1.50/month, charged on a recurring monthly cycle.",
+        "Each virtual phone number costs $15 to purchase and is billed at $15/month on a recurring monthly cycle.",
     },
   },
 

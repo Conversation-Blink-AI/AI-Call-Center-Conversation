@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import Link from "next/link"
 import {
   Building2,
@@ -13,6 +13,8 @@ import {
   ExternalLink,
   BarChart3,
   Plug,
+  Search,
+  X,
   type LucideIcon,
 } from "lucide-react"
 import { Navbar } from "@/components/navbar"
@@ -23,6 +25,7 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 
 type FaqItem = {
@@ -355,7 +358,7 @@ const FAQ_SECTIONS: FaqSection[] = [
       {
         question: "Where can I find more documentation?",
         answer:
-          "Visit /public-api for API docs and /dashboard/help for product guides after you sign in.",
+          "Visit /public-api for API docs and /help for product guides — no sign-in required.",
       },
     ],
   },
@@ -363,6 +366,29 @@ const FAQ_SECTIONS: FaqSection[] = [
 
 export default function FaqPage() {
   const [activeSection, setActiveSection] = useState(FAQ_SECTIONS[0].id)
+  const [searchQuery, setSearchQuery] = useState("")
+
+  const normalizedQuery = searchQuery.trim().toLowerCase()
+
+  const filteredSections = useMemo(() => {
+    if (!normalizedQuery) return FAQ_SECTIONS
+
+    return FAQ_SECTIONS.map((section) => {
+      const items = section.items.filter(
+        (item) =>
+          item.question.toLowerCase().includes(normalizedQuery) ||
+          item.answer.toLowerCase().includes(normalizedQuery) ||
+          section.title.toLowerCase().includes(normalizedQuery) ||
+          section.description.toLowerCase().includes(normalizedQuery),
+      )
+      return { ...section, items }
+    }).filter((section) => section.items.length > 0)
+  }, [normalizedQuery])
+
+  const matchCount = useMemo(
+    () => filteredSections.reduce((total, section) => total + section.items.length, 0),
+    [filteredSections],
+  )
 
   const scrollToSection = (id: string) => {
     setActiveSection(id)
@@ -387,91 +413,152 @@ export default function FaqPage() {
                 Frequently Asked Questions
               </span>
             </h1>
-            <p className="text-lg text-gray-300 max-w-2xl mx-auto">
+            <p className="text-lg text-gray-300 max-w-2xl mx-auto mb-8">
               Learn how Conversation works — call flows, phone numbers, AI features, analytics,
               integrations, and pricing — based on what the platform actually supports.
             </p>
+
+            <div className="relative mx-auto max-w-xl text-left">
+              <label htmlFor="faq-search" className="sr-only">
+                Search FAQ
+              </label>
+              <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
+              <Input
+                id="faq-search"
+                type="search"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search questions, answers, and topics..."
+                className="h-12 rounded-xl border-white/15 bg-white/5 pl-10 pr-10 text-white placeholder:text-gray-500 focus-visible:ring-purple-500/50 focus-visible:ring-offset-0"
+                autoComplete="off"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  aria-label="Clear search"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-gray-400 transition-colors hover:bg-white/10 hover:text-white"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              )}
+            </div>
+            {normalizedQuery && (
+              <p className="mt-3 text-sm text-gray-400" aria-live="polite">
+                {matchCount === 0
+                  ? "No matching questions"
+                  : `${matchCount} result${matchCount === 1 ? "" : "s"} for “${searchQuery.trim()}”`}
+              </p>
+            )}
           </header>
 
-          <nav
-            aria-label="FAQ sections"
-            className="mb-12 flex flex-wrap justify-center gap-2"
-          >
-            {FAQ_SECTIONS.map((section) => {
-              const Icon = section.icon
-              const isActive = activeSection === section.id
-              return (
-                <button
-                  key={section.id}
-                  type="button"
-                  onClick={() => scrollToSection(section.id)}
-                  className={cn(
-                    "inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors border",
-                    isActive
-                      ? "bg-purple-600/30 border-purple-500/50 text-white"
-                      : "bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:text-white",
-                  )}
-                >
-                  <Icon className="h-4 w-4 shrink-0" />
-                  {section.title}
-                </button>
-              )
-            })}
-          </nav>
+          {filteredSections.length > 0 && (
+            <nav
+              aria-label="FAQ sections"
+              className="mb-12 flex flex-wrap justify-center gap-2"
+            >
+              {filteredSections.map((section) => {
+                const Icon = section.icon
+                const isActive = activeSection === section.id
+                return (
+                  <button
+                    key={section.id}
+                    type="button"
+                    onClick={() => scrollToSection(section.id)}
+                    className={cn(
+                      "inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors border",
+                      isActive
+                        ? "bg-purple-600/30 border-purple-500/50 text-white"
+                        : "bg-white/5 border-white/10 text-gray-300 hover:bg-white/10 hover:text-white",
+                    )}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    {section.title}
+                  </button>
+                )
+              })}
+            </nav>
+          )}
 
           <div className="space-y-10">
-            {FAQ_SECTIONS.map((section) => {
-              const Icon = section.icon
-              return (
-                <section
-                  key={section.id}
-                  id={section.id}
-                  className="scroll-mt-28 rounded-2xl border border-white/10 bg-white/[0.03] p-6 md:p-8"
-                >
-                  <div className="mb-6 flex items-start gap-3">
-                    <div className="mt-0.5 rounded-lg bg-purple-500/20 p-2 text-purple-300">
-                      <Icon className="h-5 w-5" />
+            {filteredSections.length === 0 ? (
+              <div className="rounded-2xl border border-white/10 bg-white/[0.03] px-6 py-16 text-center">
+                <Search className="mx-auto mb-4 h-8 w-8 text-gray-500" />
+                <h2 className="text-xl font-semibold text-white mb-2">No results found</h2>
+                <p className="text-gray-400 max-w-md mx-auto mb-6">
+                  Nothing matched “{searchQuery.trim()}”. Try a different keyword, clear the
+                  search to browse all topics, or visit the Help Center.
+                </p>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <Button
+                    asChild
+                    className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white"
+                  >
+                    <Link href="/help">Open Help Center</Link>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setSearchQuery("")}
+                    className="border-white/20 bg-transparent text-white hover:bg-white/10"
+                  >
+                    Clear search
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              filteredSections.map((section) => {
+                const Icon = section.icon
+                return (
+                  <section
+                    key={section.id}
+                    id={section.id}
+                    className="scroll-mt-28 rounded-2xl border border-white/10 bg-white/[0.03] p-6 md:p-8"
+                  >
+                    <div className="mb-6 flex items-start gap-3">
+                      <div className="mt-0.5 rounded-lg bg-purple-500/20 p-2 text-purple-300">
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h2 className="text-2xl font-semibold text-white">{section.title}</h2>
+                        <p className="mt-1 text-sm text-gray-400">{section.description}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h2 className="text-2xl font-semibold text-white">{section.title}</h2>
-                      <p className="mt-1 text-sm text-gray-400">{section.description}</p>
-                    </div>
-                  </div>
 
-                  <Accordion type="single" collapsible className="w-full">
-                    {section.items.map((item, index) => (
-                      <AccordionItem
-                        key={`${section.id}-${index}`}
-                        value={`${section.id}-${index}`}
-                        className="border-white/10"
-                      >
-                        <AccordionTrigger className="text-left text-base text-gray-100 hover:no-underline hover:text-white">
-                          {item.question}
-                        </AccordionTrigger>
-                        <AccordionContent className="text-gray-400 leading-relaxed">
-                          {item.answer}
-                        </AccordionContent>
-                      </AccordionItem>
-                    ))}
-                  </Accordion>
-                </section>
-              )
-            })}
+                    <Accordion type="single" collapsible className="w-full">
+                      {section.items.map((item, index) => (
+                        <AccordionItem
+                          key={`${section.id}-${index}`}
+                          value={`${section.id}-${index}`}
+                          className="border-white/10"
+                        >
+                          <AccordionTrigger className="text-left text-base text-gray-100 hover:no-underline hover:text-white">
+                            {item.question}
+                          </AccordionTrigger>
+                          <AccordionContent className="text-gray-400 leading-relaxed">
+                            {item.answer}
+                          </AccordionContent>
+                        </AccordionItem>
+                      ))}
+                    </Accordion>
+                  </section>
+                )
+              })
+            )}
           </div>
 
           <div className="mt-14 rounded-2xl border border-white/10 bg-gradient-to-br from-purple-900/40 via-gray-900/60 to-blue-900/30 p-8 text-center">
             <Workflow className="mx-auto mb-4 h-8 w-8 text-purple-300" />
             <h2 className="text-2xl font-semibold mb-2">Still need help?</h2>
             <p className="text-gray-300 mb-6 max-w-xl mx-auto">
-              Browse the in-app Help Center after you sign in, review public API docs, or contact
-              support.
+              Browse the Help Center, review public API docs, or contact support.
             </p>
             <div className="flex flex-wrap items-center justify-center gap-3">
               <Button
                 asChild
                 className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white"
               >
-                <Link href="/dashboard/help">Open Help Center</Link>
+                <Link href="/help">Open Help Center</Link>
               </Button>
               <Button
                 asChild
