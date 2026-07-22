@@ -188,10 +188,54 @@ export type OrgAdminWalletOwner = {
   source: "owner" | "organization_admin" | "call_center_admin"
 }
 
+async function findLocalUserByExternalId(
+  pool: Pool,
+  externalId: string,
+): Promise<{ id: string; email: string | null; external_id: string | null } | null> {
+  const result = await pool.query(
+    `SELECT id, email, email_enc, external_id
+     FROM users
+     WHERE external_id = $1
+     LIMIT 1`,
+    [externalId],
+  )
+  if (result.rows.length === 0) return null
+  const row = result.rows[0]
+  return {
+    id: row.id,
+    email: normalizeEmail(decryptMaybe(row.email, row.email_enc)) || null,
+    external_id: row.external_id,
+  }
+}
+
+async function findLocalUserByEmail(
+  pool: Pool,
+  email: string | null | undefined,
+): Promise<{ id: string; email: string | null; external_id: string | null } | null> {
+  const normalized = email ? normalizeEmail(email) : ""
+  if (!normalized) return null
+
+  const result = await pool.query(
+    `SELECT id, email, email_enc, external_id
+     FROM users
+     WHERE LOWER(TRIM(COALESCE(email, ''))) = $1
+     LIMIT 1`,
+    [normalized],
+  )
+  if (result.rows.length === 0) return null
+  const row = result.rows[0]
+  return {
+    id: row.id,
+    email: normalizeEmail(decryptMaybe(row.email, row.email_enc)) || normalized,
+    external_id: row.external_id,
+  }
+}
+
 /**
  * Resolve the organization admin whose personal wallet represents the org wallet.
  * Prefer forex_organizations.owner_external_user_id, then active membership with
  * organization_admin / call_center_admin role.
+ * Falls back to owner_email / membership email when user_id is not yet linked.
  */
 export async function resolveOrgAdminUserId(
   pool: Pool,
@@ -213,44 +257,76 @@ export async function resolveOrgAdminUserId(
   const ownerEmail = orgResult.rows[0].owner_email as string | null
 
   if (ownerExternalId) {
-    const byExternal = await pool.query(
-      `SELECT id, email, email_enc, external_id
-       FROM users
-       WHERE external_id = $1
-       LIMIT 1`,
-      [ownerExternalId],
-    )
-    if (byExternal.rows.length > 0) {
-      const row = byExternal.rows[0]
+    const byExternal = await findLocalUserByExternalId(pool, ownerExternalId)
+    if (byExternal) {
       return {
-        userId: row.id,
-        email: normalizeEmail(decryptMaybe(row.email, row.email_enc)) || ownerEmail,
-        externalId: row.external_id,
+        userId: byExternal.id,
+        email: byExternal.email || (ownerEmail ? normalizeEmail(ownerEmail) : null),
+        externalId: byExternal.external_id,
         source: "owner",
       }
     }
 
     const byMembership = await pool.query(
-      `SELECT m.user_id, m.user_email, m.user_external_id, u.email, u.email_enc
+      `SELECT m.user_id, m.user_email, m.user_external_id, u.email, u.email_enc, u.id as linked_user_id
        FROM forex_org_memberships m
        LEFT JOIN users u ON u.id = m.user_id
        WHERE m.external_org_id = $1
          AND m.user_external_id = $2
          AND m.status = 'active'
-         AND m.user_id IS NOT NULL
        LIMIT 1`,
       [orgId, ownerExternalId],
     )
     if (byMembership.rows.length > 0) {
       const row = byMembership.rows[0]
-      const email =
+      let userId = (row.user_id || row.linked_user_id) as string | null
+      const membershipEmail =
         normalizeEmail(decryptMaybe(row.email, row.email_enc)) ||
         (row.user_email ? normalizeEmail(row.user_email) : null) ||
         (ownerEmail ? normalizeEmail(ownerEmail) : null)
+
+      if (!userId && membershipEmail) {
+        const byEmail = await findLocalUserByEmail(pool, membershipEmail)
+        if (byEmail) {
+          userId = byEmail.id
+          await pool.query(
+            `UPDATE forex_org_memberships
+             SET user_id = $1::uuid, updated_at = NOW()
+             WHERE external_org_id = $2
+               AND user_external_id = $3
+               AND user_id IS NULL`,
+            [userId, orgId, ownerExternalId],
+          )
+        }
+      }
+
+      if (userId) {
+        return {
+          userId,
+          email: membershipEmail,
+          externalId: row.user_external_id,
+          source: "owner",
+        }
+      }
+    }
+  }
+
+  // Owner email fallback when external_id on users table does not match Hustle owner id
+  if (ownerEmail) {
+    const byOwnerEmail = await findLocalUserByEmail(pool, ownerEmail)
+    if (byOwnerEmail) {
+      await pool.query(
+        `UPDATE forex_org_memberships
+         SET user_id = $1::uuid, updated_at = NOW()
+         WHERE external_org_id = $2
+           AND LOWER(TRIM(user_email)) = $3
+           AND user_id IS NULL`,
+        [byOwnerEmail.id, orgId, normalizeEmail(ownerEmail)],
+      )
       return {
-        userId: row.user_id,
-        email,
-        externalId: row.user_external_id,
+        userId: byOwnerEmail.id,
+        email: byOwnerEmail.email || normalizeEmail(ownerEmail),
+        externalId: byOwnerEmail.external_id,
         source: "owner",
       }
     }
@@ -258,6 +334,7 @@ export async function resolveOrgAdminUserId(
 
   const adminMembership = await pool.query(
     `SELECT
+       m.id,
        m.user_id,
        m.user_email,
        m.user_external_id,
@@ -270,7 +347,6 @@ export async function resolveOrgAdminUserId(
      LEFT JOIN users u ON u.id = m.user_id
      WHERE m.external_org_id = $1
        AND m.status = 'active'
-       AND m.user_id IS NOT NULL
        AND (
          COALESCE(m.call_center_role, m.role) = 'organization_admin'
          OR COALESCE(m.call_center_role, m.role) = 'call_center_admin'
@@ -281,6 +357,7 @@ export async function resolveOrgAdminUserId(
          WHEN 'call_center_admin' THEN 1
          ELSE 2
        END,
+       CASE WHEN m.user_id IS NOT NULL THEN 0 ELSE 1 END,
        m.updated_at DESC NULLS LAST
      LIMIT 1`,
     [orgId],
@@ -292,12 +369,36 @@ export async function resolveOrgAdminUserId(
 
   const row = adminMembership.rows[0]
   const role = (row.call_center_role || row.role) as string
+  let userId = row.user_id as string | null
   const email =
     normalizeEmail(decryptMaybe(row.email, row.email_enc)) ||
     (row.user_email ? normalizeEmail(row.user_email) : null)
 
+  if (!userId && row.user_external_id) {
+    const byExt = await findLocalUserByExternalId(pool, row.user_external_id)
+    if (byExt) userId = byExt.id
+  }
+
+  if (!userId && email) {
+    const byEmail = await findLocalUserByEmail(pool, email)
+    if (byEmail) userId = byEmail.id
+  }
+
+  if (!userId) {
+    return null
+  }
+
+  if (!row.user_id) {
+    await pool.query(
+      `UPDATE forex_org_memberships
+       SET user_id = $1::uuid, updated_at = NOW()
+       WHERE id = $2 AND user_id IS NULL`,
+      [userId, row.id],
+    )
+  }
+
   return {
-    userId: row.user_id,
+    userId,
     email,
     externalId: row.external_id || row.user_external_id,
     source: role === "call_center_admin" ? "call_center_admin" : "organization_admin",

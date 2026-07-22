@@ -118,17 +118,6 @@ export async function DELETE(request: NextRequest, context: { params: Promise<{ 
     return NextResponse.json({ success: true, knowledgeBase: deleted })
   } catch (error) {
     console.error("[KNOWLEDGE-BASE] DELETE failed:", error)
-    const pg = error as { code?: string; message?: string }
-    if (pg.code === "23514" && pg.message?.includes("knowledge_bases_status_check")) {
-      return NextResponse.json(
-        {
-          error: "Database cannot store deleted knowledge bases until the schema is updated.",
-          details:
-            'Run: psql "$DATABASE_URL" -f scripts/alter-knowledge-bases-add-deleted-status.sql',
-        },
-        { status: 500 }
-      )
-    }
     const message = error instanceof Error ? error.message : "Failed to delete knowledge base"
     return NextResponse.json({ error: message }, { status: 500 })
   }

@@ -3,9 +3,31 @@ import { z } from "zod"
 import { buildHustleSignInResponse, completeHustleSignIn } from "@/lib/hustle-signin"
 import { mapHustleSignInError } from "@/lib/hustle-signin-errors"
 
-const hustleSignInSchema = z.object({
-  token: z.string().min(1).max(8192),
-})
+const hustleSignInSchema = z
+  .object({
+    token: z.string().min(1).max(8192),
+    redirect: z.string().max(2048).optional().nullable(),
+    billingCtx: z.string().min(1).max(16384).optional(),
+    billingTs: z.union([z.string().min(1), z.number()]).optional(),
+    billingSig: z.string().min(1).max(256).optional(),
+  })
+  .superRefine((data, ctx) => {
+    const hasAnyBilling =
+      data.billingCtx !== undefined ||
+      data.billingTs !== undefined ||
+      data.billingSig !== undefined
+    const hasAllBilling =
+      data.billingCtx !== undefined &&
+      data.billingTs !== undefined &&
+      data.billingSig !== undefined
+
+    if (hasAnyBilling && !hasAllBilling) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "billingCtx, billingTs, and billingSig are all required together",
+      })
+    }
+  })
 
 export async function POST(request: NextRequest) {
   try {
@@ -19,11 +41,16 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { token } = parsed.data
+    const { token, redirect, billingCtx, billingTs, billingSig } = parsed.data
 
     console.log("[HUSTLE-SIGNIN] Starting Forex-verified auto login...")
 
-    const result = await completeHustleSignIn(token)
+    const billing =
+      billingCtx && billingTs !== undefined && billingSig
+        ? { billingCtx, billingTs, billingSig }
+        : null
+
+    const result = await completeHustleSignIn(token, { billing, redirect })
     if (!result.ok) {
       console.log("[HUSTLE-SIGNIN] Sign-in failed:", result.message)
       return NextResponse.json(

@@ -17,10 +17,27 @@ export async function POST() {
     // Also try deleting it (some browsers need both)
     cookieStore.delete("auth-token")
 
+    // Clear org workspace proxy cookie
+    cookieStore.set("cc-workspace-org-id", "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 0,
+      path: "/",
+    })
+    cookieStore.delete("cc-workspace-org-id")
+
     console.log("[AUTH/LOGOUT] ✅ Cookie cleared successfully")
     
     // Return response with no-cache headers to prevent caching
     const response = NextResponse.json({ success: true })
+    response.cookies.set("cc-workspace-org-id", "", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 0,
+      path: "/",
+    })
     response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, private')
     response.headers.set('Pragma', 'no-cache')
     response.headers.set('Expires', '0')
