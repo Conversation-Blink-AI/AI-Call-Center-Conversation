@@ -1,7 +1,10 @@
-
 import { NextRequest, NextResponse } from 'next/server'
 import { getCurrentUser } from '@/lib/auth-utils'
 import { db } from '@/lib/db'
+import {
+  getWorkspaceOrgIdFromCookies,
+  resolveDashboardResourceOwner,
+} from '@/lib/workspace-context'
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,12 +18,18 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    console.log(`🔍 [WALLET-BALANCE] Fetching balance for user: ${user.id}`)
+    const workspaceOrgId = await getWorkspaceOrgIdFromCookies()
+    const owner = await resolveDashboardResourceOwner(user, workspaceOrgId)
+    const resourceUserId = owner.userId
+
+    console.log(
+      `🔍 [WALLET-BALANCE] Fetching balance for resource user: ${resourceUserId} (auth=${user.id}, mode=${owner.mode})`,
+    )
 
     // Query wallet for this user
     const result = await db.query(
       'SELECT balance_cents FROM wallets WHERE user_id = $1',
-      [user.id]
+      [resourceUserId]
     )
 
     let balanceCents = 0
@@ -31,16 +40,18 @@ export async function GET(request: NextRequest) {
       // Create new wallet with 0 balance if doesn't exist
       await db.query(
         'INSERT INTO wallets (user_id, balance_cents, created_at, updated_at) VALUES ($1, $2, NOW(), NOW())',
-        [user.id, 0]
+        [resourceUserId, 0]
       )
-      console.log(`✅ [WALLET-BALANCE] Created new wallet for user: ${user.id}`)
+      console.log(`✅ [WALLET-BALANCE] Created new wallet for user: ${resourceUserId}`)
     }
 
-    console.log(`✅ [WALLET-BALANCE] Balance for user ${user.id}: ${balanceCents} cents`)
+    console.log(`✅ [WALLET-BALANCE] Balance for user ${resourceUserId}: ${balanceCents} cents`)
 
     return NextResponse.json({
       balance_cents: balanceCents,
-      balance_dollars: (balanceCents / 100).toFixed(2)
+      balance_dollars: (balanceCents / 100).toFixed(2),
+      workspace_mode: owner.mode,
+      resource_user_id: resourceUserId,
     })
 
   } catch (error) {

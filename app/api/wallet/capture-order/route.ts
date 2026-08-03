@@ -19,8 +19,8 @@ export async function POST(req) {
 
   try {
     // Get user from session/auth
-    const { getUser } = await import('../../../../lib/auth-utils')
-    const user = await getUser()
+    const { getCurrentUser } = await import('../../../../lib/auth-utils')
+    const user = await getCurrentUser()
 
     if (!user) {
       return NextResponse.json(
@@ -29,7 +29,12 @@ export async function POST(req) {
       )
     }
 
-    const userId = user.id
+    const { getWorkspaceOrgIdFromCookies, resolveDashboardResourceOwner } = await import(
+      '@/lib/workspace-context'
+    )
+    const workspaceOrgId = await getWorkspaceOrgIdFromCookies()
+    const owner = await resolveDashboardResourceOwner(user, workspaceOrgId)
+    const userId = owner.userId
     const { orderID } = await req.json()
 
     if (!orderID) {

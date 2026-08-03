@@ -33,7 +33,7 @@ interface FormData {
   first_sentence: string
   summary_prompt: string
   block_interruptions: boolean
-  interruption_threshold: number
+  interruption_threshold: number | ""
   model: string
   language: string
   record: boolean
@@ -53,6 +53,7 @@ interface VoiceOption {
 const INTERRUPTION_THRESHOLD_MIN = 50
 const INTERRUPTION_THRESHOLD_MAX = 200
 const INTERRUPTION_THRESHOLD_DEFAULT = 100
+const SUMMARY_PROMPT_MAX_LENGTH = 2000
 
 function normalizeInterruptionThreshold(value: unknown): number {
   const parsed = typeof value === "number" ? value : Number(value)
@@ -186,7 +187,10 @@ export default function ManageNumberPage({ params }: ManageNumberPageProps) {
           typeof data.language === "string" && LANGUAGE_VALUES.has(data.language) ? data.language : "en-US"
         const interruptionThresholdValue = normalizeInterruptionThreshold(data.interruption_threshold)
         const recordValue = typeof data.record === "boolean" ? data.record : false
-        const summaryPromptValue = typeof data.summary_prompt === "string" ? data.summary_prompt : ""
+        const summaryPromptValue =
+          typeof data.summary_prompt === "string"
+            ? data.summary_prompt.slice(0, SUMMARY_PROMPT_MAX_LENGTH)
+            : ""
         const noiseCancellationValue = typeof data.noise_cancellation === "boolean" ? data.noise_cancellation : false
         const ignoreButtonPressValue = typeof data.ignore_button_press === "boolean" ? data.ignore_button_press : false
 
@@ -559,7 +563,7 @@ export default function ManageNumberPage({ params }: ManageNumberPageProps) {
         requestBody.first_sentence = data.first_sentence
       }
       if (data.summary_prompt) {
-        requestBody.summary_prompt = data.summary_prompt
+        requestBody.summary_prompt = data.summary_prompt.slice(0, SUMMARY_PROMPT_MAX_LENGTH)
       } else {
         requestBody.summary_prompt = null
       }
@@ -808,8 +812,9 @@ export default function ManageNumberPage({ params }: ManageNumberPageProps) {
                   value={watch("interruption_threshold") ?? ""}
                   onChange={(e) => {
                     const raw = e.target.value
+                    // Allow clearing while typing so users can enter values like 50–99
                     if (raw === "") {
-                      setValue("interruption_threshold", INTERRUPTION_THRESHOLD_DEFAULT, { shouldValidate: true })
+                      setValue("interruption_threshold", "", { shouldValidate: true })
                       return
                     }
 
@@ -921,12 +926,26 @@ export default function ManageNumberPage({ params }: ManageNumberPageProps) {
                 <Label htmlFor="summary_prompt">Summary Prompt</Label>
                 <Textarea
                   id="summary_prompt"
-                  {...register('summary_prompt')}
+                  {...register("summary_prompt", {
+                    maxLength: {
+                      value: SUMMARY_PROMPT_MAX_LENGTH,
+                      message: `Summary prompt must be ${SUMMARY_PROMPT_MAX_LENGTH} characters or fewer`,
+                    },
+                    onChange: (e) => {
+                      const value = e.target.value
+                      if (value.length > SUMMARY_PROMPT_MAX_LENGTH) {
+                        setValue("summary_prompt", value.slice(0, SUMMARY_PROMPT_MAX_LENGTH), {
+                          shouldValidate: true,
+                        })
+                      }
+                    },
+                  })}
+                  maxLength={SUMMARY_PROMPT_MAX_LENGTH}
                   placeholder="Custom instructions for how the call summary should be generated..."
                   rows={3}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Maximum length: 2000 characters
+                  {(watch("summary_prompt") || "").length}/{SUMMARY_PROMPT_MAX_LENGTH} characters
                 </p>
               </div>
             </CardContent>

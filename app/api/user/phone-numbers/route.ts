@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
-import { validateAuthToken } from "@/lib/auth-utils"
+import { getCurrentUser, validateAuthToken } from "@/lib/auth-utils"
 import { Client } from "pg"
 import { getSSLConfig } from "@/lib/db-client"
 import { encryptString, hashPhoneNumber, phoneLast4 } from "@/lib/encryption"
 import { toE164Format } from "@/utils/phone-utils"
+import {
+  getWorkspaceOrgIdFromCookies,
+  resolveDashboardResourceOwner,
+} from "@/lib/workspace-context"
 
 export async function GET(request: Request) {
   try {
@@ -17,10 +21,17 @@ export async function GET(request: Request) {
       }, { status: 401 })
     }
 
-    const user = authResult.user
-    const userId = user.id
+    // Prefer full DB user (email/external_id) for workspace membership checks
+    const authUser = (await getCurrentUser()) || authResult.user
+    const workspaceOrgId = await getWorkspaceOrgIdFromCookies()
+    const owner = await resolveDashboardResourceOwner(authUser, workspaceOrgId)
+    const userId = owner.userId
 
-    console.log("🔍 [USER-PHONE-NUMBERS] Fetching phone numbers for authenticated user:", userId)
+    console.log(
+      "🔍 [USER-PHONE-NUMBERS] Fetching phone numbers for resource user:",
+      userId,
+      `(auth=${authUser.id}, mode=${owner.mode})`,
+    )
 
     // Use PostgreSQL with RLS to fetch phone numbers
     const client = new Client({
@@ -89,7 +100,9 @@ export async function GET(request: Request) {
 
       return NextResponse.json({
         success: true,
-        phoneNumbers
+        phoneNumbers,
+        workspace_mode: owner.mode,
+        resource_user_id: userId,
       })
     } finally {
       await client.end()
@@ -108,19 +121,34 @@ export async function POST(request: NextRequest) {
   try {
     console.log("📱 [ADD-PHONE-NUMBER] Starting request...")
 
-    const body = await request.json()
-    const { phoneNumber, userId, location, type, pathwayId } = body
+    const authResult = await validateAuthToken()
+    if (!authResult.isValid || !authResult.user) {
+      return NextResponse.json({
+        success: false,
+        message: "Unauthorized",
+      }, { status: 401 })
+    }
 
-    if (!phoneNumber || !userId) {
+    const authUser = (await getCurrentUser()) || authResult.user
+    const workspaceOrgId = await getWorkspaceOrgIdFromCookies()
+    const owner = await resolveDashboardResourceOwner(authUser, workspaceOrgId)
+    const resourceUserId = owner.userId
+
+    const body = await request.json()
+    const { phoneNumber, location, type, pathwayId } = body
+
+    if (!phoneNumber) {
       return NextResponse.json({ 
         success: false, 
-        message: "Phone number and user ID are required" 
+        message: "Phone number is required" 
       }, { status: 400 })
     }
 
     console.log("📱 [ADD-PHONE-NUMBER] Adding phone number:", {
       phoneNumber,
-      userId,
+      userId: resourceUserId,
+      authUserId: authUser.id,
+      workspaceMode: owner.mode,
       location,
       type,
       pathwayId
@@ -164,7 +192,7 @@ export async function POST(request: NextRequest) {
           phoneEnc,
           phoneHash,
           phoneLast,
-          userId,
+          resourceUserId,
           location || 'Unknown',
           type || 'Local',
           'Unassigned'

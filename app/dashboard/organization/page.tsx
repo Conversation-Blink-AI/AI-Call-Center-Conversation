@@ -1,17 +1,25 @@
 "use client"
 
 import { useEffect, useMemo, useState } from "react"
-import { Building2, CheckCircle2, Mail, ShieldCheck, Users } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Building2, CheckCircle2, ChevronDown, Mail, ShieldCheck, Users } from "lucide-react"
+import { toast } from "sonner"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { useAuth } from "@/contexts/auth-context"
+import { useWorkspace } from "@/contexts/workspace-context"
 import {
   ForexOrgMembership,
   ForexPermission,
   resolveOrgId,
   resolveOrgName,
 } from "@/lib/forex-permissions"
+import {
+  CALL_CENTER_ADMIN_PERMISSIONS,
+  type CallCenterPermissions,
+} from "@/lib/hustle-integration-schemas"
 
 type OrganizationMember = {
   userId: string
@@ -61,6 +69,81 @@ function formatCallCenterPermissions(permissions: Record<string, boolean>) {
     )
 }
 
+function isCallCenterPermissionMap(value: unknown): value is Record<string, boolean> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false
+  return Object.values(value).some((entry) => typeof entry === "boolean")
+}
+
+function normalizeEmail(email?: string | null) {
+  return (email || "").trim().toLowerCase()
+}
+
+function isOrgAdminRole(role?: string | null) {
+  const normalized = (role || "").trim().toLowerCase()
+  return (
+    normalized === "call_center_admin" ||
+    normalized === "organization_admin" ||
+    normalized === "call center admin" ||
+    normalized === "organization admin"
+  )
+}
+
+function findCurrentMember(
+  members: OrganizationMember[] | undefined,
+  user: { id?: string; email?: string | null } | null | undefined,
+): OrganizationMember | null {
+  if (!members?.length || !user) return null
+
+  const byId = user.id ? members.find((member) => member.userId === user.id) : null
+  if (byId) return byId
+
+  const email = normalizeEmail(user.email)
+  if (!email) return null
+
+  return members.find((member) => normalizeEmail(member.email) === email) || null
+}
+
+function resolveCallCenterPermissions(
+  member: OrganizationMember | null,
+  tokenPermissions: ForexPermission[] | undefined,
+): {
+  roleLabel: string | null
+  forexPermissions: ForexPermission[]
+  callCenterPermissions: Record<string, boolean> | null
+} {
+  const role = member?.callCenterRole || member?.role || null
+  const roleLabel = role ? formatRole(role) : null
+  const memberPermissions = member?.permissions
+  const isAdminRole =
+    role === "call_center_admin" ||
+    role === "organization_admin" ||
+    role === "Call Center Admin" ||
+    role === "Organization Admin"
+
+  let callCenterPermissions: Record<string, boolean> | null = null
+
+  if (isCallCenterPermissionMap(memberPermissions)) {
+    const enabled = formatCallCenterPermissions(memberPermissions)
+    callCenterPermissions =
+      enabled.length > 0
+        ? memberPermissions
+        : isAdminRole
+          ? CALL_CENTER_ADMIN_PERMISSIONS
+          : memberPermissions
+  } else if (isAdminRole) {
+    callCenterPermissions = CALL_CENTER_ADMIN_PERMISSIONS
+  }
+
+  const forexPermissions =
+    Array.isArray(tokenPermissions) && tokenPermissions.length > 0
+      ? tokenPermissions
+      : Array.isArray(memberPermissions)
+        ? (memberPermissions as ForexPermission[])
+        : []
+
+  return { roleLabel, forexPermissions, callCenterPermissions }
+}
+
 function fallbackOrganizations(memberships: ForexOrgMembership[] = []): LocalOrganization[] {
   return memberships.reduce<LocalOrganization[]>((orgs, membership) => {
     const externalOrgId = resolveOrgId(membership.orgId)
@@ -78,10 +161,13 @@ function fallbackOrganizations(memberships: ForexOrgMembership[] = []): LocalOrg
 }
 
 export default function OrganizationPage() {
+  const router = useRouter()
   const { user, loading, activeOrgMembership } = useAuth()
+  const { workspace, switchWorkspace, exitWorkspace } = useWorkspace()
   const [organizations, setOrganizations] = useState<LocalOrganization[]>([])
   const [isLoadingOrganizations, setIsLoadingOrganizations] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [switchingOrgId, setSwitchingOrgId] = useState<string | null>(null)
 
   const fallbackOrgs = useMemo(
     () => fallbackOrganizations(user?.orgMemberships ?? []),
@@ -121,6 +207,42 @@ export default function OrganizationPage() {
   const displayOrganizations = organizations.length > 0 ? organizations : fallbackOrgs
   const activeOrgId = user?.activeOrgId || null
 
+  const handleSwitchWorkspace = async (orgId: string, orgName: string) => {
+    setSwitchingOrgId(orgId)
+    setError(null)
+    try {
+      const result = await switchWorkspace(orgId)
+      if (!result.success) {
+        const message = result.message || "Failed to switch workspace"
+        setError(message)
+        toast.error(message)
+        return
+      }
+      toast.success(`Switched to ${orgName} workspace`)
+      router.push("/dashboard")
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to switch workspace"
+      setError(message)
+      toast.error(message)
+    } finally {
+      setSwitchingOrgId(null)
+    }
+  }
+
+  const handleExitWorkspace = async () => {
+    setSwitchingOrgId("exit")
+    try {
+      const result = await exitWorkspace()
+      if (!result.success) {
+        toast.error(result.message || "Failed to exit workspace")
+        return
+      }
+      toast.success("Returned to personal workspace")
+    } finally {
+      setSwitchingOrgId(null)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -151,14 +273,16 @@ export default function OrganizationPage() {
             </CardHeader>
             <CardContent>
               <div className="text-lg font-semibold">
-                {activeOrgId ? "Organization" : "Personal"}
+                {workspace ? "Organization workspace" : activeOrgId ? "Organization" : "Personal"}
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
-                {activeOrgId
-                  ? activeOrgMembership
-                    ? resolveOrgName(activeOrgMembership.orgId) || activeOrgId
-                    : activeOrgId
-                  : "No organization is active in the token yet."}
+                {workspace
+                  ? `${workspace.orgName}${workspace.adminEmail ? ` · admin ${workspace.adminEmail}` : ""}`
+                  : activeOrgId
+                    ? activeOrgMembership
+                      ? resolveOrgName(activeOrgMembership.orgId) || activeOrgId
+                      : activeOrgId
+                    : "No organization is active in the token yet."}
               </p>
             </CardContent>
           </Card>
@@ -209,9 +333,28 @@ export default function OrganizationPage() {
               const tokenMembership = user?.orgMemberships?.find(
                 (membership) => resolveOrgId(membership.orgId) === org.external_org_id,
               )
-              const isActive = activeOrgId === org.external_org_id
-              const role = tokenMembership?.role || org.members?.find((member) => member.email === user?.email)?.role
-              const permissions = tokenMembership?.permissions ?? []
+              const currentMember = findCurrentMember(org.members, user)
+              const isTokenActive = activeOrgId === org.external_org_id
+              const isWorkspaceActive = workspace?.orgId === org.external_org_id
+              const memberRole =
+                currentMember?.callCenterRole || currentMember?.role || null
+              const role =
+                currentMember?.callCenterRole ||
+                currentMember?.role ||
+                tokenMembership?.role ||
+                null
+              const isOrgAdmin = isOrgAdminRole(memberRole) || isOrgAdminRole(role)
+              const isSwitchingThisOrg = switchingOrgId === org.external_org_id
+              // Operators/users can switch into admin workspace; admins already own it
+              const showSwitchButton =
+                Boolean(currentMember) &&
+                !isOrgAdmin &&
+                (memberRole || "").toLowerCase() !== "no_access"
+              const { roleLabel, forexPermissions, callCenterPermissions } =
+                resolveCallCenterPermissions(currentMember, tokenMembership?.permissions)
+              const permissionLabels = callCenterPermissions
+                ? formatCallCenterPermissions(callCenterPermissions as CallCenterPermissions)
+                : []
 
               return (
                 <Card key={org.external_org_id} className="overflow-hidden">
@@ -231,20 +374,38 @@ export default function OrganizationPage() {
                               {org.status || "unknown"}
                             </Badge>
                             <Badge variant="outline">{formatRole(role)}</Badge>
-                            {isActive ? (
+                            {isWorkspaceActive ? (
                               <Badge className="gap-1">
                                 <CheckCircle2 className="h-3 w-3" />
                                 Current workspace
                               </Badge>
+                            ) : isTokenActive ? (
+                              <Badge variant="secondary">Token active org</Badge>
                             ) : (
                               <Badge variant="secondary">Available membership</Badge>
                             )}
                           </div>
                         </div>
                       </div>
-                      <Button variant={isActive ? "default" : "outline"} disabled={!isActive}>
-                        {isActive ? "Manage Organization" : "Switch endpoint required"}
-                      </Button>
+                      <div className="flex flex-wrap gap-2">
+                        {isWorkspaceActive ? (
+                          <Button
+                            variant="outline"
+                            disabled={switchingOrgId === "exit" || isSwitchingThisOrg}
+                            onClick={handleExitWorkspace}
+                          >
+                            {switchingOrgId === "exit" ? "Exiting..." : "Exit to personal"}
+                          </Button>
+                        ) : showSwitchButton ? (
+                          <Button
+                            variant="default"
+                            disabled={isSwitchingThisOrg || switchingOrgId === "exit"}
+                            onClick={() => handleSwitchWorkspace(org.external_org_id, org.name)}
+                          >
+                            {isSwitchingThisOrg ? "Switching..." : "Switch to workspace"}
+                          </Button>
+                        ) : null}
+                      </div>
                     </div>
                   </CardHeader>
 
@@ -287,39 +448,52 @@ export default function OrganizationPage() {
                     </div>
 
                     <div>
-                      <div className="mb-3 flex items-center gap-2 font-semibold">
-                        <ShieldCheck className="h-4 w-4" />
-                        Your permissions in this org
-                      </div>
-                      {Array.isArray(permissions) && permissions.length > 0 ? (
-                        <div className="space-y-2">
-                          {permissions.map((permission) => (
-                            <div
-                              key={permission._id || getPermissionLabel(permission)}
-                              className="rounded-lg border bg-card p-3 text-sm"
-                            >
-                              {getPermissionLabel(permission)}
+                      <Collapsible defaultOpen={false} className="rounded-lg border">
+                        <CollapsibleTrigger className="flex w-full items-center justify-between gap-3 p-3 text-left hover:bg-muted/40 transition-colors [&[data-state=open]>svg]:rotate-180">
+                          <div className="flex min-w-0 items-center gap-2 font-semibold">
+                            <ShieldCheck className="h-4 w-4 shrink-0" />
+                            <span>Your permissions in this org</span>
+                            {roleLabel && (
+                              <Badge variant="outline" className="font-normal">
+                                {roleLabel}
+                              </Badge>
+                            )}
+                          </div>
+                          <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200" />
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="border-t px-3 pb-3 pt-3">
+                          {roleLabel || permissionLabels.length > 0 || forexPermissions.length > 0 ? (
+                            <div className="space-y-2">
+                              {roleLabel && (
+                                <div className="rounded-lg border bg-card p-3">
+                                  <div className="text-xs uppercase tracking-wide text-muted-foreground">
+                                    Role
+                                  </div>
+                                  <div className="mt-1 text-sm font-medium">{roleLabel}</div>
+                                </div>
+                              )}
+                              {permissionLabels.map((label) => (
+                                <div key={label} className="rounded-lg border bg-card p-3 text-sm">
+                                  {label}
+                                </div>
+                              ))}
+                              {permissionLabels.length === 0 &&
+                                forexPermissions.map((permission) => (
+                                  <div
+                                    key={permission._id || getPermissionLabel(permission)}
+                                    className="rounded-lg border bg-card p-3 text-sm"
+                                  >
+                                    {getPermissionLabel(permission)}
+                                  </div>
+                                ))}
                             </div>
-                          ))}
-                        </div>
-                      ) : permissions &&
-                        typeof permissions === "object" &&
-                        !Array.isArray(permissions) &&
-                        Object.keys(permissions).length > 0 ? (
-                        <div className="space-y-2">
-                          {formatCallCenterPermissions(permissions as Record<string, boolean>).map(
-                            (label) => (
-                              <div key={label} className="rounded-lg border bg-card p-3 text-sm">
-                                {label}
-                              </div>
-                            ),
+                          ) : (
+                            <p className="rounded-lg border p-3 text-sm text-muted-foreground">
+                              No explicit org permissions were returned for your membership.
+                            </p>
                           )}
-                        </div>
-                      ) : (
-                        <p className="rounded-lg border p-3 text-sm text-muted-foreground">
-                          No explicit org permissions were returned for your membership.
-                        </p>
-                      )}
+                        </CollapsibleContent>
+                      </Collapsible>
                     </div>
                   </CardContent>
                 </Card>

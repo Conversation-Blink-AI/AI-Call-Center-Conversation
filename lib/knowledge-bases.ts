@@ -48,6 +48,55 @@ export function normalizeKnowledgeBaseStatus(
   return "PROCESSING"
 }
 
+let deletedStatusEnsured = false
+
+/**
+ * Ensure knowledge_bases.status CHECK allows DELETED (soft-delete).
+ * Older DBs only allowed PROCESSING/COMPLETED/FAILED.
+ */
+export async function ensureKnowledgeBaseDeletedStatusAllowed(): Promise<void> {
+  if (deletedStatusEnsured) return
+
+  await db.query(`
+    DO $$
+    DECLARE
+      r RECORD;
+    BEGIN
+      FOR r IN
+        SELECT c.conname
+        FROM pg_constraint c
+        JOIN pg_class t ON c.conrelid = t.oid
+        JOIN pg_namespace n ON t.relnamespace = n.oid
+        WHERE n.nspname = 'public'
+          AND t.relname = 'knowledge_bases'
+          AND c.contype = 'c'
+          AND pg_get_constraintdef(c.oid) LIKE '%status%'
+          AND pg_get_constraintdef(c.oid) LIKE '%IN%'
+          AND pg_get_constraintdef(c.oid) NOT LIKE '%DELETED%'
+      LOOP
+        EXECUTE format('ALTER TABLE public.knowledge_bases DROP CONSTRAINT %I', r.conname);
+      END LOOP;
+
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint c
+        JOIN pg_class t ON c.conrelid = t.oid
+        JOIN pg_namespace n ON t.relnamespace = n.oid
+        WHERE n.nspname = 'public'
+          AND t.relname = 'knowledge_bases'
+          AND c.contype = 'c'
+          AND c.conname = 'knowledge_bases_status_check'
+      ) THEN
+        ALTER TABLE public.knowledge_bases
+          ADD CONSTRAINT knowledge_bases_status_check
+          CHECK (status IN ('PROCESSING', 'COMPLETED', 'FAILED', 'DELETED'));
+      END IF;
+    END $$;
+  `)
+
+  deletedStatusEnsured = true
+}
+
 export function normalizeKnowledgeBaseType(
   type: string | null | undefined
 ): KnowledgeBaseType {
@@ -269,14 +318,35 @@ export async function markKnowledgeBaseDeleted(
   id: string,
   userId: string
 ): Promise<KnowledgeBaseRecord | null> {
-  const result = await db.query(
-    `UPDATE knowledge_bases
-     SET status = 'DELETED',
-         updated_at = NOW()
-     WHERE id = $1 AND user_id = $2
-     RETURNING *`,
-    [id, userId]
-  )
+  await ensureKnowledgeBaseDeletedStatusAllowed()
 
-  return (result.rows[0] as KnowledgeBaseRecord | undefined) ?? null
+  try {
+    const result = await db.query(
+      `UPDATE knowledge_bases
+       SET status = 'DELETED',
+           updated_at = NOW()
+       WHERE id = $1 AND user_id = $2
+       RETURNING *`,
+      [id, userId]
+    )
+
+    return (result.rows[0] as KnowledgeBaseRecord | undefined) ?? null
+  } catch (error) {
+    const pg = error as { code?: string; message?: string }
+    // Constraint may still be stale in another process; force re-ensure once and retry
+    if (pg.code === "23514" && pg.message?.includes("knowledge_bases_status_check")) {
+      deletedStatusEnsured = false
+      await ensureKnowledgeBaseDeletedStatusAllowed()
+      const retry = await db.query(
+        `UPDATE knowledge_bases
+         SET status = 'DELETED',
+             updated_at = NOW()
+         WHERE id = $1 AND user_id = $2
+         RETURNING *`,
+        [id, userId]
+      )
+      return (retry.rows[0] as KnowledgeBaseRecord | undefined) ?? null
+    }
+    throw error
+  }
 }

@@ -51,6 +51,10 @@ export default function LoginPage() {
 
     try {
       const result = await login(email, password)
+      // 2FA redirects to /verify-2fa — don't flash an error on this page
+      if (result.requires2FA) {
+        return
+      }
       if (!result.success) {
         const errorMessage = getAuthErrorMessage(result.message)
         if (isInvalidCredentials(errorMessage)) {

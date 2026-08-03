@@ -4,6 +4,15 @@ import { Suspense, useEffect, useRef, useState } from "react"
 import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
+function sanitizeRedirect(redirect: string | null): string {
+  if (!redirect) return "/dashboard"
+  const trimmed = redirect.trim()
+  if (!trimmed.startsWith("/") || trimmed.startsWith("//") || trimmed.includes("://")) {
+    return "/dashboard"
+  }
+  return trimmed
+}
+
 function AuthenticateHustleContent() {
   const searchParams = useSearchParams()
   const [error, setError] = useState<string | null>(null)
@@ -23,10 +32,22 @@ function AuthenticateHustleContent() {
     }
     signInStartedRef.current = true
 
+    const redirect = sanitizeRedirect(searchParams.get("redirect"))
+    const billingCtx = searchParams.get("billingCtx")
+    const billingTs = searchParams.get("billingTs")
+    const billingSig = searchParams.get("billingSig")
+
     const signIn = async () => {
       try {
         setLoading(true)
         setError(null)
+
+        const body: Record<string, string> = { token, redirect }
+        if (billingCtx && billingTs && billingSig) {
+          body.billingCtx = billingCtx
+          body.billingTs = billingTs
+          body.billingSig = billingSig
+        }
 
         const response = await fetch("/api/auth/hustle-signin", {
           method: "POST",
@@ -34,7 +55,7 @@ function AuthenticateHustleContent() {
             "Content-Type": "application/json",
           },
           credentials: "include",
-          body: JSON.stringify({ token }),
+          body: JSON.stringify(body),
         })
 
         const data = await response.json().catch(() => ({}))
@@ -50,7 +71,10 @@ function AuthenticateHustleContent() {
         }
 
         // Hard navigation ensures the auth cookie is picked up reliably before dashboard loads.
-        window.location.replace("/dashboard")
+        const nextPath = sanitizeRedirect(
+          typeof data.redirect === "string" ? data.redirect : redirect,
+        )
+        window.location.replace(nextPath)
       } catch (err: unknown) {
         console.error("[AUTHENTICATE-HUSTLE] Sign-in failed:", err)
         signInStartedRef.current = false

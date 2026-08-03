@@ -33,7 +33,10 @@ export interface User extends ForexPermissionUser {
 interface AuthContextType {
   user: User | null
   loading: boolean
-  login: (email: string, password: string) => Promise<{ success: boolean; message: string }>
+  login: (
+    email: string,
+    password: string,
+  ) => Promise<{ success: boolean; message: string; requires2FA?: boolean }>
   signup: (data: SignupData) => Promise<{ success: boolean; message: string }>
   logout: () => Promise<void>
   updateProfile: (data: Partial<User>) => Promise<{ success: boolean; message: string }>
@@ -196,9 +199,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           try {
             sessionStorage.setItem('pending-2fa-token', pending2FAToken)
             sessionStorage.setItem('pending-2fa-email', email)
+            sessionStorage.setItem(
+              'pending-2fa-message',
+              errorMessage || "Please check your email for the verification code",
+            )
           } catch {}
           router.push("/verify-2fa")
-          return { success: false, message: errorMessage }
+          return { success: false, message: errorMessage, requires2FA: true }
         }
 
         // If verification is required, redirect to verification page
@@ -213,12 +220,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const result = await response.json()
 
       if (result.requires2FA) {
+        const twoFactorMessage =
+          result.message || "Please check your email for the verification code"
         try {
           sessionStorage.setItem('pending-2fa-token', result.pending2FAToken || "")
           sessionStorage.setItem('pending-2fa-email', result.email || email)
+          sessionStorage.setItem('pending-2fa-message', twoFactorMessage)
         } catch {}
         router.push("/verify-2fa")
-        return { success: false, message: result.message || "Please verify your login code" }
+        return { success: false, message: twoFactorMessage, requires2FA: true }
       }
 
       if (!result.success) {
@@ -310,7 +320,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsAuthenticated(false)
       setLoading(false)
       
-      // Call logout API to clear server-side cookie
+      // Call logout API to clear server-side cookie (also clears workspace cookie)
       await fetch("/api/auth/logout", {
         method: "POST",
         credentials: "include",
