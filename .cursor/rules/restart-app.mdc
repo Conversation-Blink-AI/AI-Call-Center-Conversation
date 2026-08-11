@@ -1,0 +1,61 @@
+---
+description: Restart the full dev stack when the user says "restart app"
+alwaysApply: true
+---
+
+# Restart App
+
+When the user says **"restart app"**, **"restat app"**, **"restart the app"**, or clearly wants a full dev restart, run this workflow immediately. Do not ask for confirmation.
+
+## What this project runs
+
+- **Frontend + API**: Next.js on port **3000** (`npm run dev`) — API routes live in the same process
+- **Database**: PostgreSQL on port **5432** via `docker-compose.yml` (container: `ai-call-center-postgres`)
+
+## Step 1 — Kill all running servers
+
+Run from the project root (`/Users/blinkdigital/Documents/Cursor-dev-2`):
+
+```bash
+# Next.js (frontend + API)
+lsof -ti:3000 | xargs kill -9 2>/dev/null
+pkill -f "next dev" 2>/dev/null
+pkill -f "next start" 2>/dev/null
+pkill -f "node server.js" 2>/dev/null
+
+# PostgreSQL (Docker)
+docker compose down 2>/dev/null || docker-compose down 2>/dev/null
+```
+
+Wait ~1 second after killing processes before restarting.
+
+## Step 2 — Restart servers
+
+```bash
+cd "/Users/blinkdigital/Documents/Cursor-dev-2"
+docker compose up -d 2>/dev/null || docker-compose up -d 2>/dev/null
+```
+
+If Docker is not available or Postgres runs via Homebrew instead, skip Docker and note that in your reply.
+
+## Step 3 — Restart the app
+
+Start the dev server in the **background**:
+
+```bash
+cd "/Users/blinkdigital/Documents/Cursor-dev-2" && npm run dev
+```
+
+Use `block_until_ms: 0` so it runs as a background process.
+
+## Step 4 — Verify
+
+- Confirm something is listening on port 3000 (`lsof -i:3000` or check terminal output for "Ready")
+- Confirm Postgres is up (`docker ps` shows `ai-call-center-postgres`, or port 5432 is open)
+- Tell the user the app URL: **http://localhost:3000**
+
+## Rules
+
+- Execute all steps yourself — never tell the user to run commands manually
+- If a port is still in use after kill, retry the kill commands once, then start fresh
+- If `npm run dev` fails, read the error, fix if obvious, and retry once
