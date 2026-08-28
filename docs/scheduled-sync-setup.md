@@ -80,14 +80,14 @@ Check the console logs for sync status:
 
 1. **Call Sync**: Calls are fetched and stored with `cost_cents = NULL`
 2. **Auto-Billing**: After sync, `CallBillingService.processPendingBills()` runs
-3. **Wallet Deduction**: Completed calls are billed at $0.11/minute
+3. **Wallet Deduction**: Completed calls are billed at $0.16/minute
 4. **Transaction Record**: Each billing creates a wallet transaction
 
 ## Webhook Status
 
 The Bland AI webhook at `/api/webhooks/bland` is **DISABLED for billing**. It only logs events for debugging. All billing happens through scheduled sync.
 
-## Rate: $0.11 per minute
+## Rate: $0.16 per minute
 
 Duration is rounded up to the nearest minute.
 

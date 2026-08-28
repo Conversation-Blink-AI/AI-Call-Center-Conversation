@@ -3,7 +3,7 @@ import { CheckCircle, CreditCard } from "lucide-react"
 export function PricingInfo() {
   const pricingItems = [
     "Dedicated Phone Numbers – $15 per number / month",
-    "Voice Call Usage – $0.11 per minute",
+    "Voice Call Usage – $0.16 per minute",
     "$5 Free Trial Credit – Test the platform with free wallet balance",
     "Scale anytime – Add numbers or increase call usage as your business grows",
     "Secure Payment Gateway – Safe and encrypted transactions for all payments",

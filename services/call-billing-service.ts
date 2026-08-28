@@ -11,8 +11,8 @@ export interface CallBillingResult {
 }
 
 export class CallBillingService {
-  // Standard rate: $0.11 per minute (11 cents)
-  static readonly RATE_PER_MINUTE_CENTS = 11
+  // Standard rate: $0.16 per minute (16 cents)
+  static readonly RATE_PER_MINUTE_CENTS = 16
 
   /**
    * Process billing for unbilled completed calls

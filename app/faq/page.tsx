@@ -372,22 +372,22 @@ const FAQ_SECTIONS: FaqSection[] = [
       {
         question: "What are the per-minute call charges?",
         answer:
-          "Inbound AI call usage is billed at $0.11 per minute (USD), with a 30-second minimum and partial minutes rounded up.",
+          "Inbound AI call usage is billed at $0.16 per minute (USD), with a 30-second minimum and partial minutes rounded up.",
       },
       {
         question: "Do you charge per second or per minute?",
         answer:
-          "Billing is per minute at $0.11/min. There is a 30-second minimum, and partial minutes are rounded up — not billed per second.",
+          "Billing is per minute at $0.16/min. There is a 30-second minimum, and partial minutes are rounded up — not billed per second.",
       },
       {
         question: "Are inbound and outbound charges different?",
         answer:
-          "Inbound AI answering is available and charged at $0.11 per minute (30-second minimum, rounded up). That is the call usage rate applied to inbound conversations.",
+          "Inbound AI answering is available and charged at $0.16 per minute (30-second minimum, rounded up). That is the call usage rate applied to inbound conversations.",
       },
       {
         question: "Is there any setup fee?",
         answer:
-          "No. There is no separate setup fee. You pay for wallet top-ups, $15 phone-number purchase/rental, and $0.11 per minute of inbound AI call usage.",
+          "No. There is no separate setup fee. You pay for wallet top-ups, $15 phone-number purchase/rental, and $0.16 per minute of inbound AI call usage.",
       },
       {
         question: "Is onboarding free?",
