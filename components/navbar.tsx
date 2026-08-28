@@ -62,17 +62,8 @@ export function Navbar() {
 
           {/* Desktop navigation */}
           <nav className="hidden md:flex items-center space-x-8">
-            <Link href="/platform" className="text-gray-300 hover:text-white transition-colors">
-              Platform
-            </Link>
-            <Link href="/solutions" className="text-gray-300 hover:text-white transition-colors">
-              Solutions
-            </Link>
             <Link href="/pricing" className="text-gray-300 hover:text-white transition-colors">
               Pricing
-            </Link>
-            <Link href="/resources" className="text-gray-300 hover:text-white transition-colors">
-              Resources
             </Link>
             <Link href="/faq" className="text-gray-300 hover:text-white transition-colors">
               FAQ
@@ -108,32 +99,11 @@ export function Navbar() {
         <div className="md:hidden bg-gray-900">
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
             <Link
-              href="/platform"
-              className="block px-3 py-2 text-base font-medium text-gray-300 hover:text-white hover:bg-gray-800 rounded-md"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              Platform
-            </Link>
-            <Link
-              href="/solutions"
-              className="block px-3 py-2 text-base font-medium text-gray-300 hover:text-white hover:bg-gray-800 rounded-md"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              Solutions
-            </Link>
-            <Link
               href="/pricing"
               className="block px-3 py-2 text-base font-medium text-gray-300 hover:text-white hover:bg-gray-800 rounded-md"
               onClick={() => setIsMenuOpen(false)}
             >
               Pricing
-            </Link>
-            <Link
-              href="/resources"
-              className="block px-3 py-2 text-base font-medium text-gray-300 hover:text-white hover:bg-gray-800 rounded-md"
-              onClick={() => setIsMenuOpen(false)}
-            >
-              Resources
             </Link>
             <Link
               href="/faq"

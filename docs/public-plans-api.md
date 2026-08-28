@@ -101,10 +101,10 @@ Free / Pro / Enterprise subscription. The response reflects that:
 | Concept | Where in the response | Notes |
 |---|---|---|
 | Wallet top-up tiers | `plans[]` | $25 Starter, $50 Growth, $100 Pro, $250 Scale. `billingCycle: "one_time"` — funds never expire. |
-| Per-minute call cost | `usagePricing.callRate` | $0.11/min, 30-second minimum, partial minutes rounded up. |
+| Per-minute call cost | `usagePricing.callRate` | $0.16/min, 30-second minimum, partial minutes rounded up. |
 | Phone number rental | `usagePricing.phoneNumber` | $15/month per virtual number (also $15 to purchase), recurring monthly. |
 
-So a typical user pays: **(top-up amount) + ($15/mo × number of phone numbers) + ($0.11/min × call minutes)**, drawn from their wallet balance.
+So a typical user pays: **(top-up amount) + ($15/mo × number of phone numbers) + ($0.16/min × call minutes)**, drawn from their wallet balance.
 
 ---
 
@@ -183,12 +183,12 @@ So a typical user pays: **(top-up amount) + ($15/mo × number of phone numbers) 
   ],
   "usagePricing": {
     "callRate": {
-      "pricePerMinute": 0.11,
+      "pricePerMinute": 0.16,
       "pricePerMinuteCents": 11,
       "currency": "USD",
       "minimumBillableSeconds": 30,
       "roundUpPartialMinutes": true,
-      "description": "AI calls are billed at $0.11/minute, with a 30-second minimum and partial minutes rounded up."
+      "description": "AI calls are billed at $0.16/minute, with a 30-second minimum and partial minutes rounded up."
     },
     "phoneNumber": {
       "defaultMonthlyFee": 15,
@@ -260,7 +260,7 @@ So a typical user pays: **(top-up amount) + ($15/mo × number of phone numbers) 
 | `currency` | string | ISO 4217 code. |
 | `billingCycle` | string | `"one_time"`, `"monthly"`, or `"yearly"`. All current plans are `"one_time"`. |
 | `credits` | number | Wallet credits granted (1 credit = $1 USD of wallet balance). |
-| `estimatedCallMinutes` | number | Calculated as `credits / 0.11` — purely informational. |
+| `estimatedCallMinutes` | number | Calculated as `credits / 0.16` — purely informational. |
 | `features` | string[] | Bullet list for marketing tiles. |
 | `detailedFeatures` | object[] | `{ label, included }` for feature comparison tables. |
 | `popular` | boolean | `true` for the recommended plan (use to render a "Most popular" badge). |
@@ -273,7 +273,7 @@ So a typical user pays: **(top-up amount) + ($15/mo × number of phone numbers) 
 
 | Field | Type | Description |
 |---|---|---|
-| `pricePerMinute` | number | Decimal price (e.g. `0.11`). |
+| `pricePerMinute` | number | Decimal price (e.g. `0.16`). |
 | `pricePerMinuteCents` | number | Same value in cents (e.g. `11`). |
 | `currency` | string | ISO 4217. |
 | `minimumBillableSeconds` | number | Calls shorter than this are billed as if they hit the minimum. |

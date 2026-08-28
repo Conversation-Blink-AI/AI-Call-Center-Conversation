@@ -1,7 +1,7 @@
 
 export const PRICING_CONFIG = {
   // Rate per minute in cents
-  CALL_RATE_PER_MINUTE_CENTS: 11, // $0.11 per minute
+  CALL_RATE_PER_MINUTE_CENTS: 16, // $0.16 per minute
   
   // Minimum billable duration in seconds (e.g., 30 seconds minimum)
   MIN_BILLABLE_DURATION_SECONDS: 30,

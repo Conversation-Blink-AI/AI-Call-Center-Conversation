@@ -106,10 +106,10 @@ export const CALL_CENTER_PLANS: PlatformPlans = {
       currency: "USD",
       billingCycle: "one_time",
       credits: 25,
-      estimatedCallMinutes: Math.floor(2500 / 11), // 25 USD ÷ $0.11/min ≈ 227 min
+      estimatedCallMinutes: Math.floor(2500 / 16), // 25 USD ÷ $0.16/min ≈ 156 min
       features: [
         "Wallet top-up of $25",
-        "≈ 227 minutes of AI calls",
+        "≈ 156 minutes of AI calls",
         "1 virtual phone number ($15/mo)",
         "Conversational AI pathways",
         "Stripe & PayPal checkout",
@@ -139,10 +139,10 @@ export const CALL_CENTER_PLANS: PlatformPlans = {
       currency: "USD",
       billingCycle: "one_time",
       credits: 50,
-      estimatedCallMinutes: Math.floor(5000 / 11), // ≈ 454 min
+      estimatedCallMinutes: Math.floor(5000 / 16), // ≈ 312 min
       features: [
         "Wallet top-up of $50",
-        "≈ 454 minutes of AI calls",
+        "≈ 312 minutes of AI calls",
         "Multiple virtual phone numbers",
         "Conversational AI pathways",
         "Stripe & PayPal checkout",
@@ -172,10 +172,10 @@ export const CALL_CENTER_PLANS: PlatformPlans = {
       currency: "USD",
       billingCycle: "one_time",
       credits: 100,
-      estimatedCallMinutes: Math.floor(10000 / 11), // ≈ 909 min
+      estimatedCallMinutes: Math.floor(10000 / 16), // ≈ 625 min
       features: [
         "Wallet top-up of $100",
-        "≈ 909 minutes of AI calls",
+        "≈ 625 minutes of AI calls",
         "Unlimited virtual phone numbers",
         "Conversational AI pathways",
         "Knowledge bases & integrations",
@@ -206,10 +206,10 @@ export const CALL_CENTER_PLANS: PlatformPlans = {
       currency: "USD",
       billingCycle: "one_time",
       credits: 250,
-      estimatedCallMinutes: Math.floor(25000 / 11), // ≈ 2272 min
+      estimatedCallMinutes: Math.floor(25000 / 16), // ≈ 1562 min
       features: [
         "Wallet top-up of $250",
-        "≈ 2272 minutes of AI calls",
+        "≈ 1562 minutes of AI calls",
         "Unlimited virtual phone numbers",
         "Conversational AI pathways",
         "Knowledge bases & integrations",
@@ -236,13 +236,13 @@ export const CALL_CENTER_PLANS: PlatformPlans = {
 
   usagePricing: {
     callRate: {
-      pricePerMinute: 0.11,
-      pricePerMinuteCents: 11,
+      pricePerMinute: 0.16,
+      pricePerMinuteCents: 16,
       currency: "USD",
       minimumBillableSeconds: 30,
       roundUpPartialMinutes: true,
       description:
-        "AI calls are billed at $0.11/minute, with a 30-second minimum and partial minutes rounded up.",
+        "AI calls are billed at $0.16/minute, with a 30-second minimum and partial minutes rounded up.",
     },
     phoneNumber: {
       defaultMonthlyFee: 15,
