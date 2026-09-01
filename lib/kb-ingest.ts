@@ -167,29 +167,29 @@ async function staticExtract(url: string): Promise<UrlExtractionResult | null> {
   const html = await res.text()
   const finalUrl = res.url || url
 
-  const { JSDOM } = (await import("jsdom")) as typeof import("jsdom")
-  const dom = new JSDOM(html, { url: finalUrl })
-  const documentTitle = dom.window.document.title || null
+  // Cheerio first: works in serverless runtimes where jsdom's dependency tree
+  // (html-encoding-sniffer -> @exodus/bytes ESM) can fail at import time.
+  const cheerio = (await import("cheerio")) as typeof import("cheerio")
+  const $ = cheerio.load(html)
+  $("script, style, noscript, svg, iframe, nav, footer, header, form").remove()
+  let articleText = $("body").text() || $.root().text() || ""
+  let articleTitle = $("title").first().text()?.trim() || null
 
-  let articleText = ""
-  let articleTitle: string | null = null
-  try {
-    const { Readability } = (await import("@mozilla/readability")) as typeof import("@mozilla/readability")
-    const reader = new Readability(dom.window.document)
-    const article = reader.parse()
-    if (article?.textContent && article.textContent.trim().length > 0) {
-      articleText = article.textContent
-      articleTitle = article.title || null
+  // Optional Readability pass when jsdom is available (local dev / full Node).
+  if (articleText.trim().length < STATIC_EXTRACTION_MIN_CHARS) {
+    try {
+      const { JSDOM } = (await import("jsdom")) as typeof import("jsdom")
+      const dom = new JSDOM(html, { url: finalUrl })
+      const { Readability } = (await import("@mozilla/readability")) as typeof import("@mozilla/readability")
+      const reader = new Readability(dom.window.document)
+      const article = reader.parse()
+      if (article?.textContent && article.textContent.trim().length > articleText.trim().length) {
+        articleText = article.textContent
+        articleTitle = article.title || dom.window.document.title || articleTitle
+      }
+    } catch {
+      // jsdom unavailable or Readability failed; keep cheerio output
     }
-  } catch {
-    // fall through to cheerio extraction below
-  }
-
-  if (!articleText) {
-    const cheerio = (await import("cheerio")) as typeof import("cheerio")
-    const $ = cheerio.load(html)
-    $("script, style, noscript, svg, iframe, nav, footer, header, form").remove()
-    articleText = $("body").text() || $.root().text() || ""
   }
 
   if (articleText.trim().length < STATIC_EXTRACTION_MIN_CHARS) {
@@ -199,7 +199,7 @@ async function staticExtract(url: string): Promise<UrlExtractionResult | null> {
   return {
     url,
     finalUrl,
-    title: articleTitle ?? documentTitle,
+    title: articleTitle,
     text: articleText,
   }
 }
@@ -244,7 +244,11 @@ async function readerProxyExtract(url: string): Promise<UrlExtractionResult | nu
   }
 
   if (!res.ok) {
-    throw new Error(`Reader proxy failed for ${url}: ${res.status} ${res.statusText}`)
+    const hint =
+      res.status === 403 && !process.env.JINA_API_KEY
+        ? " Set JINA_API_KEY in your deployment environment for JS-rendered pages."
+        : ""
+    throw new Error(`Reader proxy failed for ${url}: ${res.status} ${res.statusText}.${hint}`)
   }
 
   const body = await res.text()
