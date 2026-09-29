@@ -62,7 +62,10 @@ function AuthenticateHustleContent() {
 
         if (!response.ok || !data.success) {
           const errorMessage = data.message || `HTTP ${response.status}: ${response.statusText}`
-          throw new Error(errorMessage)
+          signInStartedRef.current = false
+          setError(errorMessage)
+          setLoading(false)
+          return
         }
 
         if (data.token || data.externalToken) {

@@ -69,7 +69,8 @@ export async function completeHustleSignIn(
     return { ok: false, status: verifyResult.status, message: verifyResult.message }
   }
 
-  const decodeResult = decodeHustleToken(token)
+  const sessionJwt = verifyResult.token || token
+  const decodeResult = decodeHustleToken(sessionJwt)
   if (!decodeResult.ok) {
     return { ok: false, status: decodeResult.status, message: decodeResult.message }
   }
@@ -82,9 +83,16 @@ export async function completeHustleSignIn(
     return { ok: false, status: 400, message: "Invalid user data from token" }
   }
 
+  if (
+    verifyResult.email &&
+    verifyResult.email.toLowerCase() !== String(userEmail).toLowerCase()
+  ) {
+    return { ok: false, status: 401, message: "Hustle session email does not match the token." }
+  }
+
   console.log("[HUSTLE-SIGNIN] Token decoded for user:", userEmail)
 
-  const { user, forexAuthFields } = await syncUserFromHustleToken(token, decoded)
+  const { user, forexAuthFields } = await syncUserFromHustleToken(sessionJwt, decoded)
 
   if (billingPayload?.ok) {
     const pool = getPool()
@@ -140,7 +148,7 @@ export async function completeHustleSignIn(
     user,
     decoded,
     forexAuthFields,
-    token,
+    token: sessionJwt,
     redirect,
   }
 }
