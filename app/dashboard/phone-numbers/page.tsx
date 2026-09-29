@@ -116,7 +116,7 @@ export default function PhoneNumbersPage() {
 
   if (!user) {
     return (
-      <div className="container mx-auto py-8">
+      <div className="p-6 space-y-6">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Please log in</h1>
           <p className="text-gray-600">You need to be logged in to view your phone numbers.</p>
@@ -126,11 +126,11 @@ export default function PhoneNumbersPage() {
   }
 
   return (
-    <div className="container mx-auto py-8">
-      <div className="flex items-center justify-between mb-8">
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Phone Numbers</h1>
-          <p className="text-muted-foreground">
+          <p className="text-muted-foreground mt-1">
             Manage your purchased phone numbers and assign them to call flows
           </p>
         </div>

@@ -19,6 +19,9 @@ export interface UserCall {
   summary?: string
   ended_reason?: string
   call_successful?: boolean
+  /** Whether recording was enabled for this call (from Bland `record`) */
+  record_enabled?: boolean | null
+  transferred_to?: string
   variables?: any
 }
 
@@ -137,11 +140,18 @@ export function useUserCallData(options: UseUserCallDataOptions = {}) {
         pathway_id: call.pathway_id,
         pathway_name: call.pathway_name,
         outcome: call.answered_by,
-        recording_url: call.recording_url,
+        recording_url: call.recording_url || call.recording || undefined,
         transcript: call.transcript,
         summary: call.summary,
         ended_reason: call.ended_reason,
         call_successful: call.call_successful,
+        record_enabled:
+          typeof call.record === "boolean"
+            ? call.record
+            : typeof call.record_enabled === "boolean"
+              ? call.record_enabled
+              : null,
+        transferred_to: call.transferred_to,
         variables: call.variables,
       }))
 

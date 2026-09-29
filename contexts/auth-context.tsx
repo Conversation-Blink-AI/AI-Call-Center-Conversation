@@ -306,54 +306,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   const logout = async () => {
+    console.log("🚪 [AUTH-CONTEXT] Starting logout process...")
+
+    // Prevent in-flight /api/auth/me from clearing user mid-logout (which races
+    // dashboard pages into a brief /login redirect before we leave).
+    authCheckAbortRef.current?.abort()
+    localStorage.removeItem("auth-token")
+
     try {
-      console.log("🚪 [AUTH-CONTEXT] Starting logout process...")
-
-      authCheckAbortRef.current?.abort()
-
-      // Clear localStorage token first
-      localStorage.removeItem('auth-token')
-      console.log("✅ [AUTH-CONTEXT] Token cleared from localStorage")
-
-      // Clear user state immediately
-      setUser(null)
-      setIsAuthenticated(false)
-      setLoading(false)
-      
-      // Call logout API to clear server-side cookie (also clears workspace cookie)
       await fetch("/api/auth/logout", {
         method: "POST",
         credentials: "include",
       })
-
       console.log("✅ [AUTH-CONTEXT] Logout complete, redirecting to home page")
-      
-      // Redirect to home page
-      router.push("/")
-      
-      // Re-check auth state after a brief delay to ensure everything is cleared
-      setTimeout(() => {
-        checkAuth()
-      }, 200)
     } catch (err) {
       console.error("❌ [AUTH-CONTEXT] Logout error:", err)
-      
-      // Clear localStorage token even on error
-      localStorage.removeItem('auth-token')
-      
-      // Clear user state
-      setUser(null)
-      setIsAuthenticated(false)
-      setLoading(false)
-      
-      // Redirect to home page
-      router.push("/")
-      
-      // Re-check auth state after a brief delay
-      setTimeout(() => {
-        checkAuth()
-      }, 200)
     }
+
+    // Hard navigation: do not clear React auth state first. Clearing user while
+    // still on /dashboard triggers client redirects to /login and causes flicker.
+    window.location.replace("/")
   }
 
   const updateProfile = async (data: Partial<User>) => {

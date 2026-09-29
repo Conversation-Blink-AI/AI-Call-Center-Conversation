@@ -114,9 +114,10 @@ export default function DashboardPage() {
   }, [user?.id])
 
   // Fallback only after auth check completes — middleware handles unauthenticated access.
+  // Prefer landing over /login so intentional logout never flashes the login form.
   useEffect(() => {
     if (!loading && !user) {
-      router.replace("/login")
+      router.replace("/")
     }
   }, [loading, user, router])
 
@@ -183,7 +184,7 @@ export default function DashboardPage() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Redirecting to login...</p>
+          <p className="text-gray-600">Redirecting...</p>
         </div>
       </div>
     )
