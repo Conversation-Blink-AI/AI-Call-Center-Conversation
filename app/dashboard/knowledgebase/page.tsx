@@ -774,9 +774,17 @@ function KnowledgeBaseListPage() {
               ) : null}
             </div>
 
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex h-full flex-col">
+            <Tabs
+              value={activeTab}
+              onValueChange={(value) => {
+                setActiveTab(value)
+                setErrorMessage(null)
+                setSuccessMessage(null)
+              }}
+              className="flex h-full flex-col"
+            >
               <div className="border-y border-border">
-                <TabsList className="grid h-auto w-full grid-cols-4 rounded-none bg-transparent p-0">
+                <TabsList className="grid h-auto w-full grid-cols-3 rounded-none bg-transparent p-0">
                   <TabsTrigger
                     value="website"
                     className="rounded-none border-r border-border py-3 text-[12px] font-semibold uppercase tracking-[0.08em] data-[state=active]:bg-background data-[state=active]:shadow-none"
@@ -791,15 +799,9 @@ function KnowledgeBaseListPage() {
                   </TabsTrigger>
                   <TabsTrigger
                     value="text"
-                    className="rounded-none border-r border-border py-3 text-[12px] font-semibold uppercase tracking-[0.08em] data-[state=active]:bg-background data-[state=active]:shadow-none"
-                  >
-                    Text
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="integration"
                     className="rounded-none py-3 text-[12px] font-semibold uppercase tracking-[0.08em] data-[state=active]:bg-background data-[state=active]:shadow-none"
                   >
-                    Integration
+                    Text
                   </TabsTrigger>
                 </TabsList>
               </div>
@@ -957,17 +959,6 @@ function KnowledgeBaseListPage() {
                     description="Create entries from raw text, notes, SOPs, or internal documentation."
                   />
                 </div>
-              </TabsContent>
-
-              <TabsContent value="integration" className="m-0 px-5 py-8">
-                <SourcePlaceholder
-                  icon={Link2}
-                  title="Connect Integration"
-                  description="Integration sources are reserved for a future phase of the Knowledge Base feature."
-                />
-                <Button variant="outline" className="mt-6 w-full" disabled>
-                  Connect Source
-                </Button>
               </TabsContent>
             </Tabs>
           </div>

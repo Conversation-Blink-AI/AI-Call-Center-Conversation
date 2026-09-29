@@ -10,7 +10,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useUserCallData } from "@/hooks/use-user-call-data"
+import { useUserCallData, type UserCall } from "@/hooks/use-user-call-data"
 import { useState, useRef, useEffect } from "react"
 
 // Three dots loading animation
@@ -21,6 +21,46 @@ const ThreeDotsLoader = () => (
     <span className="inline-block w-1 h-1 bg-current rounded-full mx-0.5 dot-loader" style={{ animationDelay: '0.4s' }}></span>
   </span>
 )
+
+type RecordingAvailability =
+  | { state: "available"; label: string }
+  | { state: "processing"; label: string }
+  | { state: "disabled"; label: string }
+  | { state: "unavailable"; label: string }
+
+function getRecordingAvailability(call: UserCall): RecordingAvailability {
+  if (call.recording_url) {
+    return { state: "available", label: "Play recording" }
+  }
+
+  const status = (call.status || "").toLowerCase()
+  const isInProgress =
+    status.includes("progress") ||
+    status === "queued" ||
+    status === "pending" ||
+    status === "ringing" ||
+    status === "allocated"
+
+  if (isInProgress) {
+    return { state: "processing", label: "Recording processing" }
+  }
+
+  if (call.record_enabled === false) {
+    return { state: "disabled", label: "Recording disabled" }
+  }
+
+  // Recording was enabled, but the URL is not present yet for a recent completed call
+  const isCompleted = status === "completed" || status === "complete" || call.call_successful === true
+  if (call.record_enabled === true && isCompleted) {
+    const startedAt = call.start_time ? new Date(call.start_time).getTime() : 0
+    const ageMs = startedAt ? Date.now() - startedAt : Number.POSITIVE_INFINITY
+    if (ageMs < 15 * 60 * 1000) {
+      return { state: "processing", label: "Recording processing" }
+    }
+  }
+
+  return { state: "unavailable", label: "Recording not available" }
+}
 
 export default function CallHistoryPage() {
   const { calls, totalCalls, userPhoneNumber, loading, error, lastUpdated, refetch } = useUserCallData()
@@ -421,11 +461,13 @@ export default function CallHistoryPage() {
                         <TableHead className="font-semibold text-foreground whitespace-nowrap">Transferred To</TableHead>
                         <TableHead className="font-semibold text-foreground">Pathway ID</TableHead>
                         <TableHead className="font-semibold text-foreground">Conversation Summary</TableHead>
-                        <TableHead className="font-semibold text-foreground whitespace-nowrap w-[200px]">Call Recordings</TableHead>
+                        <TableHead className="font-semibold text-foreground whitespace-nowrap w-[240px]">Call Recordings</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {paginatedCalls.map((call, index) => (
+                      {paginatedCalls.map((call, index) => {
+                        const recording = getRecordingAvailability(call)
+                        return (
                         <TableRow key={call.id || index}>
                           <TableCell className="font-mono text-xs whitespace-nowrap">
                             {call.from_number || "—"}
@@ -467,16 +509,17 @@ export default function CallHistoryPage() {
                               </div>
                             ) : "—"}
                           </TableCell>
-                          <TableCell className="whitespace-nowrap w-[200px]">
-                            <div className="flex items-center gap-1 max-w-[200px]">
-                              {call.recording_url && (
+                          <TableCell className="whitespace-nowrap w-[240px]">
+                            <div className="flex items-center gap-1.5 max-w-[240px]">
+                              {recording.state === "available" && call.recording_url ? (
                                 <div className="flex items-center gap-1 flex-shrink-0">
                                   <Button
                                     variant="ghost"
                                     size="sm"
                                     className="h-7 w-7 p-0 flex-shrink-0"
-                                    onClick={() => handlePlayPause(call.id, call.recording_url)}
+                                    onClick={() => handlePlayPause(call.id, call.recording_url!)}
                                     title={currentlyPlaying === call.id ? "Pause Recording" : "Play Recording"}
+                                    aria-label={currentlyPlaying === call.id ? "Pause Recording" : "Play Recording"}
                                   >
                                     {currentlyPlaying === call.id ? (
                                       <Pause className="h-3 w-3" />
@@ -541,15 +584,29 @@ export default function CallHistoryPage() {
                                     )}
                                   </div>
                                 </div>
+                              ) : (
+                                <span
+                                  className={`text-xs leading-tight ${
+                                    recording.state === "processing"
+                                      ? "text-amber-700"
+                                      : recording.state === "disabled"
+                                        ? "text-muted-foreground"
+                                        : "text-muted-foreground"
+                                  }`}
+                                  title={recording.label}
+                                >
+                                  {recording.label}
+                                </span>
                               )}
 
                               {call.id && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="h-7 w-7 p-0"
+                                  className="h-7 w-7 p-0 flex-shrink-0"
                                   onClick={() => handleViewCallDetails(call.id)}
                                   title="View call details"
+                                  aria-label="View call details"
                                 >
                                   <Info className="h-3 w-3" />
                                 </Button>
@@ -559,7 +616,7 @@ export default function CallHistoryPage() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
-                                  className="h-7 w-7 p-0"
+                                  className="h-7 w-7 p-0 flex-shrink-0"
                                   onClick={() => {
                                     const modal = document.createElement('div')
                                     modal.innerHTML = `
@@ -581,7 +638,8 @@ export default function CallHistoryPage() {
                             </div>
                           </TableCell>
                         </TableRow>
-                      ))}
+                        )
+                      })}
                     </TableBody>
                   </Table>
                 </div>

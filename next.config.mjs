@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Keep heavy / native-ish packages out of the server bundle so they load
+  // from node_modules at runtime (avoids ESM/CJS bundling issues in serverless).
+  serverExternalPackages: ["jsdom", "cheerio", "@mozilla/readability", "pdf-parse", "mammoth"],
   eslint: {
     ignoreDuringBuilds: true,
   },

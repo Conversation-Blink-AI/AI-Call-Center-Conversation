@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -50,7 +50,6 @@ export function DashboardSidebar() {
   const [isMounted, setIsMounted] = useState(false)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   const pathname = usePathname()
-  const router = useRouter()
   const { user, logout } = useAuth()
   const dropdownRef = useRef<HTMLDivElement>(null)
   const isAdmin = Boolean(user?.is_admin)
@@ -62,12 +61,12 @@ export function DashboardSidebar() {
     : [...navigation.slice(0, 1), ...organizationLinks, ...navigation.slice(1)]
 
   const handleLogout = async () => {
+    setIsDropdownOpen(false)
     try {
-      setIsDropdownOpen(false)
       await logout()
     } catch (error) {
       console.error("❌ [SIDEBAR] Logout error:", error)
-      router.push("/")
+      window.location.replace("/")
     }
   }
 
