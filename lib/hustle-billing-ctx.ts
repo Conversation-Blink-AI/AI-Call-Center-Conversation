@@ -96,12 +96,14 @@ export function verifyAndDecryptHustleBillingCtx(input: {
     return { ok: false, status: 401, message: "Invalid billing timestamp" }
   }
 
+  // This window is only for billingTs (Unix seconds from Hustle). Never compare a session JWT iat or age to it.
   const nowSeconds = Math.floor(Date.now() / 1000)
   if (Math.abs(nowSeconds - billingTs) > TIMESTAMP_MAX_SKEW_SECONDS) {
     return {
       ok: false,
       status: 401,
-      message: "Billing context timestamp is outside allowed window",
+      message:
+        "Billing context timestamp is outside allowed window. Open Call Center from Hustle again for a new billing link.",
     }
   }
 
@@ -166,7 +168,12 @@ export function verifyAndDecryptHustleBillingCtx(input: {
   }
 
   if (payload.exp < nowSeconds) {
-    return { ok: false, status: 401, message: "Billing context expired" }
+    return {
+      ok: false,
+      status: 401,
+      message:
+        "Billing context timestamp is outside allowed window. Open Call Center from Hustle again for a new billing link.",
+    }
   }
 
   return { ok: true, payload }
